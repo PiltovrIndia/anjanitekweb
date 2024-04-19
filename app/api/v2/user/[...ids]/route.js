@@ -557,14 +557,21 @@ export async function GET(request,{params}) {
             // this is requested by the user itself to refresh their profile after update by admin
             else if(params.ids[1] == 'U12'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT u.*, IFNULL(d.fatherName, "") AS fatherName, IFNULL(d.fatherPhoneNumber, "") AS fatherPhoneNumber, IFNULL(d.motherName, "") AS motherName, IFNULL(d.motherPhoneNumber, "") AS motherPhoneNumber, IFNULL(d.address, "") AS address, IFNULL(d.guardianName, "") AS guardianName, IFNULL(d.guardianPhoneNumber, "") AS guardianPhoneNumber, IFNULL(d.guardian2Name, "") AS guardian2Name, IFNULL(d.guardian2PhoneNumber, "") AS guardian2PhoneNumber, IFNULL(d.hostelId, "") AS hostelId, IFNULL(d.roomNumber, "") AS roomNumber, IFNULL(h.hostelName, "") AS hostelName FROM users u LEFT JOIN user_details d ON u.userId = d.userId LEFT JOIN `hostel` h ON d.hostelId = h.hostelId WHERE u.userId = "'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('SELECT * from users WHERE u.userId = "'+params.ids[2]+'"');
                     connection.release();
                     // return successful update
 
                     // check if user is found
                     if(rows.length > 0){
-                        // return the requests data
-                        return Response.json({status: 200, data: rows[0], message:'Data found!'}, {status: 200})
+
+                        if(rows[0].role == 'dealer'){
+                            let p = 'SELECT * from dealers WHERE userId ="'+rows[0].userId+'"';
+                            const [drows, dfields] = await connection.execute(p);
+                            return Response.json({status: 200, message:'User found!', data: rows[0], data1: drows[0]}, {status: 200})
+                        }
+                        else {
+                            return Response.json({status: 200, message:'User found!', data: rows[0]}, {status: 200})
+                        }
 
                     }
                     else {
