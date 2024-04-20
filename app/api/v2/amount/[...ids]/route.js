@@ -19,8 +19,8 @@ export async function GET(request,{params}) {
         if(await Keyverify(params.ids[0])){
           
           if(params.ids[1] == 'U1'){ // get all hostels
-            const connection = await pool.getConnection();
-            const [rows, fields] = await connection.execute('SELECT * FROM `invoices` where billTo="%'+params.ids[2]+'%" and status="NotPaid"');
+            // const connection = await pool.getConnection();
+            const [rows, fields] = await connection.execute('SELECT * FROM `invoices` where billTo="'+params.ids[2]+'" and status="NotPaid"');
             connection.release();
 
             
