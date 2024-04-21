@@ -35,17 +35,17 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No user found!'}, {status: 200})
                 }
             }
-            // get secondary details of the user
+            // get details of the dealer by name
             else if(params.ids[1] == 'U2'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT u.*,IFNULL(h.hostelName, "") AS hostelName FROM user_details u JOIN hostel h ON u.hostelId=h.hostelId WHERE userId = "'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('SELECT * from users WHERE name LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
                     // return successful update
 
                     // check if user is found
                     if(rows.length > 0){
                         // return the requests data
-                        return Response.json({status: 200, data: rows[0], message:'Updated!'}, {status: 200})
+                        return Response.json({status: 200, data: rows, message:'Updated!'}, {status: 200})
 
                     }
                     else {
@@ -53,7 +53,28 @@ export async function GET(request,{params}) {
                         return Response.json({status: 201, message:'No parents data found!'}, {status: 200})
                     }
                 } catch (error) { // error updating
-                    return Response.json({status: 404, message:'No user found!'}, {status: 200})
+                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                }
+            }
+            // get details of the dealer by id
+            else if(params.ids[1] == 'U3'){
+                try {
+                    const [rows, fields] = await connection.execute('SELECT * from users WHERE userId LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3]);
+                    connection.release();
+                    // return successful update
+
+                    // check if user is found
+                    if(rows.length > 0){
+                        // return the requests data
+                        return Response.json({status: 200, data: rows, message:'Updated!'}, {status: 200})
+
+                    }
+                    else {
+                        // user doesn't exist in the system
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
                 }
             }
             

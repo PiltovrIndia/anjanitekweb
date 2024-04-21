@@ -20,7 +20,7 @@ export async function GET(request,{params}) {
           
           if(params.ids[1] == 'U1'){ // get all hostels
             // const connection = await pool.getConnection();
-            const [rows, fields] = await connection.execute('SELECT * FROM `invoices` where billTo="'+params.ids[2]+'" and status="NotPaid"');
+            const [rows, fields] = await connection.execute('SELECT * FROM `invoices` where billTo="'+params.ids[2]+'" and status!="NotPaid"');
             connection.release();
 
             
@@ -33,7 +33,7 @@ export async function GET(request,{params}) {
                 try {
                     // let q = 'SELECT * FROM users WHERE collegeId LIKE "%'+params.ids[2]+'%"';
                     // console.log(q);
-                    let q = 'SELECT * FROM `invoices` WHERE billTo="'+params.ids[2]+'" LIMIT 20 OFFSET '+params.ids[3];
+                    let q = 'SELECT * FROM `invoices` WHERE billTo="'+params.ids[2]+'" LIMIT 5 OFFSET '+params.ids[3];
                     const [rows, fields] = await connection.execute(q);
                     connection.release();
                     // return successful update
@@ -49,7 +49,7 @@ export async function GET(request,{params}) {
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
                     }
                 } catch (error) { // error updating
-                    return Response.json({status: 404, message:'No users found!'}, {status: 200})
+                    return Response.json({status: 404, message:'No users found!'+error}, {status: 200})
                 }
             }
             // Get the payments done by the dealer by id
