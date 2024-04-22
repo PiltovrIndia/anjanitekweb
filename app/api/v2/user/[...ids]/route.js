@@ -56,7 +56,7 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
                 }
             }
-            // get details of the dealer by id
+            // get user details of the dealer by id
             else if(params.ids[1] == 'U3'){
                 try {
                     const [rows, fields] = await connection.execute('SELECT * from users WHERE userId LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3]);
@@ -67,6 +67,27 @@ export async function GET(request,{params}) {
                     if(rows.length > 0){
                         // return the requests data
                         return Response.json({status: 200, data: rows, message:'Updated!'}, {status: 200})
+
+                    }
+                    else {
+                        // user doesn't exist in the system
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                }
+            }
+            // get dealer details of the dealer by id
+            else if(params.ids[1] == 'U4'){
+                try {
+                    const [rows, fields] = await connection.execute('SELECT * from dealers WHERE userId = "'+params.ids[2]+'"');
+                    connection.release();
+                    // return successful update
+
+                    // check if user is found
+                    if(rows.length > 0){
+                        // return the requests data
+                        return Response.json({status: 200, data: rows[0], message:'Data found!'}, {status: 200})
 
                     }
                     else {
@@ -199,20 +220,20 @@ export async function GET(request,{params}) {
             
 
             // reset the user login by Admin
-            else if(params.ids[1] == 'U4'){
-                try {
+            // else if(params.ids[1] == 'U4'){
+            //     try {
                     
-                    var q = 'DELETE FROM user_sessions WHERE userId="'+params.ids[2]+'"';
+            //         var q = 'DELETE FROM user_sessions WHERE userId="'+params.ids[2]+'"';
 
-                    const [rows, fields] = await connection.execute(q);
-                    connection.release();
+            //         const [rows, fields] = await connection.execute(q);
+            //         connection.release();
 
-                        return Response.json({status: 200, data: rows, message:'Login reset success!'}, {status: 200})
+            //             return Response.json({status: 200, data: rows, message:'Login reset success!'}, {status: 200})
 
-                    } catch (error) { // error updating
-                        return Response.json({status: 404, message:'No user found!'}, {status: 200})
-                }
-            }
+            //         } catch (error) { // error updating
+            //             return Response.json({status: 404, message:'No user found!'}, {status: 200})
+            //     }
+            // }
 
             // search for user requests that are active by "userId"
             else if(params.ids[1] == 'U5'){

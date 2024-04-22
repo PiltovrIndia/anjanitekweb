@@ -47,7 +47,7 @@ export async function GET(request,{params}) {
         if(await Keyverify(params.ids[0])){
 
             // apply payment to multiple invoices at a time
-            await applyPayment(params.ids[1], params.ids[2]);
+            await applyPayment(params.ids[1], params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
         }
         else {
@@ -63,7 +63,7 @@ export async function GET(request,{params}) {
   }
 
   // apply payment to the invoices one by one
-  async function applyPayment(userId, paymentAmount) {
+  async function applyPayment(userId, paymentAmount, invoiceNo, transactionId, paymentDate, adminId) {
     // get the pool connection to db
     const connection = await pool.getConnection(); 
 
@@ -73,10 +73,12 @@ export async function GET(request,{params}) {
     try {
         await connection.beginTransaction();
 
-        const [invoices] = await connection.query(
-            'SELECT invoiceNo, pending FROM invoices WHERE billTo = "'+userId+'" AND pending > 0 ORDER BY invoiceDate ASC',
-            []
-        );
+        // update the invoices table with pending amount
+        const q = 'INSERT INTO payments (amountPaid, userId, invoiceNo, transactionId, paymentDate, adminId) VALUES ( ?, ?, ?, ?, ?, ? )';
+        const [payments] = await connection.query(q,[paymentAmount,userId,invoiceNo,transactionId,paymentDate,adminId]);
+        
+        // update the invoices table with pending amount
+        const [invoices] = await connection.query('SELECT invoiceNo, pending FROM invoices WHERE billTo = "'+userId+'" AND pending > 0 ORDER BY invoiceDate ASC',[]);
 
         for (const invoice of invoices) {
             if (paymentAmount <= 0) break;
