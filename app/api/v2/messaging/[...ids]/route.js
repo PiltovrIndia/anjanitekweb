@@ -1,6 +1,9 @@
 import pool from '../../../db'
 import { Keyverify } from '../../../secretverify';
 import dayjs from 'dayjs'
+const OneSignal = require('onesignal-node')
+
+const client = new OneSignal.Client(process.env.ONE_SIGNAL_APPID, process.env.ONE_SIGNAL_APIKEY)
 
 // create new officialrequest for outing by the Admins
 // key, what, oRequestId, type, duration, from, to, by, description, branch, year – Super admin
@@ -26,43 +29,29 @@ export async function GET(request,{params}) {
         // authorize secret key
         if(await Keyverify(params.ids[0])){
 
-            if(params.ids[1] == 0){ // create circular
+            if(params.ids[1] == 0){ // create notification
                 try {
                     // create query for insert
-                    const q = 'INSERT INTO circular (circularId, universityId, campusId, createdBy, createdOn, branch, year, subject, description, media, isActive, link, studentType, circularType) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
-                    // create new circular
-                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], params.ids[7], params.ids[8], decodeURIComponent(params.ids[9]), decodeURIComponent(params.ids[10]), params.ids[11], params.ids[12],params.ids[13],params.ids[14],params.ids[15] ]);
-                    connection.release();
+                    const q = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen) VALUES ( ?, ?, ?, ?, ?)';
+                    // create new notification
+                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6] ]);
+                    
 
-                    // send notification to circular specific students
+                    // send notification to notification specific dealers
 
                     // get the gcm_regIds of Students to notify
                         // Split the branches string into an array
                         var conditionsString = '';
-                        if(params.ids[14]!='All'){ // check for the student type
-                            conditionsString = conditionsString + ' type="'+params.ids[14]+'" AND';
+                        if(params.ids[3]!='All'){ // check for the student type
+                            conditionsString = conditionsString + ' userId="'+params.ids[3]+'" ';
                         }
-                        if(params.ids[7]!='All'){ // check for the branches
+                        else {
+                            conditionsString = conditionsString + ' role="dealer" ';
+                        }
                         
-                            let branches = (params.ids[7]).split(',');
-
-                            // check if there are more than 1 branch
-                            if(branches.length > 1){
-                                // Build the LIKE conditions with case sensitivity
-                                let likeConditions = branches.map(branch => `BINARY CONCAT(course,'-',branch,'-',year) LIKE '%${branch}%'`);
-
-                                // Join the conditions with OR
-                                conditionsString = likeConditions.join(' OR ');
-                            }
-                            else {
-                                conditionsString = `BINARY CONCAT(course,'-',branch,'-',year) LIKE '%${branches}%'`;
-                            }
-                        }
-
-                        // from all the users of a branch from a college from university
-                        conditionsString = ` universityId="`+params.ids[3]+`" AND campusId="`+params.ids[4]+`" AND role="Student" AND (${conditionsString})`;
                         // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
                         const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where ${conditionsString} AND CHAR_LENGTH(gcm_regId) > 3`);
+                        connection.release();
                         // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         
                         // get the gcm_regIds list from the query result
@@ -78,25 +67,23 @@ export async function GET(request,{params}) {
                         // console.log(gcmIds);
 
                         // send the notification
-                        const notificationResult = await send_notification('New '+params.ids[15]+' available', gcmIds, 'Multiple');
+                        const notificationResult = await send_notification(params.ids[5], gcmIds, 'Multiple');
                             
                         // return successful update
-                        return Response.json({status: 200, message:'Circular created!', notification: notificationResult}, {status: 200})
-
-
-
+                        return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
 
 
                     // return the user data
                     // return Response.json({status: 200, message: ' Circular created!'}, {status: 200})
                 } catch (error) {
                     // user doesn't exist in the system
-                    return Response.json({status: 404, message:'Error creating request. Please try again later!'+error.message}, {status: 200})
+                    return Response.json({status: 404, message:'Error creating notification. Please try again later!'+error.message}, {status: 200})
                 }
             }
-            else if(params.ids[1] == 1){ // fetch data for all circulars – Super admin & Outing Issuer Admin & Outing Issuer
+            else if(params.ids[1] == 1){ // fetch data for all notifications – Super admin 
                 // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
-                const [rows, fields] = await connection.execute('SELECT * from circular WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
+                // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
+                const [rows, fields] = await connection.execute('SELECT * from notification ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[2]);
                 connection.release();
             
                 // check if user is found
@@ -110,53 +97,13 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No data!'}, {status: 200})
                 }
             }
-            else if(params.ids[1] == 2){ // fetch data for specific branch – Department Admin
+            else if(params.ids[1] == 2){ // fetch data for specific dealer
                 
-                var q = '';
-                // check if all branches
-                if(params.ids[4]!='All'){
-                    var branchesString = params.ids[4];
-
-                    // Split the string into an array
-                    let branches = branchesString.split(',');
-
-                    // check if there are more than 1 branch
-                    var conditionsString = '';
-                    if(branches.length > 1){
-                        // Build the LIKE conditions with case sensitivity
-                        let likeConditions = branches.map(branch => `branch LIKE '%${branch}%'`);
-
-                        // Join the conditions with OR
-                        conditionsString = likeConditions.join(' OR ');
-                    }
-                    else {
-                        conditionsString = `branch LIKE '%${branchesString}%'`;
-                    }
-
-                    q = `SELECT * from circular WHERE universityId="`+params.ids[2]+`" AND campusId="`+params.ids[3]+`" AND  (${conditionsString}) ORDER BY createdOn DESC`;
-                }
-                else {
-                    q = `SELECT * from circular WHERE universityId="`+params.ids[2]+`" AND campusId="`+params.ids[3]+`" ORDER BY createdOn DESC`;
-                }
+                var q = 'SELECT * from notification WHERE receiver="'+params.ids[2]+'" ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[3];
+                
 
                 const [rows, fields] = await connection.execute(q);
-                // const [rows, fields] = await connection.execute('SELECT * from circular WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" AND branch = "All" or FIND_IN_SET("'+params.ids[4]+'", branch)>0 ORDER BY createdOn DESC');
-                connection.release();
-            
-                // check if user is found
-                if(rows.length > 0){
-                    // return the requests data
-                    return Response.json({status: 200, message:'Data found!', data: rows}, {status: 200})
-
-                }
-                else {
-                    // user doesn't exist in the system
-                    return Response.json({status: 404, message:'No data!'}, {status: 200})
-                }
-            }
-            else if(params.ids[1] == 3){ // fetch data for specific branch and year – student
-                const [rows, fields] = await connection.execute('SELECT * from circular WHERE universityId="'+params.ids[2]+'" AND campusId = "'+params.ids[3]+'" AND (branch = "All" or FIND_IN_SET("'+params.ids[4]+'", branch)>0) AND (studentType="All" or studentType="'+params.ids[5]+'") ORDER BY createdOn DESC');
-                // const [rows, fields] = await connection.execute('SELECT * from officialrequest WHERE (campusId = "All" or FIND_IN_SET("'+params.ids[5]+'", campusId)>0) AND (course = "All" or FIND_IN_SET("'+params.ids[6]+'", course)>0) AND (branch = "All" or FIND_IN_SET("'+params.ids[3]+'", branch)>0) AND (year="All" or FIND_IN_SET("'+params.ids[4]+'",year)>0) AND (oFrom >= "'+currentDate+'" OR oTo >= "'+currentDate+'") ORDER BY oFrom DESC');
+                // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" AND branch = "All" or FIND_IN_SET("'+params.ids[4]+'", branch)>0 ORDER BY createdOn DESC');
                 connection.release();
             
                 // check if user is found

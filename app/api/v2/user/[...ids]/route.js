@@ -38,7 +38,7 @@ export async function GET(request,{params}) {
             // get details of the dealer by name
             else if(params.ids[1] == 'U2'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * from users WHERE name LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3]);
+                    const [rows, fields] = await connection.execute('SELECT * from users WHERE role="dealer" AND name LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
                     // return successful update
 
@@ -59,7 +59,7 @@ export async function GET(request,{params}) {
             // get user details of the dealer by id
             else if(params.ids[1] == 'U3'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * from users WHERE userId LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3]);
+                    const [rows, fields] = await connection.execute('SELECT * from users WHERE role="dealer" AND userId LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
                     // return successful update
 
@@ -80,7 +80,7 @@ export async function GET(request,{params}) {
             // get dealer details of the dealer by id
             else if(params.ids[1] == 'U4'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * from dealers WHERE userId = "'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('SELECT * from dealers d LEFT JOIN users u ON d.salesId = u.userId WHERE d.userId = "'+params.ids[2]+'"');
                     connection.release();
                     // return successful update
 

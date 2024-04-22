@@ -47,7 +47,7 @@ export async function GET(request,{params}) {
         if(await Keyverify(params.ids[0])){
 
             // apply payment to multiple invoices at a time
-            await applyPayment(params.ids[1], params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6]);
+            await applyPayment(params.ids[1], params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], params.ids[7], params.ids[8]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
         }
         else {
@@ -63,7 +63,10 @@ export async function GET(request,{params}) {
   }
 
   // apply payment to the invoices one by one
-  async function applyPayment(userId, paymentAmount, invoiceNo, transactionId, paymentDate, adminId) {
+  async function applyPayment(userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular) {
+    
+    var amount = paymentAmount;
+
     // get the pool connection to db
     const connection = await pool.getConnection(); 
 
@@ -72,16 +75,22 @@ export async function GET(request,{params}) {
     
     try {
         await connection.beginTransaction();
-
-        // update the invoices table with pending amount
-        const q = 'INSERT INTO payments (amountPaid, userId, invoiceNo, transactionId, paymentDate, adminId) VALUES ( ?, ?, ?, ?, ?, ? )';
-        const [payments] = await connection.query(q,[paymentAmount,userId,invoiceNo,transactionId,paymentDate,adminId]);
         
-        // update the invoices table with pending amount
+        // 1. get the pending invoices from table for the given dealer
+        // 2. update the invoices table with pending amount for the selected invoices
+        // 3. update the payments table with the transaction of selected invoices
+
+        // 1
         const [invoices] = await connection.query('SELECT invoiceNo, pending FROM invoices WHERE billTo = "'+userId+'" AND pending > 0 ORDER BY invoiceDate ASC',[]);
 
+        // 2
+        // collect the invoices list for updating in payments table
+        var invcs = '';
         for (const invoice of invoices) {
+        
             if (paymentAmount <= 0) break;
+
+            invcs += invoice.invoiceNo; // get the invoice which is getting updated
 
             const amountToApply = Math.min(paymentAmount, invoice.pending); // get the minimum amount to apply
 
@@ -97,7 +106,27 @@ export async function GET(request,{params}) {
                 [amountToApply, amountToApply, newStatus, invoice.invoiceNo]
             );
             paymentAmount -= amountToApply;
+            
+            if(paymentAmount > 0)  invcs += ','; // add , for next invoice in the list
+
         }
+
+        // 3
+        const [balance] = await connection.query('SELECT balance FROM payments WHERE userId = "'+userId+'" ORDER BY paymentDate DESC LIMIT 1',[]);
+        console.log(balance[0].balance);
+
+        // 4
+        var bal = 0;
+        if(type == 'credit'){
+            bal = parseFloat(balance[0].balance) - parseFloat(amount);
+        }
+        else {
+            bal = parseFloat(balance[0].balance) + parseFloat(amount);
+        }
+        const q = 'INSERT INTO payments (amount, type, userId, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+        const [payments] = await connection.query(q,[amount, type, userId,invcs,transactionId,paymentDate,adminId, particular, bal]);
+
+        
 
         await connection.commit();
     } catch (error) {

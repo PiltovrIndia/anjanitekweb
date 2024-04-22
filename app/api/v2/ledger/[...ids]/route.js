@@ -20,6 +20,8 @@ export async function GET(request,{params}) {
 
     // current date time for updating
     var currentDate =  dayjs(new Date(params.ids[2])).format('YYYY-MM-DD');
+    var fromDate =  dayjs(new Date(params.ids[2])).format('YYYY-MM-DD');
+    var toDate =  dayjs(new Date(params.ids[3])).format('YYYY-MM-DD');
     console.log(currentDate);
 
     try{
@@ -40,9 +42,9 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'Error creating request. Please try again later!'+error.message}, {status: 200})
                 }
             }
-            else if(params.ids[1] == 1){ // fetch data for all branches – Super admin & Outing Issuer Admin & Outing Issuer
+            else if(params.ids[1] == 1){ // fetch data for all payments – for a given time period
                 // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
-                const [rows, fields] = await connection.execute('SELECT * from officialrequest WHERE (oFrom >= "'+currentDate+'" OR oTo >= "'+currentDate+'") ORDER BY createdOn DESC');
+                const [rows, fields] = await connection.execute('SELECT * from payments WHERE (paymentDate >= "'+currentDate+'" OR paymentDate <= "'+currentDate+'") ORDER BY paymentDate DESC LIMIT 10 OFFSET '+params.ids[4]);
                 connection.release();
             
                 // check if user is found
