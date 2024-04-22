@@ -83,7 +83,7 @@ export async function GET(request,{params}) {
             else if(params.ids[1] == 1){ // fetch data for all notifications – Super admin 
                 // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
                 // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
-                const [rows, fields] = await connection.execute('SELECT * from notification ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[2]);
+                const [rows, fields] = await connection.execute('SELECT * from notifications ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[2]);
                 connection.release();
             
                 // check if user is found
@@ -99,7 +99,7 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 2){ // fetch data for specific dealer
                 
-                var q = 'SELECT * from notification WHERE receiver="'+params.ids[2]+'" ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[3];
+                var q = 'SELECT * from notifications WHERE receiver="'+params.ids[2]+'" OR receiver="All" ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[3];
                 
 
                 const [rows, fields] = await connection.execute(q);

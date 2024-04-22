@@ -44,7 +44,10 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 1){ // fetch data for all payments – for a given time period
                 // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
-                const [rows, fields] = await connection.execute('SELECT * from payments WHERE (paymentDate >= "'+currentDate+'" OR paymentDate <= "'+currentDate+'") ORDER BY paymentDate DESC LIMIT 10 OFFSET '+params.ids[4]);
+                // const [rows, fields] = await connection.execute('SELECT * from payments WHERE (paymentDate >= "'+fromDate+'" OR paymentDate <= "'+toDate+'") ORDER BY paymentDate DESC LIMIT 10 OFFSET '+params.ids[4]);
+                // console.log('SELECT * from payments WHERE (paymentDate >= "'+fromDate+'" OR paymentDate <= "'+toDate+'") ORDER BY paymentDate DESC LIMIT 10 OFFSET '+params.ids[4]);
+                const [rows, fields] = await connection.execute('SELECT * from payments WHERE DATE(paymentDate) BETWEEN "'+fromDate+'" AND "'+toDate+'" ORDER BY paymentDate DESC LIMIT 10 OFFSET '+params.ids[4]);
+                console.log('SELECT * from payments WHERE DATE(paymentDate) BETWEEN "'+fromDate+'" AND "'+toDate+'" ORDER BY paymentDate DESC LIMIT 10 OFFSET '+params.ids[4]);
                 connection.release();
             
                 // check if user is found
