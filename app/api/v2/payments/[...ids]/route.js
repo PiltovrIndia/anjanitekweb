@@ -40,6 +40,8 @@ export async function GET(request,{params}) {
 
     // current date time for updating
     var currentDate =  dayjs(new Date(Date.now())).format('YYYY-MM-DD HH:mm:ss');
+
+    const paymentDate = new Date(params.ids[6]);
     
     try{
 
@@ -47,7 +49,7 @@ export async function GET(request,{params}) {
         if(await Keyverify(params.ids[0])){
 
             // apply payment to multiple invoices at a time
-            await applyPayment(params.ids[1], params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], params.ids[7], params.ids[8]);
+            await applyPayment(params.ids[1], params.ids[2], params.ids[3], params.ids[4], params.ids[5], paymentDate, params.ids[7], params.ids[8]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
         }
         else {
@@ -57,7 +59,7 @@ export async function GET(request,{params}) {
     }
     catch (error) {
         console.error('Payment application failed:', error);
-        return Response.json({status: 500, message:'Facing issues. Please try again!'+err.message}, {status: 200})
+        return Response.json({status: 500, message:'Facing issues. Please try again!'+error.message}, {status: 200})
         
     }
   }
