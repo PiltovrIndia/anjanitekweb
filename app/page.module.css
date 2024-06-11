@@ -326,7 +326,7 @@
 .primarybtn{
 
   font-size: 14px;
-  background: #2567F6;
+  background: #008060;
   color: #ffffff;
   padding: 8px 16px;
   border-radius: 4px;
@@ -336,7 +336,7 @@
   cursor: pointer;
 }
 .primarybtn:hover {
-  background: #2845E0;
+  background: #008060;
 }
 .secondarybtn {
   font-family: unset;

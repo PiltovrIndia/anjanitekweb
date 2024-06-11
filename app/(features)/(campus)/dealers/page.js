@@ -1,25 +1,26 @@
 'use client'
 
-import { Inter } from 'next/font/google'
+import { Inter, Montserrat } from 'next/font/google'
 import { Check, Info, SpinnerGap, X, Plus, PencilSimple, UserGear } from 'phosphor-react'
 import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { useInView } from "react-intersection-observer";
 const inter = Inter({ subsets: ['latin'] })
-import styles from '../../../../../app/page.module.css'
+const montserrat = Montserrat({ subsets: ['latin'] })
+import styles from '../../../../app/page.module.css'
 import Biscuits from 'universal-cookie'
 const biscuits = new Biscuits
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
-import Toast from '../../../../components/myui/toast'
-import AddStudent from '../../../../components/myui/addstudent'
-import UpdateUser from '../../../../components/myui/updateuser'
-import UpdateParents from '../../../../components/myui/updateparents'
+import Toast from '../../../../app/components/myui/toast'
+import AddStudent from '../../../../app/components/myui/addstudent'
+import UpdateUser from '../../../../app/components/myui/updateuser'
+import UpdateParents from '../../../../app/components/myui/updateparents'
 // import ImageWithShimmer from '../../components/imagewithshimmer'
 
-// search for user based on collegeId or username
-const searchNow = async (pass, collegeId, offset) => 
+// search for user based on dealerId or username
+const searchNow = async (pass, dealerId, offset) => 
   
-fetch("/api/user/"+pass+"/U3/"+collegeId+"/"+offset, {
+fetch("/api/user/"+pass+"/U3/"+dealerId+"/"+offset, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -27,10 +28,10 @@ fetch("/api/user/"+pass+"/U3/"+collegeId+"/"+offset, {
     },
 });
 
-// get active requests for user based on collegeId
-const getActiveRequests = async (pass, collegeId, offset) => 
+// get active requests for user based on dealerId
+const getActiveRequests = async (pass, dealerId, offset) => 
   
-fetch("/api/user/"+pass+"/U5/"+collegeId+"/"+offset, {
+fetch("/api/user/"+pass+"/U5/"+dealerId+"/"+offset, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -105,14 +106,14 @@ export default function SearchStudents() {
         showUpdateParents(!showParents)
     }
     
-    // create student overlay
+    // create dealer overlay
     const [showAddStudent, showAddStudentView] = useState(false);
     const toggleAddStudentOverlay = async () => {
         
         showAddStudentView(!showAddStudent)
     }
 
-    // this is the selected student object that will be call to update after every panel closes
+    // this is the selected dealer object that will be call to update after every panel closes
     const updateSelectedStudent = (selectedStudent1) => {
         setSelectedStudent(selectedStudent1);
     }
@@ -139,32 +140,32 @@ export default function SearchStudents() {
                 const obj = JSON.parse(decodeURIComponent(cookieValue)) // get the cookie data
 
                 // set the user state variable
-                setUser(obj)
-                getHostelDetails();
+                // setUser(obj)
+                // getHostelDetails();
                 
                 // get the requests data if doesnot exist
                 // if(!requests){
 
                 //     // set the view by status based on the role
-                //     if(obj.role == 'Student'){
-                //         console.log('Student');
+                //     if(obj.role == 'dealer'){
+                //         console.log('dealer');
                 //         setViewByStatus('Returned')
-                //         getData(obj.role, 'Returned', obj.collegeId, obj.branch);
+                //         getData(obj.role, 'Returned', obj.dealerId, obj.branch);
                 //     }
                 //     else if(obj.role == 'SuperAdmin' || obj.role == 'Admin'){
                 //         console.log('SuperAdmin');
                 //         setViewByStatus('Submitted')
-                //         getData(obj.role, 'Submitted', obj.collegeId, obj.branch);
+                //         getData(obj.role, 'Submitted', obj.dealerId, obj.branch);
                 //     }
                 //     else if(obj.role == 'OutingAdmin' || obj.role == 'OutingIssuer'){
                 //         console.log('OutingAdmin');
                 //         setViewByStatus('Approved')
-                //         getData(obj.role, 'Approved', obj.collegeId, obj.branch);
+                //         getData(obj.role, 'Approved', obj.dealerId, obj.branch);
                 //     }
                 //     else if(obj.role == 'OutingAssistant'){
                 //         console.log('OutingAssistant');
                 //         setViewByStatus('Issued')
-                //         getData(obj.role, 'Issued', obj.collegeId, obj.branch);
+                //         getData(obj.role, 'Issued', obj.dealerId, obj.branch);
                 //     }   
                 // }
             }
@@ -217,8 +218,8 @@ export default function SearchStudents() {
 
                 try{
                 
-                    const collegeId = document.getElementById('userObjectId').value;
-                    const result  = await searchNow(process.env.NEXT_PUBLIC_API_PASS, collegeId, offset)
+                    const dealerId = document.getElementById('userObjectId').value;
+                    const result  = await searchNow(process.env.NEXT_PUBLIC_API_PASS, dealerId, offset)
                     const queryResult = await result.json() // get data
                     
                     setOffset(offset+20); // update the offset for every call
@@ -345,11 +346,11 @@ export default function SearchStudents() {
 
     // get the requests data
     // for the user based on their role.
-    async function getRequests(collegeId){
+    async function getRequests(dealerId){
         
 
             // setSearching(true);
-            const result  = await getActiveRequests(process.env.NEXT_PUBLIC_API_PASS, collegeId)
+            const result  = await getActiveRequests(process.env.NEXT_PUBLIC_API_PASS, dealerId)
             const queryResult = await result.json() // get data
             
             // check for the status
@@ -416,23 +417,23 @@ export default function SearchStudents() {
 
 
     // show user detail view
-    function showUserDetail(collegeId){
+    function showUserDetail(dealerId){
 
         setSelectedStudent();
         setUserDetailview(false)
 
         const studentWithCollegeId = searchedStudentsList.find(
-            (student) => student.collegeId === collegeId
+            (dealer) => dealer.dealerId === dealerId
           );
           
 
         setSelectedStudent(studentWithCollegeId);
         setUserDetailview(true);
-        // console.log(collegeId);
+        // console.log(dealerId);
 
 
         // get the active requests
-        getRequests(studentWithCollegeId.collegeId);
+        getRequests(studentWithCollegeId.dealerId);
     }
 
     
@@ -444,27 +445,30 @@ export default function SearchStudents() {
             
 
         //     <div style={{height:'10vh',display:'flex',flexDirection:'column',justifyContent:'center'}}>
-        //         <h2 className={inter.className}>Student 360</h2>
-        //         <div className={`${styles.menuItems} ${inter.className}`}>
-        //             <div className={`${styles.menuItem} ${selectedTab === 'Search' ? styles.menuItem_selected : ''}`} onClick={() => handleTabChange('Search')}>Search student</div>
-        //             <div className={`${styles.menuItem} ${selectedTab === 'Add student' ? styles.menuItem_selected : ''}`} onClick={() => handleTabChange('Add student')}>Add student</div>
+        //         <h2 className={montserrat.className}>dealer 360</h2>
+        //         <div className={`${styles.menuItems} ${montserrat.className}`}>
+        //             <div className={`${styles.menuItem} ${selectedTab === 'Search' ? styles.menuItem_selected : ''}`} onClick={() => handleTabChange('Search')}>Search dealer</div>
+        //             <div className={`${styles.menuItem} ${selectedTab === 'Add dealer' ? styles.menuItem_selected : ''}`} onClick={() => handleTabChange('Add dealer')}>Add dealer</div>
                 
         //         </div>
                 
         //     </div>
 
             
-          
+        <div  className={montserrat.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px'}}>
+            
+        <div className='flex flex-row gap-2 items-center py-4' >
+            <h1 className='text-xl font-bold'>Dealers</h1>
          
-        <div className={styles.verticalsection} style={{height:'80vh',gap:'8px'}}>
+        {/* <div className={styles.verticalsection} style={{height:'80vh',gap:'8px'}}> */}
 
-            <div style={{width:'100%',display:'flex', flexDirection:'row',justifyContent:'space-between'}}>
+            {/* <div style={{width:'100%',display:'flex', flexDirection:'row',justifyContent:'space-between'}}> */}
                 
             {hostels ?  
                 <div className={styles.horizontalsection}>
-                    <div className={`${styles.primarybtn} `} style={{display:'flex', flexDirection:'row', width:'fit-content', cursor:'pointer', gap:'4px'}} onClick={toggleAddStudentOverlay}> 
+                    <div className={`${styles.primarybtn} `} style={{display:'flex', flexDirection:'row', width:'fit-content', cursor:'pomontserrat', gap:'4px'}} onClick={toggleAddStudentOverlay}> 
                         <Plus />
-                        <p className={`${inter.className}`}>Add student</p>
+                        <p className={`${montserrat.className}`}>Add dealer</p>
                     </div>
                     <div className={`${styles.overlayBackground} ${showAddStudent ? styles.hideshowdivshow : styles.hideshowdiv}`}>
                        {/* <AddStudent hostelData={hostels} toggleAddStudentOverlay={toggleAddStudentOverlay}/> */}
@@ -474,9 +478,9 @@ export default function SearchStudents() {
                 : ''}
                 {(resultMessage.length > 0) ? <Toast type={resultType} message={resultMessage} /> : ''}
                 {/* <div className={styles.horizontalsection}>
-                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pointer', gap:'4px'}} onClick={toggleAddStudentOverlay}> 
+                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pomontserrat', gap:'4px'}} onClick={toggleAddStudentOverlay}> 
                         <Plus />
-                        <p className={`${inter.className}`}>Add student</p>
+                        <p className={`${montserrat.className}`}>Add dealer</p>
                     </div>
                     <div className={`${styles.overlayBackground} ${showAddStudent ? styles.hideshowdivshow : styles.hideshowdiv}`}>
                         <AddStudent toggleAddStudentOverlay={toggleAddStudentOverlay}/> 
@@ -495,55 +499,55 @@ export default function SearchStudents() {
                             <div className={styles.horizontalsection}>
                                 <input type="radio" name="searchByCollegeId" value="searchByCollegeId" aria-label="Option 1"  checked={selectedSearchOption === 'searchByCollegeId'} onChange={handleRadioChange}/>
                                 
-                                <span className={`${inter.className} ${styles.text2}`}>College Id</span>
+                                <span className={`${montserrat.className} ${styles.text2}`}>College Id</span>
                             </div>
                             <div className={styles.horizontalsection}>
                                 <input type="radio" name="searchByName" value="searchByName" checked={selectedSearchOption === 'searchByName'} onChange={handleRadioChange}/>
                                 
-                                <span className={`${inter.className} ${styles.text2}`}>Name</span>
+                                <span className={`${montserrat.className} ${styles.text2}`}>Name</span>
                             </div>
                             <div className={styles.horizontalsection}>
                                 <input type="radio" name="browseAll" value="browseAll" checked={selectedSearchOption === 'browseAll'} onChange={handleRadioChange}/>
                                 
-                                <span className={`${inter.className} ${styles.text2}`}>Browse All</span>
+                                <span className={`${montserrat.className} ${styles.text2}`}>Browse All</span>
                             </div>
                             
                         </div>
                    
-                        <p className={`${inter.className} ${styles.text3_heading}`}>Search by collegeId</p>
+                        <p className={`${montserrat.className} ${styles.text3_heading}`}>Search by dealerId</p>
                         
-                         <div className={`${inter.className}`} style={{display:'flex',flexDirection:'row',alignItems:'center',gap:'8px'}}>
-                                <input id="userObjectId" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="Unique user ID" onKeyDown={handleKeyPress}/>
-                                <button onClick={newSearch.bind(this)} className={`${inter.className} ${styles.scbtn}`} >Find</button>
+                         <div className={`${montserrat.className}`} style={{display:'flex',flexDirection:'row',alignItems:'center',gap:'8px'}}>
+                                <input id="userObjectId" className={`${montserrat.className} ${styles.text2} ${styles.textInput}`} placeholder="Unique dealer ID" onKeyDown={handleKeyPress}/>
+                                <button onClick={newSearch.bind(this)} className={`${montserrat.className} ${styles.scbtn}`} >Find</button>
                                 
                                 {/* {searching ? <div className={styles.horizontalsection}>
                                     <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Searching...</p> 
+                                    <p className={`${montserrat.className} ${styles.text3}`}>Searching...</p> 
                                 </div> : ''} */}
 {/*                                 
                                 {(searchedStudentsList!=null && searchedStudentsList.length > 0) ? <div className={styles.horizontalsection}>
-                                    <p className={`${inter.className} ${styles.text3}`}>Results:</p> 
-                                    <p className={`${inter.className} ${styles.text1}`}>{searchedStudentsList.length}</p>
+                                    <p className={`${montserrat.className} ${styles.text3}`}>Results:</p> 
+                                    <p className={`${montserrat.className} ${styles.text1}`}>{searchedStudentsList.length}</p>
                                 </div> : ''} */}
                             </div>
 
                             <div className={styles.horizontalsection}>
                                 {(searchedStudentsList!=null && searchedStudentsList.length > 0) ? <div className={styles.horizontalsection}>
-                                        <p className={`${inter.className} ${styles.text3}`}>Results:</p> 
-                                        <p className={`${inter.className} ${styles.text1}`}>{searchedStudentsList.length}</p>
+                                        <p className={`${montserrat.className} ${styles.text3}`}>Results:</p> 
+                                        <p className={`${montserrat.className} ${styles.text1}`}>{searchedStudentsList.length}</p>
                                     </div> : ''}
                                 {searching ? <div className={styles.horizontalsection}>
                                         <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                        <p className={`${inter.className} ${styles.text3}`}>Searching...</p> 
+                                        <p className={`${montserrat.className} ${styles.text3}`}>Searching...</p> 
                                     </div> : ''}
                             </div>
                            
                             
-                            {/* <button id="submit" onClick={loginHere.bind(this)} className={`${inter.className} ${styles.text2} ${styles.primarybtn}`}>Sign in</button> */}
+                            {/* <button id="submit" onClick={loginHere.bind(this)} className={`${montserrat.className} ${styles.text2} ${styles.primarybtn}`}>Sign in</button> */}
                         
-                            {(!dataFound && endOfData && searchedStudentsList.length == 0) ? <div className={`${styles.error} ${inter.className} ${styles.text2}`}>No match found</div>
+                            {(!dataFound && endOfData && searchedStudentsList.length == 0) ? <div className={`${styles.error} ${montserrat.className} ${styles.text2}`}>No match found</div>
                                 :''}
-                            {/* {inputError ? <div className={`${styles.error} ${inter.className} ${styles.text2}`}>Enter valid ID to proceed</div>
+                            {/* {inputError ? <div className={`${styles.error} ${montserrat.className} ${styles.text2}`}>Enter valid ID to proceed</div>
                                 :''} */}
                             
 
@@ -551,21 +555,21 @@ export default function SearchStudents() {
                         ((!dataFound) ? 
                             <div className={styles.horizontalsection}>
                                 <Check className={styles.icon} />
-                                <p className={`${inter.className} ${styles.text3}`}>Search to see results!</p> 
+                                <p className={`${montserrat.className} ${styles.text3}`}>Search to see results!</p> 
                             </div>
                             : 
                             <div className={styles.horizontalsection}>
                                 {/* <Loader className={`${styles.icon} ${styles.load}`} /> */}
                                 <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                <p className={`${inter.className} ${styles.text3}`}>Getting students ...</p> 
+                                <p className={`${montserrat.className} ${styles.text3}`}>Getting students ...</p> 
                             </div>)
                             : 
                             <div className={styles.titlecard} style={{height: '80vh',alignItems:'stretch',overflow:'scroll'}}>
                             {searchedStudentsList.map(studentItem => (
                             
-                                <div className={styles.verticalsection} key={studentItem.collegeId} style={{alignItems:'stretch', cursor:'pointer'}} onClick={() => showUserDetail(studentItem.collegeId)}>
-                                    {/* <p className={`${inter.className} ${styles.text2}`} dangerouslySetInnerHTML={{ __html: project.description.replace(/\n/g, '<br>') }}></p> */}
-                                    {/* <p className={`${inter.className} ${styles.text2}`}>{project.description.replace(/\n/g, '\n')}</p> */}
+                                <div className={styles.verticalsection} key={studentItem.dealerId} style={{alignItems:'stretch', cursor:'pomontserrat'}} onClick={() => showUserDetail(studentItem.dealerId)}>
+                                    {/* <p className={`${montserrat.className} ${styles.text2}`} dangerouslySetInnerHTML={{ __html: project.description.replace(/\n/g, '<br>') }}></p> */}
+                                    {/* <p className={`${montserrat.className} ${styles.text2}`}>{project.description.replace(/\n/g, '\n')}</p> */}
                                     
                                     <div  className={styles.cardBlockItem}>
 
@@ -575,16 +579,16 @@ export default function SearchStudents() {
 
 
                                             {(studentItem.mediaCount == 1) ?
-                                            <ImageComponent imageUrl={studentItem.userImage} id={studentItem.collegeId} username={studentItem.username}/>
+                                            <ImageComponent imageUrl={studentItem.userImage} id={studentItem.dealerId} username={studentItem.username}/>
                                                 :
                                                 <div className={`${styles.abbrevationBG}`}>
-                                                    <p className={`${inter.className} ${styles.text2}`}>{abbreviateName(studentItem.username)}</p>
+                                                    <p className={`${montserrat.className} ${styles.text2}`}>{abbreviateName(studentItem.username)}</p>
                                                 </div>
                                             }
                                             
                                             <div>
-                                                <p className={`${inter.className} ${styles.text2}`}>{studentItem.collegeId}</p>
-                                                <p className={`${inter.className} ${styles.text1}`}>{studentItem.username}</p>
+                                                <p className={`${montserrat.className} ${styles.text2}`}>{studentItem.dealerId}</p>
+                                                <p className={`${montserrat.className} ${styles.text1}`}>{studentItem.username}</p>
                                             </div>
                                             </div>
 
@@ -596,7 +600,7 @@ export default function SearchStudents() {
                             {(dataStarted && !endOfData) ?
                                 <div ref={ref} className={styles.horizontalsection}>
                                     <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                                    <p className={`${montserrat.className} ${styles.text3}`}>Loading ...</p> 
                                 </div>
                                 :
                                 ''
@@ -614,21 +618,21 @@ export default function SearchStudents() {
                        <div className={styles.verticalsection} style={{height:'100%',width:'100%'}}>
                         
                         <div className={styles.horizontalsection} style={{width: '100%',justifyContent: 'space-between'}}>
-                            <h4 className={`${inter.className}`}>Profile</h4>
+                            <h4 className={`${montserrat.className}`}>Profile</h4>
                             <div className={styles.horizontalsection} >
                                 <div className={styles.horizontalsection}>
-                                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pointer', gap:'4px'}} onClick={toggleUpdateProfileOverlay}> 
+                                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pomontserrat', gap:'4px'}} onClick={toggleUpdateProfileOverlay}> 
                                         <PencilSimple />
-                                        <p className={`${inter.className}`}>Update profile</p>
+                                        <p className={`${montserrat.className}`}>Update profile</p>
                                     </div>
                                     <div className={`${styles.overlayBackground} ${show ? styles.hideshowdivshow : styles.hideshowdiv}`}>
                                         <UpdateUser userDetail={selectedStudent} handleDataChange={updateSelectedStudent} toggleUpdateProfileOverlay={toggleUpdateProfileOverlay}/> 
                                     </div>
                                 </div>
                                 <div className={styles.horizontalsection}>
-                                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pointer', gap:'4px'}} onClick={toggleUpdateParentsOverlay}> 
+                                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pomontserrat', gap:'4px'}} onClick={toggleUpdateParentsOverlay}> 
                                         <PencilSimple />
-                                        <p className={`${inter.className}`}>Parents & Hostel</p>
+                                        <p className={`${montserrat.className}`}>Parents & Hostel</p>
                                     </div>
                                     <div className={`${styles.overlayBackground} ${showParents ? styles.hideshowdivshow : styles.hideshowdiv}`}>
                                         <UpdateParents userDetail={selectedStudent} hostelDetail={hostels} handleDataChange={updateSelectedStudent} toggleUpdateParentsOverlay={toggleUpdateParentsOverlay}/> 
@@ -643,52 +647,52 @@ export default function SearchStudents() {
                         
                         
                         <div className={styles.verticalsection} style={{width:'100%'}}>
-                            {/* <p className={`${inter.className} ${styles.text3_heading}`}>Total:</p> */}
+                            {/* <p className={`${montserrat.className} ${styles.text3_heading}`}>Total:</p> */}
                             
                             
-                            {/* <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px'}}>
-                                <p className={`${inter.className} ${styles.text3_heading}`}>Name:</p>
-                                <h3 className={`${inter.className}`} >{selectedStudent.username}</h3>
+                            {/* <div className={`${montserrat.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px'}}>
+                                <p className={`${montserrat.className} ${styles.text3_heading}`}>Name:</p>
+                                <h3 className={`${montserrat.className}`} >{selectedStudent.username}</h3>
                             </div> */}
 
                             <div className={styles.horizontalsection} style={{gap:'24px',alignItems:'flex-start',padding:'32px',width:'100%'}}>
                                 
-                                <ImageComponentLarge imageUrl={selectedStudent.userImage} id={selectedStudent.collegeId} username={selectedStudent.username}/>
+                                <ImageComponentLarge imageUrl={selectedStudent.userImage} id={selectedStudent.dealerId} username={selectedStudent.username}/>
                                 
 
                                 {/* <!-- Enlarged image container --> */}
                                 {/* <div id="enlargedimg" className={styles.enlargedImg} onClick={() => hideEnlarged()}>
-                                    <ImageComponentLarge imageUrl={selectedStudent.userImage} id={selectedStudent.collegeId} username={selectedStudent.username}/>
+                                    <ImageComponentLarge imageUrl={selectedStudent.userImage} id={selectedStudent.dealerId} username={selectedStudent.username}/>
                                    
                                 </div> */}
 
 
                                 <div className={styles.verticalsection} style={{flex:'1'}}>
-                                    <h3 className={`${inter.className}`} >{selectedStudent.username}</h3>
-                                    <p className={`${inter.className} ${styles.text2}`} style={{letterSpacing:'1px'}}>{selectedStudent.collegeId} • {selectedStudent.branch} • {selectedStudent.year} Year</p>
+                                    <h3 className={`${montserrat.className}`} >{selectedStudent.username}</h3>
+                                    <p className={`${montserrat.className} ${styles.text2}`} style={{letterSpacing:'1px'}}>{selectedStudent.dealerId} • {selectedStudent.branch} • {selectedStudent.year} Year</p>
 {/*                                     
                                     {(selectedStudent.type == 'Hostel' || selectedStudent.type == 'hostel') ? 
-                                    <p className={`${inter.className} ${styles.text2}`}>Hosteler</p> 
-                                    : <p className={`${inter.className} ${styles.text2}`}>Day scholar</p>}
+                                    <p className={`${montserrat.className} ${styles.text2}`}>Hosteler</p> 
+                                    : <p className={`${montserrat.className} ${styles.text2}`}>Day scholar</p>}
                                     
                                     {(selectedStudent.type != '-') ? 
-                                    <p className={`${inter.className} ${styles.text3} ${styles.tag}`}>Outing: {(selectedStudent.outingType == 'yes') ? 'Self permitted' : 'Not-self permitted'}</p>
+                                    <p className={`${montserrat.className} ${styles.text3} ${styles.tag}`}>Outing: {(selectedStudent.outingType == 'yes') ? 'Self permitted' : 'Not-self permitted'}</p>
                                     : ''}
                                          */}
                                     <br/>
                                     {(selectedStudent.type == 'Hostel' || selectedStudent.type == 'hostel') ? 
                                         <div style={{width:'100%'}}>
                                             <div style={{display:'flex',flexDirection:'row',justifyContent:'space-between',alignItems:'center',width:'100%'}}>
-                                                <p className={`${inter.className} ${styles.text3}`}>Student type:</p>
-                                                <p className={`${inter.className} ${styles.text2}`}>Hosteler</p>
+                                                <p className={`${montserrat.className} ${styles.text3}`}>dealer type:</p>
+                                                <p className={`${montserrat.className} ${styles.text2}`}>Hosteler</p>
                                             </div>
                                             <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'4px 0px 8px 0px'}}></div>
                                         </div>
                                         : 
                                         <div style={{width:'100%'}}>
                                             <div style={{display:'flex',flexDirection:'row',justifyContent:'space-between',alignItems:'center',width:'100%'}}>
-                                                <p className={`${inter.className} ${styles.text3}`}>Student type:</p>
-                                                <p className={`${inter.className} ${styles.text2}`}>Day scholar</p>
+                                                <p className={`${montserrat.className} ${styles.text3}`}>dealer type:</p>
+                                                <p className={`${montserrat.className} ${styles.text2}`}>Day scholar</p>
                                             </div>
                                             <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'4px 0px 8px 0px'}}></div>
                                         </div>
@@ -697,8 +701,8 @@ export default function SearchStudents() {
                                     {(selectedStudent.type != '-') ? 
                                         <div style={{width:'100%'}}>
                                             <div style={{display:'flex',flexDirection:'row',justifyContent:'space-between',alignItems:'center',width:'100%'}}>
-                                                <p className={`${inter.className} ${styles.text3}`}>Outing type:</p>
-                                                <p className={`${inter.className} ${styles.text2} ${styles.tag}`}>{(selectedStudent.outingType == 'yes') ? 'Self permitted' : 'Not-self permitted'}</p>
+                                                <p className={`${montserrat.className} ${styles.text3}`}>Outing type:</p>
+                                                <p className={`${montserrat.className} ${styles.text2} ${styles.tag}`}>{(selectedStudent.outingType == 'yes') ? 'Self permitted' : 'Not-self permitted'}</p>
                                             </div>
                                             <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'12px 0px 4px 0px'}}></div>
                                         </div>
@@ -706,34 +710,34 @@ export default function SearchStudents() {
                                         ''
                                     }
                                     <div style={{display:'flex',flexDirection:'row',justifyContent:'space-between',alignItems:'center',width:'100%'}}>
-                                        <p className={`${inter.className} ${styles.text3}`}>Email:</p>
-                                        <p className={`${inter.className} ${styles.text2}`}>{selectedStudent.email}</p>
+                                        <p className={`${montserrat.className} ${styles.text3}`}>Email:</p>
+                                        <p className={`${montserrat.className} ${styles.text2}`}>{selectedStudent.email}</p>
                                     </div>
                                     <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'4px 0px'}}></div>
                                     <div style={{display:'flex',flexDirection:'row',justifyContent:'space-between',alignItems:'center',width:'100%'}}>
-                                        <p className={`${inter.className} ${styles.text3}`}>Mobile:</p>
-                                        <p className={`${inter.className} ${styles.text2}`}>{selectedStudent.phoneNumber}</p>
+                                        <p className={`${montserrat.className} ${styles.text3}`}>Mobile:</p>
+                                        <p className={`${montserrat.className} ${styles.text2}`}>{selectedStudent.phoneNumber}</p>
                                     </div>
                                     <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'4px 0px'}}></div>
                                     <div style={{display:'flex',flexDirection:'row',justifyContent:'space-between',alignItems:'center',width:'100%'}}>
-                                        <p className={`${inter.className} ${styles.text3}`}>Hostel:</p>
-                                        <p className={`${inter.className} ${styles.text2}`}>{selectedStudent.hostelName}</p>
+                                        <p className={`${montserrat.className} ${styles.text3}`}>Hostel:</p>
+                                        <p className={`${montserrat.className} ${styles.text2}`}>{selectedStudent.hostelName}</p>
                                     </div>
                                     <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'4px 0px'}}></div>
                                     <div style={{display:'flex',flexDirection:'row',justifyContent:'space-between',alignItems:'center',width:'100%'}}>
-                                        <p className={`${inter.className} ${styles.text3}`}>Room number:</p>
-                                        <p className={`${inter.className} ${styles.text2}`}>{selectedStudent.roomNumber}</p>
+                                        <p className={`${montserrat.className} ${styles.text3}`}>Room number:</p>
+                                        <p className={`${montserrat.className} ${styles.text2}`}>{selectedStudent.roomNumber}</p>
                                     </div>
                                     <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'4px 0px'}}></div>
                                     {/* <div style={{display:'flex',flexDirection:'row',justifyContent:'space-between',width:'100%'}}>
-                                        <p className={`${inter.className} ${styles.text3}`}>Email: {selectedStudent.email}</p>
-                                        <p className={`${inter.className} ${styles.text3}`}>Mobile: {selectedStudent.phoneNumber}</p>
+                                        <p className={`${montserrat.className} ${styles.text3}`}>Email: {selectedStudent.email}</p>
+                                        <p className={`${montserrat.className} ${styles.text3}`}>Mobile: {selectedStudent.phoneNumber}</p>
                                     </div>
                                     <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'12px 0px'}}></div> */}
                                                 
                                     {/* <br/>
                                     {(selectedStudent.type == 'Hostel' || selectedStudent.type == 'hostel') ? 
-                                    <p className={`${inter.className} ${styles.text3}`}>Hostel: {selectedStudent.hostelName}, Room number: {selectedStudent.roomNumber}</p>
+                                    <p className={`${montserrat.className} ${styles.text3}`}>Hostel: {selectedStudent.hostelName}, Room number: {selectedStudent.roomNumber}</p>
                                     : ''} */}
                                     <br/>
                                 </div>
@@ -746,12 +750,12 @@ export default function SearchStudents() {
 
                         {(activeRequestsList!=null && activeRequestsList.length > 0) ?
                         <div style={{display:'flex',flexWrap:'wrap' ,gap:'8px'}}>
-                            <p className={`${inter.className} ${styles.text1}`} style={{color:'darkorange',fontSize:'28px'}} >•</p>
-                            <p className={`${inter.className} ${styles.text1}`} >Outing request –</p>
-                            <p className={`${inter.className} ${styles.text2}`}>{dayjs(activeRequestsList[0].requestFrom).format('MMM DD, YYYY')} – {dayjs(activeRequestsList[0].requestTo).format('MMM DD, YYYY')}</p>
-                            <p className={`${inter.className} ${styles.text3}`}>({activeRequestsList[0].description})</p>
+                            <p className={`${montserrat.className} ${styles.text1}`} style={{color:'darkorange',fontSize:'28px'}} >•</p>
+                            <p className={`${montserrat.className} ${styles.text1}`} >Outing request –</p>
+                            <p className={`${montserrat.className} ${styles.text2}`}>{dayjs(activeRequestsList[0].requestFrom).format('MMM DD, YYYY')} – {dayjs(activeRequestsList[0].requestTo).format('MMM DD, YYYY')}</p>
+                            <p className={`${montserrat.className} ${styles.text3}`}>({activeRequestsList[0].description})</p>
                         </div>
-                        : <p className={`${inter.className} ${styles.text3}`} >No active requests</p>
+                        : <p className={`${montserrat.className} ${styles.text3}`} >No active requests</p>
                         }
                         
                         <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'12px 0px'}}></div>
@@ -759,10 +763,10 @@ export default function SearchStudents() {
                         {(activeVisitorPassList!=null && activeVisitorPassList.length > 0) ?
                         
                             <div style={{display:'flex',flexWrap:'wrap' ,gap:'8px',width:'100%'}}>
-                                <p className={`${inter.className} ${styles.text1}`} style={{color:'darkorange',fontSize:'28px'}} >•</p>
-                                <p className={`${inter.className} ${styles.text1}`} >Visitor pass –</p>
-                                <p className={`${inter.className} ${styles.text2}`}>{dayjs(activeVisitorPassList[0].visitOn).format('MMM DD, YYYY')} – {activeRequestsList[0].count} members</p>
-                                <p className={`${inter.className} ${styles.text3}`}>({activeRequestsList[0].description})</p>
+                                <p className={`${montserrat.className} ${styles.text1}`} style={{color:'darkorange',fontSize:'28px'}} >•</p>
+                                <p className={`${montserrat.className} ${styles.text1}`} >Visitor pass –</p>
+                                <p className={`${montserrat.className} ${styles.text2}`}>{dayjs(activeVisitorPassList[0].visitOn).format('MMM DD, YYYY')} – {activeRequestsList[0].count} members</p>
+                                <p className={`${montserrat.className} ${styles.text3}`}>({activeRequestsList[0].description})</p>
                             </div>
                             
                         
@@ -771,15 +775,15 @@ export default function SearchStudents() {
                         {(activeVisitorPassList!=null && activeVisitorPassList.length > 0) ?
                         <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'12px 0px'}}></div>:''}
                         
-                        <p className={`${inter.className} ${styles.text1}`} >Parents</p>
+                        <p className={`${montserrat.className} ${styles.text1}`} >Parents</p>
                         <div className={styles.verticalsection} style={{width:'100%'}}>
                             
                             {(selectedStudent.fatherName.length > 2) ? 
                             <div className={styles.horizontalsection} style={{alignItems:'flex-start'}}>
-                                <ImageComponent imageUrl={"https://firebasestorage.googleapis.com/v0/b/smartcampusimages-1.appspot.com/o/"+selectedStudent.collegeId+"_1.jpeg?alt=media"} id={selectedStudent.collegeId} username={selectedStudent.fatherName}/>
+                                <ImageComponent imageUrl={"https://firebasestorage.googleapis.com/v0/b/smartcampusimages-1.appspot.com/o/"+selectedStudent.dealerId+"_1.jpeg?alt=media"} id={selectedStudent.dealerId} username={selectedStudent.fatherName}/>
                                 <div>
-                                    <p className={`${inter.className} ${styles.text2}`}>Father: {selectedStudent.fatherName}</p> 
-                                    <p className={`${inter.className} ${styles.text2}`}>{selectedStudent.fatherPhoneNumber}</p> 
+                                    <p className={`${montserrat.className} ${styles.text2}`}>Father: {selectedStudent.fatherName}</p> 
+                                    <p className={`${montserrat.className} ${styles.text2}`}>{selectedStudent.fatherPhoneNumber}</p> 
                                     <br/>
                                 </div>
                             </div>
@@ -788,10 +792,10 @@ export default function SearchStudents() {
                             
                             {(selectedStudent.motherName.length > 2) ? 
                              <div className={styles.horizontalsection} style={{alignItems:'flex-start'}}>
-                                <ImageComponent imageUrl={"https://firebasestorage.googleapis.com/v0/b/smartcampusimages-1.appspot.com/o/"+selectedStudent.collegeId+"_2.jpeg?alt=media"} id={selectedStudent.collegeId} username={selectedStudent.motherName}/>
+                                <ImageComponent imageUrl={"https://firebasestorage.googleapis.com/v0/b/smartcampusimages-1.appspot.com/o/"+selectedStudent.dealerId+"_2.jpeg?alt=media"} id={selectedStudent.dealerId} username={selectedStudent.motherName}/>
                                 <div>
-                                    <p className={`${inter.className} ${styles.text2}`}>Mother: {selectedStudent.motherName}</p> 
-                                    <p className={`${inter.className} ${styles.text2}`}>{selectedStudent.motherPhoneNumber}</p> 
+                                    <p className={`${montserrat.className} ${styles.text2}`}>Mother: {selectedStudent.motherName}</p> 
+                                    <p className={`${montserrat.className} ${styles.text2}`}>{selectedStudent.motherPhoneNumber}</p> 
                                     <br/>
                                 </div>
                             </div>
@@ -799,10 +803,10 @@ export default function SearchStudents() {
                             
                             {(selectedStudent.guardianName.length > 2) ? 
                             <div className={styles.horizontalsection} style={{alignItems:'flex-start'}}>
-                                <ImageComponent imageUrl={"https://firebasestorage.googleapis.com/v0/b/smartcampusimages-1.appspot.com/o/"+selectedStudent.collegeId+"_3.jpeg?alt=media"} id={selectedStudent.collegeId} username={selectedStudent.guardianName}/>
+                                <ImageComponent imageUrl={"https://firebasestorage.googleapis.com/v0/b/smartcampusimages-1.appspot.com/o/"+selectedStudent.dealerId+"_3.jpeg?alt=media"} id={selectedStudent.dealerId} username={selectedStudent.guardianName}/>
                                 <div>
-                                    <p className={`${inter.className} ${styles.text2}`}>Guardian 1: {selectedStudent.guardianName}</p> 
-                                    <p className={`${inter.className} ${styles.text2}`}>{selectedStudent.guardianPhoneNumber}</p> 
+                                    <p className={`${montserrat.className} ${styles.text2}`}>Guardian 1: {selectedStudent.guardianName}</p> 
+                                    <p className={`${montserrat.className} ${styles.text2}`}>{selectedStudent.guardianPhoneNumber}</p> 
                                     <br/>
                                 </div>
                             </div>
@@ -810,10 +814,10 @@ export default function SearchStudents() {
                             
                             {(selectedStudent.guardian2Name.length > 2) ? 
                             <div className={styles.horizontalsection} style={{alignItems:'flex-start'}}>
-                                <ImageComponent imageUrl={"https://firebasestorage.googleapis.com/v0/b/smartcampusimages-1.appspot.com/o/"+selectedStudent.collegeId+"_3.jpeg?alt=media"} id={selectedStudent.collegeId} username={selectedStudent.guardian2Name}/>
+                                <ImageComponent imageUrl={"https://firebasestorage.googleapis.com/v0/b/smartcampusimages-1.appspot.com/o/"+selectedStudent.dealerId+"_3.jpeg?alt=media"} id={selectedStudent.dealerId} username={selectedStudent.guardian2Name}/>
                                 <div>
-                                    <p className={`${inter.className} ${styles.text2}`}>Guardian 2: {selectedStudent.guardian2Name}</p> 
-                                    <p className={`${inter.className} ${styles.text2}`}>{selectedStudent.guardian2PhoneNumber}</p> 
+                                    <p className={`${montserrat.className} ${styles.text2}`}>Guardian 2: {selectedStudent.guardian2Name}</p> 
+                                    <p className={`${montserrat.className} ${styles.text2}`}>{selectedStudent.guardian2PhoneNumber}</p> 
                                     <br/>
                                 </div>
                             </div>
@@ -824,7 +828,7 @@ export default function SearchStudents() {
                         <div style={{borderBottom: '0.5px solid #00000026', width:'100%',margin:'12px 0px'}}></div>
 
                         <div style={{width:'100%'}}>
-                                <p className={`${inter.className} ${styles.text1}`}>Address: {selectedStudent.address}</p> 
+                                <p className={`${montserrat.className} ${styles.text1}`}>Address: {selectedStudent.address}</p> 
                             <br/>
                         </div>
                         <br/>
@@ -886,13 +890,14 @@ export default function SearchStudents() {
           }, [imageUrl]);
     
         return (
+            
           <div>
             {imageLoaded ? (
 
                 <div>
                 {isEnlarged ? (
                         <div className="enlarged-image" onClick={toggleEnlarged} style={{ position: 'fixed', top: 0, left: 0, width: '100%',height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, }}>
-                            <img key={id} src={imageUrl} alt="Profile image" style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '8px', cursor: 'pointer',maxWidth: '100%',maxHeight: '100%' }} onClick={toggleEnlarged} />
+                            <img key={id} src={imageUrl} alt="Profile image" style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '8px', cursor: 'pomontserrat',maxWidth: '100%',maxHeight: '100%' }} onClick={toggleEnlarged} />
                         </div>
                     ) : 
                     ''}
@@ -902,7 +907,7 @@ export default function SearchStudents() {
                         alt="Profile image"
                         width={'50px'}
                         height={'50px'}
-                        style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pointer' }}
+                        style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pomontserrat' }}
                         onClick={toggleEnlarged} 
                         title='Click to enlarge'
                     />
@@ -916,7 +921,7 @@ export default function SearchStudents() {
             //     style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '50%' }}
             //   />
             ) : (
-              <div style={{backgroundColor: '#f5f5f5', width: '50px', height: '50px', borderRadius: '50%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}><p className={`${inter.className}`}>{abbreviateName(username)}</p></div>
+              <div style={{backgroundColor: '#f5f5f5', width: '50px', height: '50px', borderRadius: '50%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}><p className={`${montserrat.className}`}>{abbreviateName(username)}</p></div>
             )}
           </div>
         );
@@ -952,7 +957,7 @@ export default function SearchStudents() {
                 <div>
                 {isEnlarged ? (
                         <div className="enlarged-image" onClick={toggleEnlarged} style={{ position: 'fixed', top: 0, left: 0, width: '100%',height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, }}>
-                            <img key={id} src={imageUrl} alt="Profile image" style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '8px', cursor: 'pointer',maxWidth: '100%',maxHeight: '100%' }} onClick={toggleEnlarged} />
+                            <img key={id} src={imageUrl} alt="Profile image" style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '8px', cursor: 'pomontserrat',maxWidth: '100%',maxHeight: '100%' }} onClick={toggleEnlarged} />
                         </div>
                     ) : 
                     ''}
@@ -962,7 +967,7 @@ export default function SearchStudents() {
                         alt="Profile image"
                         width={'200px'}
                         height={'250px'}
-                        style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pointer' }}
+                        style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pomontserrat' }}
                         onClick={toggleEnlarged} 
                         title='Click to enlarge'
                     />
@@ -974,13 +979,13 @@ export default function SearchStudents() {
             //     alt="Downloaded Image"
             //     width={'200px'}
             //     height={'250px'}
-            //     style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pointer' }}
+            //     style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pomontserrat' }}
             //     onClick={toggleEnlarged} 
             //   />
             ) : (
                 <div style={{backgroundColor: '#f5f5f5', width: '200px', height: '250px', borderRadius: '10%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                    <h2 className={`${inter.className}`}>{abbreviateName(username)}</h2><br/>
-                    <p className={`${inter.className} ${styles.text3}`}>No image</p>
+                    <h2 className={`${montserrat.className}`}>{abbreviateName(username)}</h2><br/>
+                    <p className={`${montserrat.className} ${styles.text3}`}>No image</p>
                 </div>
             )}
           </div>

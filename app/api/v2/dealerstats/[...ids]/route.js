@@ -17,7 +17,13 @@ export async function GET(request,{params}) {
             // authorize secret key
             if(params.ids[1] == '0'){
 
-              const [rows, fields] = await connection.execute('SELECT campusId as campusId, campusName as campusName, courses as courses, departments as departments FROM campus order by modifiedDate DESC');
+              const [rows, fields] = await connection.execute(
+                `SELECT d.state, 
+                  count(CASE WHEN i.status NOT IN ('Paid') THEN d.userId END) as count, 
+                  COUNT(DISTINCT d.userId) AS dealers,
+                  COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') THEN i.pending END), 0) AS pending
+                  FROM dealers d LEFT JOIN invoices i ON i.billTo = d.userId GROUP BY d.state`);
+              // const [rows, fields] = await connection.execute('SELECT DISTINCT(state),count(*) as count FROM dealers group by state');
               connection.release();
 
               // send the notification
@@ -28,7 +34,7 @@ export async function GET(request,{params}) {
             }
             else{
                 
-              const [rows, fields] = await connection.execute('SELECT campusId as campusId, campusName as campusName, courses as courses, departments as departments FROM campus where campusId=?',[params.ids[2]]);
+              const [rows, fields] = await connection.execute('SELECT * FROM dealers where state=?',[params.ids[2]]);
               connection.release();
               
               // check if user is found

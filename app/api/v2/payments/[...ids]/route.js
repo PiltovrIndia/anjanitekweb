@@ -48,9 +48,29 @@ export async function GET(request,{params}) {
         // authorize secret key
         if(await Keyverify(params.ids[0])){
 
+          // is it a single operation of bulk from web
+          if(params.ids[1] == 'mobile'){
+
             // apply payment to multiple invoices at a time
-            await applyPayment(params.ids[1], params.ids[2], params.ids[3], params.ids[4], params.ids[5], paymentDate, params.ids[7], params.ids[8]);
+            await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
+          }
+          else {
+
+            // apply payment to multiple invoices at a time
+            // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
+            // Parse the JSON string into an array
+            const decodedItems = decodeURIComponent(params.ids[2]);
+            const items = JSON.parse(decodedItems);
+            
+            items.forEach(async (item, index) => {
+              console.log(`Item ${index}:`, item);
+              await applyPayment(item.dealerId, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+            });
+
+            // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
+            return Response.json({status: 200, message:'Success!'}, {status: 200})
+          }
         }
         else {
             // wrong secret key
@@ -64,7 +84,9 @@ export async function GET(request,{params}) {
     }
   }
 
+
   // apply payment to the invoices one by one
+  // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
   async function applyPayment(userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular) {
     
     var amount = paymentAmount;
@@ -115,7 +137,8 @@ export async function GET(request,{params}) {
 
         // 3
         const [balance] = await connection.query('SELECT balance FROM payments WHERE userId = "'+userId+'" ORDER BY paymentDate DESC LIMIT 1',[]);
-        console.log(balance[0].balance);
+        // console.log(balance[0].balance);
+        // console.log(paymentDate);
 
         // 4
         var bal = 0;

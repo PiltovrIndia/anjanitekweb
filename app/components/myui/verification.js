@@ -2,11 +2,12 @@
 
 import Registration from '../../(features)/(campus)/registration/form/page'
 import Dashboard from '../../(features)/(campus)/dashboard/page'
-import { Inter } from 'next/font/google'
+import { Inter, Montserrat } from 'next/font/google'
 import Image from 'next/image'
 import { SpinnerGap } from 'phosphor-react'
 import { useEffect, useState } from 'react'
 const inter = Inter({ subsets: ['latin'] })
+const montserrat = Montserrat({ subsets: ['latin'] })
 import Biscuits from 'universal-cookie'
 import styles from '../../page.module.css'
 import { useRouter } from 'next/navigation'
@@ -17,7 +18,7 @@ import Toast from './toast';
 // declare the apis of this page
   const verifyUser = async (pass, id, otp) => 
   
-    fetch("/api/verify/"+pass+"/"+id+"/"+otp+"/"+generateDeviceID()+"/"+dayjs(new Date(Date.now())).format('YYYY-MM-DD HH:mm:ss'), {
+    fetch("/api/v2/verify/"+pass+"/"+id+"/"+otp+"/"+generateDeviceID()+"/"+dayjs(new Date(Date.now())).format('YYYY-MM-DD HH:mm:ss'), {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -104,12 +105,12 @@ export default function Vertification() {
         }
     };
 
-// verify the collegeId by calling the API
+// verify the mobileNumber by calling the API
 async function loginHere(){
-
+    console.log("/api/v2/verify/"+process.env.NEXT_PUBLIC_API_PASS+"/"+document.getElementById('mobileNumber').value+"/"+otp+"/"+generateDeviceID()+"/"+dayjs(new Date(Date.now())).format('YYYY-MM-DD HH:mm:ss'));
     try{
         // check for the input
-        if(document.getElementById('collegeId').value.length > 0){
+        if(document.getElementById('mobileNumber').value.length > 0){
 
             var otp = Math.floor(1000 + Math.random() * 9000);
             setOTP(otp);
@@ -119,8 +120,8 @@ async function loginHere(){
             setuserFound(true);
             setotpSent(false);
             
-            // call the api using secret key and collegeId provided
-            const result  = await verifyUser(process.env.NEXT_PUBLIC_API_PASS, document.getElementById('collegeId').value, otp)
+            // call the api using secret key and mobileNumber provided
+            const result  = await verifyUser(process.env.NEXT_PUBLIC_API_PASS, document.getElementById('mobileNumber').value, otp)
             const resultData = await result.json() // get data
             setQueryResult(resultData); // store data
             
@@ -130,9 +131,9 @@ async function loginHere(){
                 
                 // set the state variables with the user data
                 setUser(resultData.data)
-                setUsername(resultData.data.username)
+                setUsername(resultData.data.name)
                 setEmail(resultData.data.email)
-                setPhone(resultData.data.phoneNumber)
+                setPhone(resultData.data.mobile)
 
                 // save the data to local cookie
                 // let jsonString = JSON.stringify(queryResult.data)
@@ -150,11 +151,7 @@ async function loginHere(){
                 // As OTP is already sent, show the OTP prompt text field
 
                 // for now, only allow if user is admin
-                if(resultData.data.role == 'SuperAdmin' || resultData.data.role == 'Admin' || resultData.data.role == 'OutingAdmin' || resultData.data.role == 'OutingIssuer'){
-                    // otp sent
-                    setotpSent(true)
-                }
-                else if(resultData.data.role == 'Student' || resultData.data.role == 'student'){
+                if(resultData.data.role == 'admin'){
                     // otp sent
                     setotpSent(true)
                 }
@@ -162,7 +159,7 @@ async function loginHere(){
                     // block the user
                     setuserFound(false);
                     setotpSent(false);
-                    seterrorMsg('You do not have enough permissions to login. Contact your campus administrator.')
+                    seterrorMsg('You do not have enough permissions to login. Contact your administrator.')
                 }
                 // if(true){
                 //     // otp sent
@@ -171,7 +168,7 @@ async function loginHere(){
             }
             else if(resultData.status == 404) {
 
-                seterrorMsg('No match found. Contact your campus administrator.')
+                seterrorMsg('No match found. Contact your administrator.')
                 setuserFound(false)
                 setinfoMsg(true) // show the big info message about reaching out
                 // otp sent
@@ -181,7 +178,7 @@ async function loginHere(){
         }
         else {
             // show error incase of no input
-            seterrorMsg('Enter your college registered number')
+            seterrorMsg('Enter your mobile number')
         }
     }
     catch(e){
@@ -278,13 +275,14 @@ function verifyOTP(){
             // router.push('/dashboard')
             
             // for now navigate the students to update their profile specific images
-            if(queryResult.data.role == 'SuperAdmin' || queryResult.data.role == 'Admin' || queryResult.data.role == 'OutingAdmin' || queryResult.data.role == 'OutingIssuer')
-            {
-                router.push('/dashboard')
-            }
-            else if(queryResult.data.role == 'Student' || queryResult.data.role == 'student'){
+            // if(queryResult.data.role == 'SuperAdmin' || queryResult.data.role == 'Admin' || queryResult.data.role == 'OutingAdmin' || queryResult.data.role == 'OutingIssuer')
+            // {
+            //     router.push('/dashboard')
+            // }
+            // else 
+            if(queryResult.data.role == 'admin'){
                 
-                router.push('/profileupdate')
+                router.push('/dashboard')
             }
         }
         else{
@@ -338,7 +336,7 @@ function verifyOTP(){
         <div className='flex flex-col items-center gap-4'>
             <div className={styles.section_one}>
             <div className={styles.horizontalsection}>
-              <Image src="/sc_logo1.svg" alt="Smart Campus" width={200} height={60} priority style={{height:'auto'}}/>
+              <Image src="/anjani_title.webp" alt="Anjani Tek" width={200} height={60} priority style={{height:'auto'}}/>
               {/* <span style={{color: '#CCCCCC'}}>|</span>
               <Image src="/svecw_sc_logo.svg" alt="Smart Campus" width={90} height={40} priority style={{height:'auto'}} /> */}
               {/* <h3>Smart Campus</h3> */}
@@ -355,37 +353,38 @@ function verifyOTP(){
                 {(!userFound) ?
                 <div className={styles.card_block1}>
             
-                    <p className={`${inter.className} ${styles.text2}`}>Your College Registered ID: </p><br/>
-                    <input id="collegeId" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="" onKeyDown={handleKeyPress}/>
+                    <p className={`${montserrat.className} ${styles.text1}`}>Your Mobile Number </p><br/>
+                    <input id="mobileNumber" className={`${montserrat.className} ${styles.text2} ${styles.textInput}`} placeholder="" onKeyDown={handleKeyPress}/>
                     <br/><br/>
-                    <button id="submit" onClick={loginHere.bind(this)} className={`${inter.className} ${styles.text2} ${styles.primarybtn}`}>Sign in</button>
+                    <button id="submit" onClick={loginHere.bind(this)} className={`${montserrat.className} ${styles.text2} ${styles.primarybtn}`}>Login with OTP</button>
                     <br/>
                     <br/>
                         {(errorMsg.length > 0) ? 
                             
-                            <div className={`${styles.error} ${inter.className} ${styles.text2}`}>{errorMsg}</div>
+                            <div className={`${styles.error} ${montserrat.className} ${styles.text2}`}>{errorMsg}</div>
                             :''}
                         
                     <br/>
                     
                     {(infoMsg) ?
                     <div className={infoMsg ? '':'styles.hidden'}>
-                        <div className={`${inter.className} ${styles.text2}`}>
+                        <div className={`${montserrat.className} ${styles.text2}`}>
                             <br/>We couldnot find you in our system for any of below reasons:<br/>
                             <ul style={{listStyle:'none'}}>
-                                <li>1. Your college Id might be incorrect.</li>
-                                <li>2. Your college is not registered with Smart Campus yet</li>
+                                <li>1. Your Mobile Number might be incorrect.</li>
+                                <li>2. Your Mobile Number is not registered with AnjaniTek yet</li>
                             </ul>  
                         </div>
                         <br/>
-                        <p className={`${inter.className} ${styles.text3}`}>Please contact your college administration or drop a mail with your campus name to <a href="mailto:hello.helpmecode@gmail.com"  className={styles.information}>hello.helpmecode@gmail.com</a></p>
+                        <p className={`${montserrat.className} ${styles.text3}`}>Please contact your administration incase you have issues to login to the app</p>
                         <br/>
                     </div>
                     :
                     ''}
                     
                     <div>
-                        <p className={`${inter.className} ${styles.text3}`}>No account? <a href="/signup"  className={styles.secondarybtn}>Join now</a></p>
+                        <p className={`${montserrat.className} ${styles.text3}`}>Contact admin incase of issues to login</p>
+                        {/* <p className={`${inter.className} ${styles.text3}`}>No account? <a href="/signup"  className={styles.secondarybtn}>Join now</a></p> */}
                     </div>
                     
                 </div>
@@ -402,7 +401,7 @@ function verifyOTP(){
                     <div className={styles.horizontalsection}>
                         {/* <Loader className={`${styles.icon} ${styles.load}`} /> */}
                         <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                        <p className={`${inter.className} ${styles.text3}`}>Sending OTP ...</p> 
+                        <p className={`${montserrat.className} ${styles.text3}`}>Sending OTP ...</p> 
                         {/* <p className={`${inter.className} ${styles.text3}`}>Sending OTP to {username}...</p>  */}
                     </div>
                 </div>
@@ -414,20 +413,20 @@ function verifyOTP(){
             <div>
                 {(otpSent) ?
                 <div className={styles.card_block1}>
-                    <p className={`${inter.className} ${styles.text3}`}>Verification</p>
-                    <p className={`${inter.className} ${styles.text2}`}>Enter the verification code sent to {email.slice(0, 4).padEnd(email.length, '*')}</p>
+                    <p className={`${montserrat.className} ${styles.text3}`}>Verification</p>
+                    <p className={`${montserrat.className} ${styles.text2}`}>Enter the verification code sent to {email.slice(0, 4).padEnd(email.length, '*')}</p>
                     {/* {phone.slice(0, 4).padEnd(phone.length, '*')} or  */}
                     <br/>
-                    <input id="otp" className={`${styles.input_one} ${inter.className} ${styles.text3}`} placeholder="OTP" maxLength="4" style={{letterSpacing:30}}  onKeyDown={handleOTPKeyPress}/>
+                    <input id="otp" className={`${styles.input_one} ${montserrat.className} ${styles.text3}`} placeholder="OTP" maxLength="4" style={{letterSpacing:30}}  onKeyDown={handleOTPKeyPress}/>
                     <br/>
                     <br/>
-                    <button onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.secondarybtn}`}>back</button> &nbsp;&nbsp;
-                    <button onClick={verifyOTP.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Verify OTP</button>
+                    <button onClick={clearCookies.bind(this)} className={`${montserrat.className} ${styles.secondarybtn}`}>back</button> &nbsp;&nbsp;
+                    <button onClick={verifyOTP.bind(this)} className={`${montserrat.className} ${styles.primarybtn}`} >Verify OTP</button>
                     <div>
                         {(verifyOtpMsg.length) > 0 ?
                         <div>
                             <br/><br/>
-                            <span className={`${inter.className} ${styles.text2}`}>{verifyOtpMsg}</span>
+                            <span className={`${montserrat.className} ${styles.text2}`}>{verifyOtpMsg}</span>
                         </div>
                         :''}
                     </div>

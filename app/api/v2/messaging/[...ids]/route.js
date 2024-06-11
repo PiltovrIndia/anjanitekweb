@@ -32,9 +32,9 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 0){ // create notification
                 try {
                     // create query for insert
-                    const q = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen) VALUES ( ?, ?, ?, ?, ?)';
+                    const q = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?)';
                     // create new notification
-                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6] ]);
+                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], params.ids[7] ]);
                     
 
                     // send notification to notification specific dealers
@@ -42,15 +42,18 @@ export async function GET(request,{params}) {
                     // get the gcm_regIds of Students to notify
                         // Split the branches string into an array
                         var conditionsString = '';
+                        var query = '';
                         if(params.ids[3]!='All'){ // check for the student type
-                            conditionsString = conditionsString + ' userId="'+params.ids[3]+'" ';
+                            // conditionsString = conditionsString + ' userId="'+params.ids[3]+'" ';
+                            query = 'SELECT gcm_regId FROM users where userId="'+params.ids[3]+'" AND CHAR_LENGTH(gcm_regId) > 3';
                         }
                         else {
-                            conditionsString = conditionsString + ' role="dealer" ';
+                            // conditionsString = conditionsString + ' role="dealer" ';
+                            query = 'SELECT u.gcm_regId from users u JOIN dealer d where d.userId=u.userId AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
                         }
                         
                         // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
-                        const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where ${conditionsString} AND CHAR_LENGTH(gcm_regId) > 3`);
+                        const [nrows, nfields] = await connection.execute(query);
                         connection.release();
                         // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         

@@ -1,5 +1,5 @@
 'use client'
-import { Inter } from 'next/font/google'
+import { Inter, Montserrat } from 'next/font/google'
 import styles from '../../../app/page.module.css'
 import { Monitor, UserFocus, ArrowSquareOut, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files } from 'phosphor-react'
 import Image from 'next/image'
@@ -8,10 +8,11 @@ const biscuits = new Biscuits
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react';
 import Registration from './registration/form/page'
-import SearchStudents from './student360/search/page'
+import SearchStudents from './dealers/page'
 import { Toaster } from "@/app/components/ui/toaster"
 
 const inter = Inter({ subsets: ['latin'] })
+const montserrat = Montserrat({ subsets: ['latin'] })
 
 // export const metadata = {
 //     title: 'Dashboard',
@@ -106,17 +107,17 @@ const inter = Inter({ subsets: ['latin'] })
       router.push('/dashboard')
     }
     function navigateStudents(){
-      // biscuits.set('selectedTab', 'Student 360', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Student 360')
-      router.push('/student360/search')
+      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
+      setSelectedTab('Dealers')
+      router.push('/dealers')
     }
     function navigateOuting(){
-      // biscuits.set('selectedTab', 'Student 360', {path: '/', expires: new Date(Date.now() + 10800000)})
+      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
       setSelectedTab('Outing Requests')
       router.push('/outing')
     }
     function navigateOutingReports(){
-      // biscuits.set('selectedTab', 'Student 360', {path: '/', expires: new Date(Date.now() + 10800000)})
+      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
       setSelectedTab('Outing Reports')
       router.push('/reports')
     }
@@ -136,17 +137,17 @@ const inter = Inter({ subsets: ['latin'] })
 
         <div className={styles.main}>
           
-        <div className={inter.className}>
+        <div className={montserrat.className}>
           <div className={styles.topbar} style={{height:'6vh'}}>
             <div className={styles.horizontalsection}>
-              <Image src="/sc_logo1.svg" alt="Smart Campus" width={160} height={40} priority style={{height:'auto'}}/>
-              <span style={{color: '#CCCCCC'}}>|</span>
-              <Image src="/sves_1.png" alt="Smart Campus" width={90} height={40} priority style={{height:'auto'}} />
+              <Image src="/anjani_title.webp" alt="Anjani Tek" width={160} height={40} priority style={{height:'auto'}}/>
+              {/* <span style={{color: '#CCCCCC'}}>|</span>
+              <Image src="/anjani_title.webp" alt="Anjani Tek" width={90} height={40} priority style={{height:'auto'}} /> */}
               {/* <Image src="/svecw_sc_logo.svg" alt="Smart Campus" width={90} height={40} priority style={{height:'auto'}} /> */}
               {/* <h3>Smart Campus</h3> */}
             </div>
             <div>
-              <p onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >Logout</p>
+              <p onClick={clearCookies.bind(this)} className={`${montserrat.className} ${styles.text2}`} style={{cursor:'pomontserrat'}} >Logout</p>
               {/* <ProfileBtn show={false} /> */}
             </div>
           </div>
@@ -163,24 +164,24 @@ const inter = Inter({ subsets: ['latin'] })
             <div style={{padding:'24px 12px 24px 20px',height: '100%',borderRight: '1px solid #efefef',width:'15%', display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
               
               <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dashboard' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDashboard.bind(this)} style={{cursor:'pointer'}}><Monitor className={styles.menuicon}/> Dashboard</div>
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Student 360' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateStudents.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Student 360</div>
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Requests' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOuting.bind(this)} style={{cursor:'pointer'}}><PersonSimpleRun className={styles.menuicon}/> Outing Requests</div>
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOutingReports.bind(this)} style={{cursor:'pointer'}}><Files className={styles.menuicon}/> Outing Reports</div>
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} style={{cursor:'pointer'}}><ArrowSquareOut className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Outing</div>
-                <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} style={{cursor:'pointer'}}><PresentationChart className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Reports</div> */}
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Registration' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateRegistration.bind(this)} style={{cursor:'pointer'}}><UserPlus className={styles.menuicon}/> Registration</div>
+                <div className={`${styles.horizontalsection} ${montserrat.className} ${selectedTab == 'Dashboard' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDashboard.bind(this)} style={{cursor:'pomontserrat'}}><Monitor className={styles.menuicon}/> Dashboard</div>
+                <div className={`${styles.horizontalsection} ${montserrat.className} ${selectedTab == 'Dealers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateStudents.bind(this)} style={{cursor:'pomontserrat'}}><UserFocus className={styles.menuicon}/> Dealers</div>
+                {/* <div className={`${styles.horizontalsection} ${montserrat.className} ${selectedTab == 'Outing Requests' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOuting.bind(this)} style={{cursor:'pomontserrat'}}><PersonSimpleRun className={styles.menuicon}/> Outing Requests</div>
+                <div className={`${styles.horizontalsection} ${montserrat.className} ${selectedTab == 'Outing Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOutingReports.bind(this)} style={{cursor:'pomontserrat'}}><Files className={styles.menuicon}/> Outing Reports</div> */}
+                {/* <div className={`${styles.horizontalsection} ${montserrat.className} ${styles.text2}`} style={{cursor:'pomontserrat'}}><ArrowSquareOut className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Outing</div>
+                <div className={`${styles.horizontalsection} ${montserrat.className} ${styles.text2}`} style={{cursor:'pomontserrat'}}><PresentationChart className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Reports</div> */}
+                {/* <div className={`${styles.horizontalsection} ${montserrat.className} ${selectedTab == 'Registration' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateRegistration.bind(this)} style={{cursor:'pomontserrat'}}><UserPlus className={styles.menuicon}/> Registration</div> */}
                 
-                {id == 'S33' ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Manage images' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateManageImages.bind(this)} style={{cursor:'pointer'}}><FileImage className={styles.menuicon}/> Manage images</div> : ''}
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Registration' ? styles.text1 : styles.text2}`} onClick={navigateRegistration.bind(this)} style={{cursor:'pointer'}}><IdentificationBadge className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Visitor pass</div> */}
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} ><CalendarCheck className={styles.menuicon} /> Control campus outing</div> */}
+                {/* {id == 'S33' ? <div className={`${styles.horizontalsection} ${montserrat.className} ${selectedTab == 'Manage images' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateManageImages.bind(this)} style={{cursor:'pomontserrat'}}><FileImage className={styles.menuicon}/> Manage images</div> : ''} */}
+                {/* <div className={`${styles.horizontalsection} ${montserrat.className} ${selectedTab == 'Registration' ? styles.text1 : styles.text2}`} onClick={navigateRegistration.bind(this)} style={{cursor:'pomontserrat'}}><IdentificationBadge className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Visitor pass</div> */}
+                {/* <div className={`${styles.horizontalsection} ${montserrat.className} ${styles.text2}`} ><CalendarCheck className={styles.menuicon} /> Control campus outing</div> */}
               </div>
               
               {userData ?
               <div className={styles.verticalsection} style={{gap:'8px',padding: '8px',backgroundColor: '#f0f0f0',border: '1px solid #e5e5e5',borderRadius: '8px'}}>
-                  <p className={`${inter.className} ${styles.text3}  ${styles.tag}`} style={{cursor:'pointer'}} >{userData.role}</p>
-                  <p className={`${inter.className} ${styles.text1}`} style={{cursor:'pointer'}} >{userData.username}</p>
-                  <p onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >Log out</p>
+                  <p className={`${montserrat.className} ${styles.text3}  ${styles.tag}`} style={{cursor:'pomontserrat'}} >{userData.role}</p>
+                  <p className={`${montserrat.className} ${styles.text1}`} style={{cursor:'pomontserrat'}} >{userData.username}</p>
+                  <p onClick={clearCookies.bind(this)} className={`${montserrat.className} ${styles.text2}`} style={{cursor:'pomontserrat'}} >Log out</p>
               </div>
               : ''}
             </div>
@@ -191,7 +192,7 @@ const inter = Inter({ subsets: ['latin'] })
             
 {/* 
           <div style={{height:'8vh',display:'flex',flexDirection:'column',justifyContent:'space-around'}}>
-              <h2 className={inter.className}>{selectedTab}</h2>
+              <h2 className={montserrat.className}>{selectedTab}</h2>
           </div> */}
 
           {children}
@@ -205,7 +206,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 
 
-          {/* <div className={`${styles.bottombar} ${inter.className} ${styles.text3}`} style={{display: 'flex', flexDirection:'column', height:'4vh'}}> 
+          {/* <div className={`${styles.bottombar} ${montserrat.className} ${styles.text3}`} style={{display: 'flex', flexDirection:'column', height:'4vh'}}> 
           Made with 💙 to empower campuses
           <br/>
             
