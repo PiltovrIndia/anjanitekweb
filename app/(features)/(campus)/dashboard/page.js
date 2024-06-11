@@ -122,7 +122,7 @@ export default function Dashboard() {
     const [searchingStats, setSearchingStats] = useState(false);
 
     const [outingData, setOutingData] = useState();
-    const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+    // const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
     const webcamRef = React.useRef(null);
     //create new date object
@@ -524,7 +524,7 @@ const processData = (e) => {
            {uploadProgress ? <Card className="w-[350px]">
                 <CardHeader>
                     <CardTitle>Uploading ...</CardTitle>
-                    <CardDescription>Don't close</CardDescription>
+                    <CardDescription>Do not close</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form>
