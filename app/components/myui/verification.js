@@ -2,18 +2,21 @@
 
 import Registration from '../../(features)/(campus)/registration/form/page'
 import Dashboard from '../../(features)/(campus)/dashboard/page'
-import { Inter, Montserrat } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import Image from 'next/image'
 import { SpinnerGap } from 'phosphor-react'
 import { useEffect, useState } from 'react'
 const inter = Inter({ subsets: ['latin'] })
-const montserrat = Montserrat({ subsets: ['latin'] })
+// const inter = inter({ subsets: ['latin'] })
 import Biscuits from 'universal-cookie'
 import styles from '../../page.module.css'
 import { useRouter } from 'next/navigation'
 const biscuits = new Biscuits
 import dayjs from 'dayjs'
 import Toast from './toast';
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
 
 // declare the apis of this page
   const verifyUser = async (pass, id, otp) => 
@@ -151,7 +154,7 @@ async function loginHere(){
                 // As OTP is already sent, show the OTP prompt text field
 
                 // for now, only allow if user is admin
-                if(resultData.data.role == 'admin'){
+                if(resultData.data.role == 'admin' || resultData.data.role == 'SuperAdmin'){
                     // otp sent
                     setotpSent(true)
                 }
@@ -256,7 +259,14 @@ function clearCookies(){
 //       return false
 //     }
 //   }
-  
+function navigateToPrivacy(){
+    router.push('/privacy')
+  }
+
+  function navigateToSupport(){
+    router.push('/support')
+  }
+
   
 function verifyOTP(){
 
@@ -280,9 +290,13 @@ function verifyOTP(){
             //     router.push('/dashboard')
             // }
             // else 
-            if(queryResult.data.role == 'admin'){
+            if(queryResult.data.role.toLocaleLowerCase() == 'SuperAdmin'.toLocaleLowerCase()){
                 
                 router.push('/dashboard')
+            }
+            else if(queryResult.data.role.toLocaleLowerCase() == 'Admin'.toLocaleLowerCase()){
+                
+                router.push('/dealers')
             }
         }
         else{
@@ -353,22 +367,22 @@ function verifyOTP(){
                 {(!userFound) ?
                 <div className={styles.card_block1}>
             
-                    <p className={`${montserrat.className} ${styles.text1}`}>Your Mobile Number </p><br/>
-                    <input id="mobileNumber" className={`${montserrat.className} ${styles.text2} ${styles.textInput}`} placeholder="" onKeyDown={handleKeyPress}/>
+                    <p className={`${inter.className} ${styles.text1}`}>Your Mobile Number </p><br/>
+                    <input id="mobileNumber" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="" onKeyDown={handleKeyPress}/>
                     <br/><br/>
-                    <button id="submit" onClick={loginHere.bind(this)} className={`${montserrat.className} ${styles.text2} ${styles.primarybtn}`}>Login with OTP</button>
+                    <button id="submit" onClick={loginHere.bind(this)} className={`${inter.className} ${styles.text2} ${styles.primarybtn}`}>Login with OTP</button>
                     <br/>
                     <br/>
                         {(errorMsg.length > 0) ? 
                             
-                            <div className={`${styles.error} ${montserrat.className} ${styles.text2}`}>{errorMsg}</div>
+                            <div className={`${styles.error} ${inter.className} ${styles.text2}`}>{errorMsg}</div>
                             :''}
                         
                     <br/>
                     
                     {(infoMsg) ?
                     <div className={infoMsg ? '':'styles.hidden'}>
-                        <div className={`${montserrat.className} ${styles.text2}`}>
+                        <div className={`${inter.className} ${styles.text2}`}>
                             <br/>We couldnot find you in our system for any of below reasons:<br/>
                             <ul style={{listStyle:'none'}}>
                                 <li>1. Your Mobile Number might be incorrect.</li>
@@ -376,14 +390,14 @@ function verifyOTP(){
                             </ul>  
                         </div>
                         <br/>
-                        <p className={`${montserrat.className} ${styles.text3}`}>Please contact your administration incase you have issues to login to the app</p>
+                        <p className={`${inter.className} ${styles.text3}`}>Please contact your administration incase you have issues to login to the app</p>
                         <br/>
                     </div>
                     :
                     ''}
                     
                     <div>
-                        <p className={`${montserrat.className} ${styles.text3}`}>Contact admin incase of issues to login</p>
+                        <p className={`${inter.className} ${styles.text3}`}>Contact admin incase of issues to login</p>
                         {/* <p className={`${inter.className} ${styles.text3}`}>No account? <a href="/signup"  className={styles.secondarybtn}>Join now</a></p> */}
                     </div>
                     
@@ -401,7 +415,7 @@ function verifyOTP(){
                     <div className={styles.horizontalsection}>
                         {/* <Loader className={`${styles.icon} ${styles.load}`} /> */}
                         <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                        <p className={`${montserrat.className} ${styles.text3}`}>Sending OTP ...</p> 
+                        <p className={`${inter.className} ${styles.text3}`}>Sending OTP ...</p> 
                         {/* <p className={`${inter.className} ${styles.text3}`}>Sending OTP to {username}...</p>  */}
                     </div>
                 </div>
@@ -413,20 +427,21 @@ function verifyOTP(){
             <div>
                 {(otpSent) ?
                 <div className={styles.card_block1}>
-                    <p className={`${montserrat.className} ${styles.text3}`}>Verification</p>
-                    <p className={`${montserrat.className} ${styles.text2}`}>Enter the verification code sent to {email.slice(0, 4).padEnd(email.length, '*')}</p>
+                    <p className={`${inter.className} ${styles.text3}`}>Verification</p>
+                    {/* <p className={`${inter.className} ${styles.text2}`}>Enter the verification code sent to {email.slice(0, 4).padEnd(email.length, '*')}</p> */}
+                    <p className={`${inter.className} ${styles.text2}`}>Enter the verification code sent to {phone.slice(0, 4).padEnd(phone.length, '*')}</p>
                     {/* {phone.slice(0, 4).padEnd(phone.length, '*')} or  */}
                     <br/>
-                    <input id="otp" className={`${styles.input_one} ${montserrat.className} ${styles.text3}`} placeholder="OTP" maxLength="4" style={{letterSpacing:30}}  onKeyDown={handleOTPKeyPress}/>
+                    <input id="otp" className={`${styles.input_one} ${inter.className} ${styles.text3}`} placeholder="OTP" maxLength="4" style={{letterSpacing:30}}  onKeyDown={handleOTPKeyPress}/>
                     <br/>
                     <br/>
-                    <button onClick={clearCookies.bind(this)} className={`${montserrat.className} ${styles.secondarybtn}`}>back</button> &nbsp;&nbsp;
-                    <button onClick={verifyOTP.bind(this)} className={`${montserrat.className} ${styles.primarybtn}`} >Verify OTP</button>
+                    <button onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.secondarybtn}`}>back</button> &nbsp;&nbsp;
+                    <button onClick={verifyOTP.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Verify OTP</button>
                     <div>
                         {(verifyOtpMsg.length) > 0 ?
                         <div>
                             <br/><br/>
-                            <span className={`${montserrat.className} ${styles.text2}`}>{verifyOtpMsg}</span>
+                            <span className={`${inter.className} ${styles.text2}`}>{verifyOtpMsg}</span>
                         </div>
                         :''}
                     </div>
@@ -438,7 +453,13 @@ function verifyOTP(){
             {(resultMessage.length > 0) ? <Toast type={resultType} message={resultMessage} /> : ''}
 
             </div>
-
+            <div className="flex flex-row gap-4 font-normal text-stone-500">
+            <Label onClick={navigateToPrivacy.bind(this)} className={`${inter.className}`} style={{cursor:'pointer'}} >Privacy</Label>
+            <Label onClick={navigateToSupport.bind(this)} className={`${inter.className}`} style={{cursor:'pointer'}} >Support</Label>
+                {/* <Link href={{pathname: '/privacy',}} 
+                      className="underline text-slate-700">Privacy</Link> */}
+                
+            </div>
             <div className='text text-sm text-slate-400 text-muted-foreground'>A Piltovr Product</div>
         </div>
      } 

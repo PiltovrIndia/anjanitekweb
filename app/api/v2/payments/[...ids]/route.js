@@ -41,7 +41,7 @@ export async function GET(request,{params}) {
     // current date time for updating
     var currentDate =  dayjs(new Date(Date.now())).format('YYYY-MM-DD HH:mm:ss');
 
-    const paymentDate = new Date(params.ids[6]);
+    const paymentDate = new Date(params.ids[7]);
     
     try{
 

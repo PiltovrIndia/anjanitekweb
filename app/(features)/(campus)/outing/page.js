@@ -184,9 +184,20 @@ fetch("/api/requeststats/"+pass+"/"+role+"/"+branch+"/All/2/"+date, {
 });
 
 // get the requests for SuperAdmin
-const getAllRequestsDataAPI = async (pass, role, statuses, offset, collegeId, branches, requestType, platformType, year, campusId, dates, branchyears, course) => 
+// const getAllDealersDataAPI = async (pass, role, statuses, offset, collegeId, branches, requestType, platformType, year, campusId, dates, branchyears, course) => 
   
-fetch("/api/requests/"+pass+"/"+role+"/"+statuses+"/"+offset+"/"+collegeId+"/"+branches+"/"+requestType+"/"+platformType+"/"+year+"/"+campusId+"/"+dates+"/"+branchyears+"/"+course, {
+// fetch("/api/requests/"+pass+"/"+role+"/"+statuses+"/"+offset+"/"+collegeId+"/"+branches+"/"+requestType+"/"+platformType+"/"+year+"/"+campusId+"/"+dates+"/"+branchyears+"/"+course, {
+//     method: "GET",
+//     headers: {
+//         "Content-Type": "application/json",
+//         Accept: "application/json",
+//     },
+// });
+
+// get the dealers for SuperAdmin/Admin
+const getAllDealersDataAPI = async (pass, role, offset) => 
+  
+fetch("/api/v2/user/"+pass+"/U5/"+role+"/"+offset, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -206,6 +217,7 @@ export default function Outing() {
 
     // user state and requests variable
     const [user, setUser] = useState();
+    const [role, setRole] = useState('');
     const [offset, setOffset] = useState(0);
     const [completed, setCompleted] = useState(false);
     
@@ -272,21 +284,26 @@ export default function Outing() {
         console.log("Hello1");
     }
 
+    
+
 
     // get the user and fire the data fetch
     useEffect(()=>{
+
+
 
         let cookieValue = biscuits.get('sc_user_detail')
             if(cookieValue){
                 const obj = JSON.parse(decodeURIComponent(cookieValue)) // get the cookie data
 
                 // set the user state variable
-                setUser(obj)
+                setUser(obj);
+                setRole(obj.role);
                 
                 if(!completed){
-                    getCampusesData();
-                    getHostelsData();
-                    getHostelWiseStrengthsData();
+                    // getCampusesData();
+                    // getHostelsData();
+                    // getHostelWiseStrengthsData();
                     // getData();
                     // getDataDetails();
                     getAllRequests(currentStatus, initialDatesValues.from,initialDatesValues.to);
@@ -733,13 +750,13 @@ setTotalInHostelStrength(inHostelSum);
             else {
                 paramBranchYears = 'All';
             }
-            const result  = await getAllRequestsDataAPI(process.env.NEXT_PUBLIC_API_PASS, 
-                JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, 
-                status, 
-                0, 
-                JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'All', '111', '0', selectedCampus, dates,  paramBranchYears, selectedCourse)
+            const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS, 
+                JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, offset) 
+                // status, 
+                // 0, 
+                // JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'All', '111', '0', selectedCampus, dates,  paramBranchYears, selectedCourse)
             
-            // const result  = await getAllRequestsDataAPI(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, status, 0, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'CSE,IT', 'All', '111', '0', JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).campusId, dates, 'BTECH-IT-2,BTECH-IT-3')
+            // const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, status, 0, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'CSE,IT', 'All', '111', '0', JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).campusId, dates, 'BTECH-IT-2,BTECH-IT-3')
             const queryResult = await result.json() // get data
 
             console.log(queryResult);
@@ -1003,7 +1020,7 @@ const handleCourseChange = (newCourse) => {
         </RadioGroup> */}
 
 
-<div className="p-2 border rounded flex flex-row " style={{height:'fit-content', gap: '40px'}}>
+{/* <div className="p-2 border rounded flex flex-row " style={{height:'fit-content', gap: '40px'}}>
         
     <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px',height:'fit-content'}}>
         <div className="flex-1 text-sm text-muted-foreground">Total Hostels Strength:</div>
@@ -1032,11 +1049,11 @@ const handleCourseChange = (newCourse) => {
         </div> : ''}
         <h1>{totalInHostelStrength}</h1>
     </div>
-</div>
+</div> */}
 
         {(viewTypeSelection == 'college') ? 
         <div className="flex items-center py-2" style={{gap:'10px'}}>
-            {(campuses.length != 0) ?
+            {/* {(campuses.length != 0) ?
             <div>
                 <div className="flex-1 text-sm text-muted-foreground">
                     Colleges:
@@ -1046,21 +1063,20 @@ const handleCourseChange = (newCourse) => {
                     <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent >
-                {/* <SelectGroup >
-                    <SelectLabel>Colleges</SelectLabel> */}
+                
                         <SelectItem value='All'>All</SelectItem>
                         {
                             campuses.map((campus) => <SelectItem key={campus.campusId} value={campus.campusId}>{campus.campusId}</SelectItem>)
                         }
-                {/* </SelectGroup> */}
+                
                 </SelectContent>
                 </Select>
             </div>
             : <br/>
-            }
+            } */}
 
             {/* show courses */}
-            {(selectedCampus!=null && selectedCampus != 'All' && courses.length > 0) ?
+            {/* {(selectedCampus!=null && selectedCampus != 'All' && courses.length > 0) ?
                 <div>
                     <div className="flex-1 text-sm text-muted-foreground">
                         Courses:
@@ -1074,15 +1090,14 @@ const handleCourseChange = (newCourse) => {
                             {
                                 courses.map((course) => <SelectItem key={course} value={course}>{course}</SelectItem>)
                             }
-                    {/* </SelectGroup> */}
                     </SelectContent>
                     </Select>
                 </div>
                 : <br/>
-            }
+            } */}
 
             {/* branches selection */}
-            {(branches.length) > 0 ?
+            {/* {(branches.length) > 0 ?
                 <Drawer>
                 <DrawerTrigger className="flex flex-col flex-start">
                     <div className="text-sm">
@@ -1155,21 +1170,21 @@ const handleCourseChange = (newCourse) => {
                     </DrawerFooter>
                 </DrawerContent>
                 </Drawer>
-            : null}
+            : null} */}
 
-        {(campuses.length != 0) ?
+        {/* {(campuses.length != 0) ?
         <div>
             <br/>
             <Button type="submit" size="sm" className="px-3" onClick={getLatestRequests}>Go</Button>
         </div>
-        : null }
+        : null } */}
 
         </div>
 
         :
 
         <div className="flex items-center py-2" style={{gap:'10px'}}>
-            {(hostels.length != 0) ?
+            {/* {(hostels.length != 0) ?
             <div>
                 <div className="flex-1 text-sm text-muted-foreground">
                     Hostels:
@@ -1179,17 +1194,14 @@ const handleCourseChange = (newCourse) => {
                     <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent >
-                {/* <SelectGroup >
-                    <SelectLabel>Colleges</SelectLabel> */}
                         <SelectItem value='All'>All</SelectItem>
                         {
                             hostels.map((hostel) => <SelectItem key={hostel.hostelId} value={hostel.hostelId}>{hostel.hostelName}</SelectItem>)
                         }
-                {/* </SelectGroup> */}
                 </SelectContent>
                 </Select>
             </div>
-            : null}
+            : null} */}
         </div>
     }
 

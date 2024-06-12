@@ -98,6 +98,27 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
                 }
             }
+            // get all the dealers for listing in web
+            else if(params.ids[1] == 'U5'){
+                try {
+                    const [rows, fields] = await connection.execute('SELECT d.userId,d.accountName,d.address1,d.city,d.state,d.gst, SUM(i.pending) as pending FROM dealers d LEFT JOIN `invoices` i ON d.userId = i.billTo GROUP BY d.userId,d.accountName,d.address1,d.city,d.state,d.gst ORDER BY SUM(i.pending) DESC LIMIT 15 OFFSET '+params.ids[3]);
+                    connection.release();
+                    // return successful update
+
+                    // check if user is found
+                    if(rows.length > 0){
+                        // return the requests data
+                        return Response.json({status: 200, data: rows[0], message:'Data found!'}, {status: 200})
+
+                    }
+                    else {
+                        // user doesn't exist in the system
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                }
+            }
             
             //////////////////////
             // Student 360 feature

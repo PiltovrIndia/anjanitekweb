@@ -32,7 +32,7 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 0){ // create notification
                 try {
                     // create query for insert
-                    const q = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?)';
+                    const q = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
                     // create new notification
                     const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], params.ids[7] ]);
                     
@@ -67,10 +67,10 @@ export async function GET(request,{params}) {
                         }
 
                         // var gcmIds = 
-                        // console.log(gcmIds);
+                        console.log(gcmIds);
 
                         // send the notification
-                        const notificationResult = await send_notification(params.ids[5], gcmIds, 'Multiple');
+                        const notificationResult = gcmIds.length > 0 ? await send_notification(params.ids[5], gcmIds, 'Multiple') : null;
                             
                         // return successful update
                         return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})

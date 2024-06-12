@@ -88,13 +88,10 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
       </div>
       : null}
       
-      <div className={cn("grid gap-2")} style={{display:'flex', flexDirection:'column', alignItems:'start'}}>
+      {/* <div className={cn("grid gap-2")} style={{display:'flex', flexDirection:'column', alignItems:'start'}}>
 
-          {/* Statuses as tabs */}
-          {/* Statuses as tabs */}
           <Tabs defaultValue={statusHere} className="w-[400px]">
               <TabsList>
-                {/* <TabsTrigger value="All" onClick={()=>changeStatus('All')}>All</TabsTrigger> */}
                 <TabsTrigger value="InOuting" onClick={()=>changeStatus('InOuting')}>InOuting</TabsTrigger>
                 <TabsTrigger value="Checkout" onClick={()=>changeStatus('Checkout')}>Checkout on</TabsTrigger>
                 <TabsTrigger value="Returned" onClick={()=>changeStatus('Returned')}>Returned</TabsTrigger>
@@ -102,19 +99,9 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
                 <TabsTrigger value="Approved" onClick={()=>changeStatus('Approved')}>Approved</TabsTrigger>
                 <TabsTrigger value="Issued" onClick={()=>changeStatus('Issued')}>Issued</TabsTrigger>
                 
-                {/* <TabsTrigger value="Rejected" onClick={()=>changeStatus('Rejected')}>Rejected</TabsTrigger>
-                <TabsTrigger value="Cancelled" onClick={()=>changeStatus('Cancelled')}>Cancelled</TabsTrigger> */}
               </TabsList>
-              {/* <TabsContent value="All">Make changes to your account here.</TabsContent>
-              <TabsContent value="Submitted">CZhange your password here.</TabsContent>
-              <TabsContent value="Approved">CZhange your password here.</TabsContent>
-              <TabsContent value="Issued">CZhange your password here.</TabsContent>
-              <TabsContent value="InOuting">CZhange your password here.</TabsContent>
-              <TabsContent value="Returned">CZhange your password here.</TabsContent>
-              <TabsContent value="Rejected">CZhange your password here.</TabsContent>
-              <TabsContent value="Cancelled">CZhange your password here.</TabsContent> */}
             </Tabs>
-     </div>
+     </div> */}
 
 
       {/* search input for filtering columns */}
@@ -122,10 +109,10 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
       {/* search input for filtering columns */}
       <div className="flex items-center py-2" style={{display:'flex', justifyContent:'space-between'}}>
         <Input
-          placeholder="Filter students by CollegeId"
-          value={(table.getColumn("collegeId")?.getFilterValue()) ?? ""}
+          placeholder="Filter students by userId"
+          value={(table.getColumn("userId")?.getFilterValue()) ?? ""}
           onChange={(event) =>
-            table.getColumn("collegeId")?.setFilterValue(event.target.value)
+            table.getColumn("userId")?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
@@ -136,14 +123,10 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
       </div>
         <div className="gap-2" style={{display:'flex'}}>
           {/* {(status == 'All') ?  */}
-            <div className="grid max-w-sm items-center gap-1" style={{display:'flex'}}>
+            {/* <div className="grid max-w-sm items-center gap-1" style={{display:'flex'}}>
             {(status == 'Checkout' || status == 'Returned') ? 
                 <Label htmlFor="email" className="text-sm text-muted-foreground">{status} on:</Label> 
                 : null}
-            {/* {(status == 'All' ) ? 
-                <Label htmlFor="email" className="text-sm text-muted-foreground">Submitted on:</Label> :
-                <Label htmlFor="email" className="text-sm text-muted-foreground">{status} on:</Label> } */}
-                {/* <Label htmlFor="email" className="text-sm text-muted-foreground">Submitted on:</Label> */}
                 {(status == 'Checkout' || status == 'Returned' ) ? 
                 <Popover>
                   <PopoverTrigger asChild>
@@ -184,7 +167,7 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
                   </PopoverContent>
                 </Popover>
                 : null }
-                </div>
+                </div> */}
               
           
           {/* : <br/>} */}

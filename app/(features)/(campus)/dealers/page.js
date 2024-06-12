@@ -466,7 +466,7 @@ export default function SearchStudents() {
                 
             {hostels ?  
                 <div className={styles.horizontalsection}>
-                    <div className={`${styles.primarybtn} `} style={{display:'flex', flexDirection:'row', width:'fit-content', cursor:'pomontserrat', gap:'4px'}} onClick={toggleAddStudentOverlay}> 
+                    <div className={`${styles.primarybtn} `} style={{display:'flex', flexDirection:'row', width:'fit-content', cursor:'pointer', gap:'4px'}} onClick={toggleAddStudentOverlay}> 
                         <Plus />
                         <p className={`${montserrat.className}`}>Add dealer</p>
                     </div>
@@ -478,7 +478,7 @@ export default function SearchStudents() {
                 : ''}
                 {(resultMessage.length > 0) ? <Toast type={resultType} message={resultMessage} /> : ''}
                 {/* <div className={styles.horizontalsection}>
-                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pomontserrat', gap:'4px'}} onClick={toggleAddStudentOverlay}> 
+                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pointer', gap:'4px'}} onClick={toggleAddStudentOverlay}> 
                         <Plus />
                         <p className={`${montserrat.className}`}>Add dealer</p>
                     </div>
@@ -567,7 +567,7 @@ export default function SearchStudents() {
                             <div className={styles.titlecard} style={{height: '80vh',alignItems:'stretch',overflow:'scroll'}}>
                             {searchedStudentsList.map(studentItem => (
                             
-                                <div className={styles.verticalsection} key={studentItem.dealerId} style={{alignItems:'stretch', cursor:'pomontserrat'}} onClick={() => showUserDetail(studentItem.dealerId)}>
+                                <div className={styles.verticalsection} key={studentItem.dealerId} style={{alignItems:'stretch', cursor:'pointer'}} onClick={() => showUserDetail(studentItem.dealerId)}>
                                     {/* <p className={`${montserrat.className} ${styles.text2}`} dangerouslySetInnerHTML={{ __html: project.description.replace(/\n/g, '<br>') }}></p> */}
                                     {/* <p className={`${montserrat.className} ${styles.text2}`}>{project.description.replace(/\n/g, '\n')}</p> */}
                                     
@@ -621,7 +621,7 @@ export default function SearchStudents() {
                             <h4 className={`${montserrat.className}`}>Profile</h4>
                             <div className={styles.horizontalsection} >
                                 <div className={styles.horizontalsection}>
-                                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pomontserrat', gap:'4px'}} onClick={toggleUpdateProfileOverlay}> 
+                                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pointer', gap:'4px'}} onClick={toggleUpdateProfileOverlay}> 
                                         <PencilSimple />
                                         <p className={`${montserrat.className}`}>Update profile</p>
                                     </div>
@@ -630,7 +630,7 @@ export default function SearchStudents() {
                                     </div>
                                 </div>
                                 <div className={styles.horizontalsection}>
-                                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pomontserrat', gap:'4px'}} onClick={toggleUpdateParentsOverlay}> 
+                                    <div className={`${styles.btn1} `} style={{width:'fit-content', cursor:'pointer', gap:'4px'}} onClick={toggleUpdateParentsOverlay}> 
                                         <PencilSimple />
                                         <p className={`${montserrat.className}`}>Parents & Hostel</p>
                                     </div>
@@ -897,7 +897,7 @@ export default function SearchStudents() {
                 <div>
                 {isEnlarged ? (
                         <div className="enlarged-image" onClick={toggleEnlarged} style={{ position: 'fixed', top: 0, left: 0, width: '100%',height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, }}>
-                            <img key={id} src={imageUrl} alt="Profile image" style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '8px', cursor: 'pomontserrat',maxWidth: '100%',maxHeight: '100%' }} onClick={toggleEnlarged} />
+                            <img key={id} src={imageUrl} alt="Profile image" style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '8px', cursor: 'pointer',maxWidth: '100%',maxHeight: '100%' }} onClick={toggleEnlarged} />
                         </div>
                     ) : 
                     ''}
@@ -907,7 +907,7 @@ export default function SearchStudents() {
                         alt="Profile image"
                         width={'50px'}
                         height={'50px'}
-                        style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pomontserrat' }}
+                        style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pointer' }}
                         onClick={toggleEnlarged} 
                         title='Click to enlarge'
                     />
@@ -957,7 +957,7 @@ export default function SearchStudents() {
                 <div>
                 {isEnlarged ? (
                         <div className="enlarged-image" onClick={toggleEnlarged} style={{ position: 'fixed', top: 0, left: 0, width: '100%',height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, }}>
-                            <img key={id} src={imageUrl} alt="Profile image" style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '8px', cursor: 'pomontserrat',maxWidth: '100%',maxHeight: '100%' }} onClick={toggleEnlarged} />
+                            <img key={id} src={imageUrl} alt="Profile image" style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '8px', cursor: 'pointer',maxWidth: '100%',maxHeight: '100%' }} onClick={toggleEnlarged} />
                         </div>
                     ) : 
                     ''}
@@ -967,7 +967,7 @@ export default function SearchStudents() {
                         alt="Profile image"
                         width={'200px'}
                         height={'250px'}
-                        style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pomontserrat' }}
+                        style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pointer' }}
                         onClick={toggleEnlarged} 
                         title='Click to enlarge'
                     />
@@ -979,7 +979,7 @@ export default function SearchStudents() {
             //     alt="Downloaded Image"
             //     width={'200px'}
             //     height={'250px'}
-            //     style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pomontserrat' }}
+            //     style={{ objectFit: 'cover', backgroundColor: '#F5F5F5', borderRadius: '10%', cursor: 'pointer' }}
             //     onClick={toggleEnlarged} 
             //   />
             ) : (

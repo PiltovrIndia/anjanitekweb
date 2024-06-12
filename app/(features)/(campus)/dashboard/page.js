@@ -1,11 +1,14 @@
 'use client'
 
-import { Inter, Montserrat } from 'next/font/google'
+import { Inter } from 'next/font/google'
+// import { Inter, Montserrat, DM_Sans, Cabin } from 'next/font/google'
 import { Check, Info, SpinnerGap, X, Plus } from 'phosphor-react'
 import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
-const montserrat = Montserrat({ subsets: ['latin'] })
+// const montserrat = Montserrat({ subsets: ['latin'] })
+// const dmSans = DM_Sans({ subsets: ['latin'] })
+// const cabin = Cabin({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
 import Biscuits from 'universal-cookie'
 const biscuits = new Biscuits
@@ -465,7 +468,7 @@ const processData = (e) => {
     
   return (
     
-        <div  className={montserrat.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px'}}>
+        <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px'}}>
             
           <div className='flex flex-row gap-2 items-center py-4' >
               <h1 className='text-xl font-bold'>Dashboard</h1>
@@ -511,7 +514,7 @@ const processData = (e) => {
 
             {/* <div style={{width:'100%',display:'flex', flexDirection:'row',justifyContent:'space-between'}}>
                 <div className={styles.horizontalsection}>
-                    <div className={`${styles.primarybtn} `} style={{display:'flex', flexDirection:'row', width:'fit-content', cursor:'pomontserrat', gap:'4px'}}> 
+                    <div className={`${styles.primarybtn} `} style={{display:'flex', flexDirection:'row', width:'fit-content', cursor:'pointer', gap:'4px'}}> 
                         <Plus />
                         <p className={`${montserrat.className}`}>New circular</p>
                     </div>
@@ -552,7 +555,7 @@ const processData = (e) => {
 
                         <Card className="w-[350px]">
                             <CardHeader>
-                                {searching ? <Skeleton className="h-4 w-[100px] h-[20px]" /> : <CardTitle>₹{formatter.format(totalOutstanding)}</CardTitle>}
+                                {searching ? <Skeleton className="h-4 w-[100px] h-[20px]" /> : <CardTitle className="text-rose-600">₹{formatter.format(totalOutstanding)}</CardTitle>}
                                 <CardDescription>Total outstanding</CardDescription>
                             </CardHeader>
                             <CardContent>
