@@ -108,7 +108,7 @@ export async function GET(request,{params}) {
                     // check if user is found
                     if(rows.length > 0){
                         // return the requests data
-                        return Response.json({status: 200, data: rows[0], message:'Data found!'}, {status: 200})
+                        return Response.json({status: 200, data: rows, message:'Data found!'}, {status: 200})
 
                     }
                     else {

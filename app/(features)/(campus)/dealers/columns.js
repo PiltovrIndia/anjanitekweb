@@ -93,8 +93,8 @@ export const columns = [
                     <SheetHeader>
                       <SheetTitle>Dealer Details</SheetTitle>
                       <SheetDescription>
-                      <h1 className="text-black-700 text-xl text-foreground">{ row.getValue("accountName")}</h1>
-                      <h1 className="text-black-700 text-xl text-foreground">{ row.getValue("userId")}</h1>
+                      <p className="text-black-700 text-xl text-foreground">{ row.getValue("accountName")}</p>
+                      <p className="text-black-700 text-xl text-foreground">{ row.getValue("userId")}</p>
                       
                       <br/>
                       <br/>
@@ -153,7 +153,7 @@ export const columns = [
                         {/* <Separator /> */}
                         <div className="flex flex-wrap justify-between items-center py-2.5">
                             <p>Pending:</p>
-                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("pending")}</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">{ (row.getValue("pending") != null) ? row.getValue("pending") :'–'}</p>
                         </div>
                         {/* <Separator />
                         <div className="flex flex-wrap justify-between items-center py-2.5">
@@ -214,6 +214,17 @@ export const columns = [
       header: "accountName"
     },
     // {
+    //   accessorKey: "pending",
+    //   // header: "Pending"
+    //   header: ({ column }) => {
+    //     return(
+    //       <div>
+    //        {(column.getValue("pending") != null) ? column.getValue("pending") :'–'}
+    //        </div>
+    //     )
+    //   }
+    // },
+    // {
     //   accessorKey: "requestStatus",
     //   // header: "Status",
     //   header: ({ column }) => {
@@ -229,20 +240,16 @@ export const columns = [
     //   },
     // },
     
-    // {
-    //   accessorKey: "requestType",
-    //   header: "Outing Type",
-    //   cell: ({ row }) => {
-    //     return <div className="flex w-[100px] rounded-md border px-2 py-1 text-xs font-semibold focus:outline-none text-foreground">
-    //               { (row.getValue("requestType")==1) ? 
-    //                     <span>LOCAL</span> : 
-    //                       (row.getValue("requestType")==2) ? 
-    //                       <span>OUT-CITY</span> :  
-    //                           (row.getValue("requestType")==3) ? 
-    //                           <span>OFFICIAL</span> : <span>TEMPORARY</span>}
-    //             </div>
-    //   },
-    // },
+    {
+      accessorKey: "pending",
+      header: "Pending",
+      cell: ({ row }) => {
+        return <div className="flex w-[100px] text-xs font-semibold focus:outline-none text-foreground">
+                  { (row.getValue("pending")==null) ? 
+                        <span>-</span>  : <span>{row.getValue("pending")}</span>}
+                </div>
+      },
+    },
     // {
     //   accessorKey: "requestFrom",
     //   header: "From",

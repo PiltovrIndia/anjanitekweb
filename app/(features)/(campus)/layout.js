@@ -8,7 +8,7 @@ const biscuits = new Biscuits
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react';
 import Registration from './registration/form/page'
-import SearchStudents from './dealers/page'
+import SearchStudents from './search/page'
 import { Toaster } from "@/app/components/ui/toaster"
 
 const inter = Inter({ subsets: ['latin'] })
@@ -109,7 +109,7 @@ const inter = Inter({ subsets: ['latin'] })
       setSelectedTab('Dashboard')
       router.push('/dashboard')
     }
-    function navigateStudents(){
+    function navigateDealers(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
       setSelectedTab('Dealers')
       router.push('/dealers')
@@ -168,8 +168,8 @@ const inter = Inter({ subsets: ['latin'] })
               
               <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dashboard' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDashboard.bind(this)} style={{cursor:'pointer'}}><Monitor className={styles.menuicon}/> Dashboard</div> : <div></div>}
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateStudents.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers</div>
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Requests' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOuting.bind(this)} style={{cursor:'pointer'}}><PersonSimpleRun className={styles.menuicon}/> Outing Requests</div>
+                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealers.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers</div>
+                {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Requests' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOuting.bind(this)} style={{cursor:'pointer'}}><PersonSimpleRun className={styles.menuicon}/> Outing Requests</div> */}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOutingReports.bind(this)} style={{cursor:'pointer'}}><Files className={styles.menuicon}/> Outing Reports</div> */}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} style={{cursor:'pointer'}}><ArrowSquareOut className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Outing</div>
                 <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} style={{cursor:'pointer'}}><PresentationChart className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Reports</div> */}

@@ -49,7 +49,7 @@ export async function GET(request,{params}) {
                         }
                         else {
                             // conditionsString = conditionsString + ' role="dealer" ';
-                            query = 'SELECT u.gcm_regId from users u JOIN dealer d where d.userId=u.userId AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
+                            query = 'SELECT u.gcm_regId from users u JOIN dealers d where d.userId=u.userId AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
                         }
                         
                         // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
@@ -102,7 +102,7 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 2){ // fetch data for specific dealer
                 
-                var q = 'SELECT * from notifications WHERE sentAt > "'+params.ids[3]+'" AND (receiver="'+params.ids[2]+'" OR receiver="All") ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[4];
+                var q = 'SELECT * from notifications WHERE sentAt < "'+params.ids[3]+'" AND (receiver="'+params.ids[2]+'" OR receiver="All") ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[4];
                 
                 const [rows, fields] = await connection.execute(q);
                 // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" AND branch = "All" or FIND_IN_SET("'+params.ids[4]+'", branch)>0 ORDER BY createdOn DESC');

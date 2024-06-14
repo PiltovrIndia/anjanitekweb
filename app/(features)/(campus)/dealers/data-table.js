@@ -118,9 +118,9 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
         />
         &nbsp;
         &nbsp;
-        <div className="flex-1 text-sm text-muted-foreground">
-        {table.getFilteredRowModel().rows.length} requests.
-      </div>
+        {/* <div className="flex-1 text-sm text-muted-foreground">
+          {table.getFilteredRowModel().rows.length} dealers.
+        </div> */}
         <div className="gap-2" style={{display:'flex'}}>
           {/* {(status == 'All') ?  */}
             {/* <div className="grid max-w-sm items-center gap-1" style={{display:'flex'}}>
@@ -171,7 +171,7 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
               
           
           {/* : <br/>} */}
-          <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button>
+          {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button> */}
         </div>
       </div>
       
@@ -224,7 +224,7 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
         {/* pagination */}
         {/* pagination */}
       <div className="flex items-center justify-end space-x-2 py-4 px-4">
-        <div className="flex-1 text-sm text-muted-foreground">{table.getFilteredRowModel().rows.length} requests</div>
+        <div className="flex-1 text-sm text-muted-foreground">{table.getFilteredRowModel().rows.length} dealers</div>
           <Button
             variant="outline"
             size="sm"
