@@ -48,8 +48,8 @@ export default function Home() {
     <main className={styles.main}>
       <div className={styles.description}>
         
-          <OnboardNewCampuses />
-          {/* <Vertification /> */}
+          {/* <OnboardNewCampuses /> */}
+          <Vertification />
 
 
           {/* <BlockDates /> */}

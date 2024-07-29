@@ -26,15 +26,15 @@ export default function PrivacyPolicy() {
             <br/>
             <Lock width={'48px'} height={'48px'}/>
             <br/>
-            <h1 className='text-3xl'>Privacy Policy of Smart Campus Platform</h1> 
+            <h1 className='text-3xl'>Privacy Policy of Anjani Tek</h1> 
             <br/>
-            <p className={`${inter.className} ${styles.text2}`} >Smart Campus operates the https://smartcampus.tools website, which provides the SERVICE.</p>
+            <p className={`${inter.className} ${styles.text2}`} >Anjani Tek operates the https://anjanitek.com website, which provides the SERVICE.</p>
 
         <p className={`${inter.className} ${styles.text2}`} >This page is used to inform website visitors regarding our policies with the collection, use, and disclosure of Personal Information if anyone decided to use our Service, the Smart Campus website.</p>
 
         <p className={`${inter.className} ${styles.text2}`} >If you choose to use our Service, then you agree to the collection and use of information in relation with this policy. The Personal Information that we collect are used for providing and improving the Service. We will not use or share your information with anyone except as described in this Privacy Policy.</p>
 
-        <p className={`${inter.className} ${styles.text2}`} >The terms used in this Privacy Policy have the same meanings as in our Terms and Conditions, which is accessible at https://mysmartcampus.app, unless otherwise defined in this Privacy Policy. Our Privacy Policy was created with the help of the <a href="https://www.privacypolicytemplate.net">Privacy Policy Template</a> and the <a href="https://www.disclaimergenerator.org/">Disclaimer Generator</a>.</p>
+        <p className={`${inter.className} ${styles.text2}`} >The terms used in this Privacy Policy have the same meanings as in our Terms and Conditions, which is accessible at https://anjanitek.com, unless otherwise defined in this Privacy Policy. Our Privacy Policy was created with the help of the <a href="https://www.privacypolicytemplate.net">Privacy Policy Template</a> and the <a href="https://www.disclaimergenerator.org/">Disclaimer Generator</a>.</p>
 <br/>
         <h2 className={`${inter.className} ${styles.h2}`}>Information Collection and Use</h2>
 

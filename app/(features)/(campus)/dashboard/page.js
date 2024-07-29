@@ -1,21 +1,51 @@
 'use client'
 
 import { Inter } from 'next/font/google'
+// import { Inter, Montserrat, DM_Sans, Cabin } from 'next/font/google'
 import { Check, Info, SpinnerGap, X, Plus } from 'phosphor-react'
 import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
+// const montserrat = Montserrat({ subsets: ['latin'] })
+// const dmSans = DM_Sans({ subsets: ['latin'] })
+// const cabin = Cabin({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
 import Biscuits from 'universal-cookie'
 const biscuits = new Biscuits
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 // import ImageWithShimmer from '../../components/imagewithshimmer'
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+// import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 // const storage = getStorage();
 import firebase from '../../../../app/firebase';
 import Toast from '../../../../app/components/myui/toast'
-const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+  } from "../../../../app/components/ui/card"
+  import { Input } from "../../../../app/components/ui/input"
+  import { Label } from "../../../../app/components/ui/label"
+  import { Button } from "../../../../app/components/ui/button"
+  import { Skeleton } from "../../../../app/components/ui/skeleton"
+  import { Toaster } from "../../../../app/components/ui/sonner"
+  import { toast, ToastAction } from "sonner"
+
+  import {
+    Sheet,
+    SheetClose,
+    SheetContent,
+    SheetDescription,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+  } from "../../../../app/components/ui/sheet"
+// const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
+import * as XLSX from 'xlsx';
 
 
 // Create a child reference
@@ -23,13 +53,24 @@ const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
 // imagesRef now points to 'images'
 
 // Child references can also take paths delimited by '/'
-const spaceRef = ref(storage, '/');
+// const spaceRef = ref(storage, '/');
 
 // const spaceRef = ref(storage, 'images/space.jpg');
 // check for the user
+const getPending = async (pass, role, branch) => 
+  
+fetch("/api/v2/amount/"+pass+"/U5", {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// get dealer count by location
 const getStats = async (pass, role, branch) => 
   
-fetch("/api/requeststats/"+pass+"/"+role+"/"+branch+"/All/1", {
+fetch("/api/v2/dealerstats/"+pass+"/0", {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -39,9 +80,10 @@ fetch("/api/requeststats/"+pass+"/"+role+"/"+branch+"/All/1", {
 
 // const spaceRef = ref(storage, 'images/space.jpg');
 // check for the user
-const getDetailedStats = async (pass, role, branch, date) => 
-  
-fetch("/api/requeststats/"+pass+"/"+role+"/"+branch+"/All/2/"+date, {
+const updateUploadData = async (pass, items1, adminId) => 
+// userId, paymentAmount, type, transactionId, paymentDate,
+// userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
+fetch("/api/v2/payments/"+pass+"/web/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -63,13 +105,15 @@ export default function Dashboard() {
     const [branch, setBranch] = useState('');
     const [offset, setOffset] = useState(0);
     const [completed, setCompleted] = useState(false);
-    const [totalStudents, setTotalStudents] = useState(0);
-    const [studentsInCampus, setStudentsInCampus] = useState(0);
+    const [uploadProgress, setUploadProgress] = useState(false);
+    const [items, setItems] = useState([]);
+    const [file, setFile] = useState(null); 
     
-    const [requestsInOuting, setRequestsInOuting] = useState(0);
-    const [requestsIssued, setRequestsIssued] = useState(0);
-    const [requestsApproved, setRequestsApproved] = useState(0);
-    const [requestsPending, setRequestsPending] = useState(0);
+    const [totalOutstanding, setTotalOutstanding] = useState(0);
+    const [dueDate, setDueDate] = useState(0);
+    const [invoicesList, setInvoicesList] = useState([]);
+    const [regionsList, setRegionsList] = useState([]);
+    const [daysLeft, setDaysLeft] = useState(0);
 
     const [resultType, setResultType] = useState('');
     const [resultMessage, setResultMessage] = useState('');
@@ -78,15 +122,23 @@ export default function Dashboard() {
     const [dataFound, setDataFound] = useState(true); // use to declare 0 rows
     const [inputError, setInputError] = useState(false);
     const [searching, setSearching] = useState(false);
+    const [searchingStats, setSearchingStats] = useState(false);
 
     const [outingData, setOutingData] = useState();
-    const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+    // const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
     const webcamRef = React.useRef(null);
     //create new date object
     const today = new dayjs();
+    // const { toast } = useToast()
     
     
+// Create an instance of Intl.NumberFormat for Indian numbering system with two decimal places
+const formatter = new Intl.NumberFormat('en-IN', {
+    style: 'decimal',  // Use 'currency' for currency formatting
+    minimumFractionDigits: 2,  // Minimum number of digits after the decimal
+    maximumFractionDigits: 2   // Maximum number of digits after the decimal
+});
 
 
     // get the user and fire the data fetch
@@ -101,7 +153,8 @@ export default function Dashboard() {
                 
                 if(!completed){
                     getData();
-                    getDataDetails();
+                    getDealerStats();
+                    // getDataDetails();
                 }
                 else {
                     console.log("DONE READING");
@@ -162,66 +215,52 @@ export default function Dashboard() {
         setOffset(offset+10); // update the offset for every call
 
         try {    
-            const result  = await getStats(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).branch)
+            const result  = await getPending(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).branch)
             const queryResult = await result.json() // get data
-
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
                 // check if data exits
                 if(queryResult.data.length > 0){
-
+                    // console.log(queryResult.data);
                     // set the state
                     // total students
                     const result = queryResult.data;
+                    var invoicesList;
+                    if (result && result.length > 0) {
+                        
+                        // Calculate total sum of pending amounts
+                        const totalSum = result.reduce((sum, invoice) => sum + invoice.pending, 0);
 
-                    // Initialize counters
-                    let inHostel = 0;
-                    let totalStrength = 0;
+                            // Find the earliest expiry date
+                            const earliestExpiryDate = result
+                            .map(invoice => dayjs(invoice.expiryDate))  // Convert all expiry dates to dayjs objects
+                            .reduce((earliest, currentExpiry) => {
+                                return earliest.isBefore(currentExpiry) ? earliest : currentExpiry;
+                            }, dayjs('9999-12-31'));
+               
+                            // Calculate the difference in days
+                            const today = dayjs();  // Gets today's date
+                            const daysBetween = earliestExpiryDate.diff(today, 'day');  // 'day' ensures the difference is calculated in days
 
-                    // Iterate through the array
-                    for (const element of result) {
-                        if (element.requestStatus === 'InOuting') {
-                            inHostel += element.count;
-                        }
+                            // Format the earliest date in a friendly format, e.g., January 1, 2023
+                            // const formattedDate = formatDate(earliestExpiryDate, 'MMMM d, yyyy');
+                            const formattedDate = dayjs(earliestExpiryDate).format('MMMM D, YYYY');
 
-                        if (element.requestStatus === 'InCampus') {
-                            totalStrength += element.count;
-                            setTotalStudents(element.count)
-                        }
-                        if (element.requestStatus === 'InOuting') {
-                            setRequestsInOuting(element.count)
-                        }
-                        if (element.requestStatus === 'Issued') {
-                            setRequestsIssued(element.count)
-                        }
-                        if (element.requestStatus === 'Approved') {
-                            setRequestsApproved(element.count)
-                        }
-                        if (element.requestStatus === 'Submitted') {
-                            setRequestsPending(element.count)
-                        }
-                    }
+                            setInvoicesList(result);
+                            setTotalOutstanding(totalSum);
+                            setDueDate(formattedDate);
+                            setDaysLeft(daysBetween);
 
-                    // Calculate studentsInCampus
-                    setStudentsInCampus(totalStrength - inHostel);
-                    
-                    
-                    // setStudentsGraph({name:'Total',value: totalStrength},{name: 'In campus',value:studentsInCampus});
-                    
-                    // setTotalStudents(result[0].requestStatus);
-                    // setStudentsInCampus(result[0].requestStatus);
-                    // setStudentsInCampus(queryResult.data[7].count);
-
-                    // check if students are present and accordingly add students list
-                    // if(studentsList==null){
-                    //    setStudentsList(queryResult.data)
-                    // }
-                    // else {
-                    //     setStudentsList((studentsList) => [...studentsList, ...queryResult.data]);
-                    // }
-                    // set data found
+                            console.log("found.");
+                        
+                      } else {
+                        console.log("No invoices data found.");
+                      }
+                   
                     setDataFound(true);
+                    setSearching(false);
                 }
                 else {
                     
@@ -231,19 +270,7 @@ export default function Dashboard() {
                 setSearching(false);
                 setCompleted(false);
             }
-            else if(queryResult.status == 401) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-            else if(queryResult.status == 404) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-            else if(queryResult.status == 201) {
+            else {
                 
                 setSearching(false);
                 setDataFound(false);
@@ -251,7 +278,88 @@ export default function Dashboard() {
             }
         }
         catch (e){
-            
+            console.log(e);
+            // show and hide message
+            setResultType('error');
+            setResultMessage('Issue loading. Please refresh or try again later!');
+            setTimeout(function(){
+                setResultType('');
+                setResultMessage('');
+            }, 3000);
+        }
+}
+
+    // get dealer stats
+    async function getDealerStats(){
+        
+        setSearchingStats(true);
+        setOffset(offset+10); // update the offset for every call
+
+        try {    
+            const result  = await getStats(process.env.NEXT_PUBLIC_API_PASS)
+            const queryResult = await result.json() // get data
+            // console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                // check if data exits
+                if(queryResult.data.length > 0){
+                    // console.log(queryResult.data);
+                    // set the state
+                    // total students
+                    const result = queryResult.data;
+                    
+                    if (result && result.length > 0) {
+                        
+                        // Calculate total sum of pending amounts
+                        // const totalSum = result.reduce((sum, invoice) => sum + invoice.pending, 0);
+
+                            // Find the earliest expiry date
+                            // const earliestExpiryDate = result
+                            // .map(invoice => dayjs(invoice.expiryDate))  // Convert all expiry dates to dayjs objects
+                            // .reduce((earliest, currentExpiry) => {
+                            //     return earliest.isBefore(currentExpiry) ? earliest : currentExpiry;
+                            // }, dayjs('9999-12-31'));
+               
+                            // // Calculate the difference in days
+                            // const today = dayjs();  // Gets today's date
+                            // const daysBetween = earliestExpiryDate.diff(today, 'day');  // 'day' ensures the difference is calculated in days
+
+                            // // Format the earliest date in a friendly format, e.g., January 1, 2023
+                            // // const formattedDate = formatDate(earliestExpiryDate, 'MMMM d, yyyy');
+                            // const formattedDate = dayjs(earliestExpiryDate).format('MMMM D, YYYY');
+
+                            setRegionsList(result);
+                            // setTotalOutstanding(totalSum);
+                            // setDueDate(formattedDate);
+                            // setDaysLeft(daysBetween);
+
+                            console.log("found.");
+                        
+                      } else {
+                        console.log("No invoices data found.");
+                      }
+                   
+                    setDataFound(true);
+                    setSearchingStats(false);
+                }
+                else {
+                    
+                    setDataFound(false);
+                }
+
+                setSearchingStats(false);
+                setCompleted(false);
+            }
+            else {
+                
+                setSearchingStats(false);
+                setDataFound(false);
+                setCompleted(true);
+            }
+        }
+        catch (e){
+            console.log(e);
             // show and hide message
             setResultType('error');
             setResultMessage('Issue loading. Please refresh or try again later!');
@@ -266,56 +374,38 @@ export default function Dashboard() {
     // get the requests data
     // for the user based on their role.
     // the actions will be seen that are specific to the role and by the selected status
-    async function getDataDetails(){
+    async function getDataDetails(items1){
         
-        setSearching(true);
-        setOffset(offset+10); // update the offset for every call
-
+        setUploadProgress(true);
+        
         try {    
-            const result  = await getDetailedStats(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).branch, dayjs(today.toDate()).format("YYYY-MM-DD"))
+            const result  = await updateUploadData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId)
             const queryResult = await result.json() // get data
-
+            console.log("Call2 for Upload...");
             // check for the status
             if(queryResult.status == 200){
 
-                // check if data exits
-                if(queryResult.data.length > 0){
 
-                    // set the state
-                    // outing data
-                    setOutingData(queryResult.data.slice(0, 4).reverse());
-                    
-                    setDataFound(true);
-                }
-                else {
-                    
-                    setDataFound(false);
-                }
+                setUploadProgress(false);
 
-                setSearching(false);
-                setCompleted(false);
+                toast("Data is uploaded", {
+                    description: "Refresh to view updated data",
+                    action: {
+                      label: "Okay",
+                      onClick: () => console.log("Okay"),
+                    },
+                  })
+
+                // toast("Event has been created.")
+
             }
-            else if(queryResult.status == 401) {
+            else {
                 
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-            else if(queryResult.status == 404) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-            else if(queryResult.status == 201) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
+                setUploadProgress(false);
             }
         }
         catch (e){
-            
+            console.log(e);
             // show and hide message
             setResultType('error');
             setResultMessage('Issue loading. Please refresh or try again later!');
@@ -326,22 +416,107 @@ export default function Dashboard() {
         }
 }
 
+const handleFileSelect = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+        setFile(selectedFile);  // Update state
+    } else {
+        console.log("No file selected.");
+    }
+};
+
+const processData = (e) => {
+    console.log("Uploading...");
+    
+    if (file) {
+        const reader = new FileReader();
+
+        reader.onload = (event) => {
+            const binaryString = event.target.result;
+            const workbook = XLSX.read(binaryString, {type: 'binary'});
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Specify date format directly in the read operation
+            const data = XLSX.utils.sheet_to_json(worksheet, {
+                dateNF: 'yyyy-mm-dd hh:mm:ss', // Format date columns
+                raw: false, // Do not use raw values (this ensures that dates are processed)
+            });
+            
+            // Optionally process amounts to ensure they are decimals with two decimal places
+            const processedData = data.map(item => ({
+                ...item,
+                amount: typeof item.amount === 'number' ? parseFloat(item.amount.toFixed(2)) : item.amount,
+            }));
+
+
+            setItems(data);
+            getDataDetails(data);
+            // const data = XLSX.utils.sheet_to_json(worksheet);
+            // setItems(data);
+            // getDataDetails(data);
+        };
+
+        reader.readAsBinaryString(file);
+    } else {
+        console.log("Please select a file first.");
+    }
+    
+}
 
 
     
   return (
     
-        <div className={styles.verticalsection} style={{height:'100vh',gap:'8px'}}>
+        <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px'}}>
             
-          <div style={{height:'8vh',display:'flex',flexDirection:'column',justifyContent:'space-around'}}>
-              <h2 className={inter.className}>Dashboard</h2>
+          <div className='flex flex-row gap-2 items-center py-4' >
+              <h1 className='text-xl font-bold'>Dashboard</h1>
+              
+              <Sheet>
+                <SheetTrigger asChild>
+                    <Button>Upload data</Button>
+                </SheetTrigger>
+                <SheetContent>
+                    <SheetHeader>
+                    <SheetTitle>File upload</SheetTitle>
+                    <SheetDescription>
+                        Make sure you use the correct format. Click Upload now when file is selected.
+                    </SheetDescription>
+                    </SheetHeader>
+                    <div className="grid gap-4 py-4">
+                        <br/>
+                        {/* <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="name" className="text-right">
+                            Name
+                            </Label>
+                            <Input id="name" value="Pedro Duarte" className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="username" className="text-right">
+                            Username
+                            </Label>
+                            <Input id="username" value="@peduarte" className="col-span-3" />
+                        </div> */}
+                        <div className="grid w-full max-w-sm items-center gap-1.5">
+                            <Label htmlFor="picture">Data file</Label>
+                            <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
+                        </div>
+                    </div>
+                    <SheetFooter>
+                    <SheetClose asChild>
+                        <Button type="submit" onClick={processData}>Upload now</Button>
+                    </SheetClose>
+                    </SheetFooter>
+                </SheetContent>
+                </Sheet>
           </div>      
 
             {/* <div style={{width:'100%',display:'flex', flexDirection:'row',justifyContent:'space-between'}}>
                 <div className={styles.horizontalsection}>
                     <div className={`${styles.primarybtn} `} style={{display:'flex', flexDirection:'row', width:'fit-content', cursor:'pointer', gap:'4px'}}> 
                         <Plus />
-                        <p className={`${inter.className}`}>New circular</p>
+                        <p className={`${montserrat.className}`}>New circular</p>
                     </div>
                     <div className={`${styles.overlayBackground} ${showAddStudent ? styles.hideshowdivshow : styles.hideshowdiv}`}>
                         <AddStudent toggleAddStudentOverlay={toggleAddStudentOverlay}/> 
@@ -349,207 +524,99 @@ export default function Dashboard() {
                 </div>
                
             </div> */}
-          
-         
+           {uploadProgress ? <Card className="w-[350px]">
+                <CardHeader>
+                    <CardTitle>Uploading ...</CardTitle>
+                    <CardDescription>Do not close</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form>
+                    <div className="grid w-full items-center gap-4">
+                        <div className="flex flex-col space-y-1.5">
+                            <Skeleton className="h-4 w-[100px] h-[20px]" />
+                        </div>
+                        
+                    </div>
+                    </form>
+                </CardContent>
+                {/* <CardFooter className="flex justify-between">
+                    <Button>Send messages</Button>
+                </CardFooter> */}
+            </Card> : null}
+            <Toaster />
         <div className={styles.verticalsection} style={{height:'80vh', width:'100%',gap:'8px'}}>
 
         <div className={styles.horizontalsection} style={{height:'100%', width:'100%'}}>
 
-                <div className={styles.carddatasection} key={1234} style={{height:'100%', width:'100%'}}>
+                <div key={1234} style={{height:'100%', width:'100%', }}>
                        
-                <div className={styles.verticalsection} style={{height:'100%',width:'100%',overflow:'scroll'}}>
+                    <div className='flex flex-col gap-2' style={{width:'100%',overflow:'scroll'}}>
                         
-                        <p className={`${inter.className} ${styles.text1_heading}`}>STUDENTS</p>
-                        <div className={styles.horizontalsection} style={{gap:'16px',paddingTop:'4px'}}>
-                           
-                            <div className={`${inter.className}`} style={{display:'flex',flexDirection:'column',gap:'8px', borderLeft: '4px solid #e5e5e5',padding: '4px 12px', width:'260px !important'}}>
-                                {/* <input id="userObjectId" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="Unique user ID"/> */}
-                                {/* <button onClick={getData.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Find</button> */}
-                                <p className={`${inter.className} ${styles.text3}`}>Hostel strength:</p>
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                {/* <div className={`${inter.className} ${styles.text1}`}>{totalStudents}</div>  */}
-                                <h2>{totalStudents}</h2>
-                            </div>
-                            <div className={`${inter.className}`} style={{display:'flex',flexDirection:'column',gap:'8px', borderLeft: '4px solid #e5e5e5',padding: '4px 12px', width:'260px !important'}}>
-                                {/* <input id="userObjectId" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="Unique user ID"/> */}
-                                {/* <button onClick={getData.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Find</button> */}
-                                <p className={`${inter.className} ${styles.text3}`}>Students in campus hostel:</p>
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                {/* <div className={`${inter.className} ${styles.text1}`}>{totalStudents}</div>  */}
-                                <h2>{studentsInCampus}</h2>
-                            </div>
-                        </div>
-                            
-                         {/* OUTING */}
-                         <br/>
-                        <p className={`${inter.className} ${styles.text1_heading}`}>OUTING REQUESTS</p>
-                        <div className={styles.horizontalsection} style={{gap:'16px',paddingTop:'4px',paddingBottom:'8px',width:'100%'}}>
-                           
-                            <div className={`${inter.className}`} style={{display:'flex',flexDirection:'column',gap:'8px', borderLeft: '4px solid #0088FE',padding: '4px 12px', width:'160px !important'}}>
-                                {/* <input id="userObjectId" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="Unique user ID"/> */}
-                                {/* <button onClick={getData.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Find</button> */}
-                                <p className={`${inter.className} ${styles.text3}`}>Pending:</p>
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                {/* <div className={`${inter.className} ${styles.text1}`}>{totalStudents}</div>  */}
-                                <h2>{requestsPending}</h2>
-                            </div>
-                            <div className={`${inter.className}`} style={{display:'flex',flexDirection:'column',gap:'8px', borderLeft: '4px solid #00C49F',padding: '4px 12px', width:'160px !important'}}>
-                                {/* <input id="userObjectId" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="Unique user ID"/> */}
-                                {/* <button onClick={getData.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Find</button> */}
-                                <p className={`${inter.className} ${styles.text3}`}>Approved:</p>
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                {/* <div className={`${inter.className} ${styles.text1}`}>{totalStudents}</div>  */}
-                                <h2>{requestsApproved}</h2>
-                            </div>
-                            <div className={`${inter.className}`} style={{display:'flex',flexDirection:'column',gap:'8px', borderLeft: '4px solid #FFBB28',padding: '4px 12px', width:'160px !important'}}>
-                                {/* <input id="userObjectId" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="Unique user ID"/> */}
-                                {/* <button onClick={getData.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Find</button> */}
-                                <p className={`${inter.className} ${styles.text3}`}>Issued:</p>
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                {/* <div className={`${inter.className} ${styles.text1}`}>{totalStudents}</div>  */}
-                                <h2>{requestsIssued}</h2>
-                            </div>
-                            <div className={`${inter.className}`} style={{display:'flex',flexDirection:'column',gap:'8px', borderLeft: '4px solid #FF8042',padding: '4px 12px', width:'160px !important'}}>
-                                {/* <input id="userObjectId" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="Unique user ID"/> */}
-                                {/* <button onClick={getData.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Find</button> */}
-                                <p className={`${inter.className} ${styles.text3}`}>In outing:</p>
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                {/* <div className={`${inter.className} ${styles.text1}`}>{totalStudents}</div>  */}
-                                <h2>{requestsInOuting}</h2>
-                            </div>
-                        </div>
-                            
-                        <div className={styles.horizontalsection}>
-                            <div className={styles.verticalsection} style={{gap:'16px',padding:'8px 24px 12px 0px', backgroundColor:'#8fc8a870',borderRadius:'8px'}}>
-                                {/* <p className={`${inter.className} ${styles.text1}`} style={{paddingLeft:'8px'}}>Last 3 months</p> */}
-                                <p className={`${inter.className} ${styles.text1_heading}`} style={{paddingTop:'4px',paddingLeft:'16px'}}>LAST 3 MONTHS</p>
-                                <AreaChart width={500} height={264} data={outingData} className={`${inter.className} ${styles.text3}`} >
-                                    <defs>
-                                        <linearGradient id="colorUv2" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="darkgreen" stopOpacity={0.8}/>
-                                        <stop offset="95%" stopColor="darkgreen" stopOpacity={0.2}/>
-                                        </linearGradient>
 
-                                        {/* background-image: linear-gradient(120deg, #f093fb 0%, #f093fb 100%); */}
-                                        <linearGradient id="colorPv2" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="darkgreen" stopOpacity={0.8}/>
-                                        <stop offset="95%" stopColor="darkgreen" stopOpacity={0.2}/>
-                                        </linearGradient>
-                                    </defs>
-                                    <XAxis dataKey="month_year" tick={{ fill: 'darkgreen' }} strokeWidth={0} padding={'4px'}/>
-                                    <YAxis tick={{ fill: 'darkgreen' }} strokeWidth={0} />
-                                    <Tooltip />
-                                    <Area type="monotone" dataKey="request_count" stroke="url(#colorUv2)" fillOpacity={1} fill="url(#colorUv2)" strokeWidth={2} />
-                                </AreaChart>
-                            </div>
+                        <Card className="w-[350px]">
+                            <CardHeader>
+                                {searching ? <Skeleton className="h-4 w-[100px] h-[20px]" /> : <CardTitle className="text-rose-600">₹{formatter.format(totalOutstanding)}</CardTitle>}
+                                <CardDescription>Total outstanding</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <form>
+                                <div className="grid w-full items-center gap-4">
+                                    {/* <div className="flex flex-col space-y-1.5">
+                                        <Label>Latest end date</Label>
+                                        <p >{dueDate}</p>
+                                    </div> */}
+                                    <div className="flex flex-col space-y-1.5">
+                                        <Label>Pending invoices</Label>
+                                        <p >{invoicesList.length}</p>
+                                    </div>
+                                    
+                                </div>
+                                </form>
+                            </CardContent>
+                            <CardFooter className="flex justify-between">
+                                <Button variant='outline' onClick={()=>getData()}>Refresh</Button>
+                            </CardFooter>
+                        </Card>
                         
-                            {/* <div className={styles.horizontalsection} style={{gap:'16px',paddingTop:'4px',width:'100%', backgroundColor:'darkseagreen',borderRadius:'8px'}}>
-                                
-                                <LineChart width={600} height={200} data={outingData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }} className={`${inter.className} ${styles.text3}`}>
-                                    <Line type="monotone" dataKey="request_count" stroke="darkgreen" width={'2px'} label="req" strokeWidth={3}/>
-                                    <XAxis dataKey="month_year" />
-                                    <YAxis />
-                                    <Tooltip />
-                                </LineChart>
-                            </div> */}
+                        <br/>
+                        <h2 className='text-l font-semibold'>Dealers by region and outstanding</h2>
                         
-                        {/* <ResponsiveContainer style={{width:'100%',height:'100%'}}> */}
-                            <div className={styles.verticalsection} style={{backgroundColor:'#c8c8c840',borderRadius:'8px'}}>
-                            {/* <div className={styles.verticalsection} style={{backgroundColor:'#e1bf7840',borderRadius:'8px'}}> */}
+                        {searchingStats ? <Skeleton className="h-4 w-[300px] h-[100px]" /> :
+                        <div className="flex flex-row gap-2" >
+                        {regionsList.map(regionItem => (
                             
-                                <p className={`${inter.className} ${styles.text1_heading}`} style={{paddingLeft:'12px',paddingTop:'8px'}}>REQUESTS BREAKUP</p>
-                                <PieChart width={300} height={292} className={`${inter.className} ${styles.text3}`}>
-                                    <Pie
-                                        data={[{name: 'Pending', value:requestsPending},{name:'Approved',value:requestsApproved},{name:'Issued',value:requestsIssued},{name:'In outing',value:requestsInOuting}]}
-                                        cx="50%"
-                                        cy="50%"
-                                        labelLine={true}
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        fill="#8884d8"
-                                        dataKey="value"
-                                        label>
-
-                                        {[{name: 'Pending', value:requestsPending},{name:'Approved',value:requestsApproved},{name:'Issued',value:requestsIssued},{name:'In outing',value:requestsInOuting}].map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} className={`${inter.className} ${styles.text3}`} style={{borderRadius:'8px'}}/>
-                                        ))}
-                                    </Pie>
-                                <Tooltip />
-                                </PieChart>
-                            </div>
-                        </div>
-                        {/* </ResponsiveContainer> */}
-{/*                        
-                       <PieChart width={300} height={300} className={`${inter.className} ${styles.text3}`} >
-                            <Pie
-                                dataKey="value"
-                                data={studentsGraph1}
-                                cx="200"
-                                cy="200"
-                                innerRadius={40}
-                                outerRadius={80}
-                                fill="#8884d8"
-                                label
-                            />
+                                <Card className="w-[250px]" key={regionItem.state}>
+                                    <br/>
+                                    <CardContent>
+                                        <form>
+                                        <p className='text-l font-semibold text-green-700'>{regionItem.state.split('-')[1]}</p>
+                                        <Label className='text-m font-normal'>{regionItem.dealers} Dealers</Label>
+                                        <br/>
+                                        <br/>
+                                        <div className="grid w-full items-center gap-4">
+                                            <div className="flex flex-col space-y-1.5">
+                                                {/* <Label className='text-m font-normal'>{regionItem.dealers} Dealers</Label> */}
+                                                <Label className='text-xl font-semibold'>₹{formatter.format(regionItem.pending)}</Label>
+                                            </div>
+                                            
+                                        </div>
+                                        </form>
+                                    </CardContent>
+                                    <CardFooter className="flex justify-between">
+                                        <Button variant='outline'>View details</Button>
+                                    </CardFooter>
+                                </Card>
                             
-                        </PieChart> */}
-
-                       
+                        ))}
+                        </div>}
                         {(resultMessage.length > 0) ? <Toast type={resultType} message={resultMessage} /> : ''}
-                      </div>
+                    </div>
                 <div>
                     
                 </div>
             </div>
 
-                {/* <div className={styles.carddatasection} key={12345} style={{height:'100%',overflow:'scroll'}}>
-                       
-                    <div className={styles.verticalsection} >
-                        <p className={`${inter.className} ${styles.text3_heading}`}>Students</p>
-                        <div className={styles.horizontalsection}>
-                            <p className={`${inter.className} ${styles.text3_heading}`}>Total:</p>
-                            <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px'}}>
-                                
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                <h1>{studentsInCampus}</h1>
-                            </div>
-                            
-                            <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px'}}>
-                                
-                                <p className={`${inter.className} ${styles.text3_heading}`}>Registered:</p>
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                <h1>{totalStudents}</h1>
-                            </div>
-                        </div>
-                      </div>
-                <div>
-                    
-                </div>
-            </div> */}
+                
         </div>
                
                 

@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation'
 // import ImageWithShimmer from '../../components/imagewithshimmer'
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 // const storage = getStorage();
-import firebase from '../../../../app/firebase';
+import firebase from '../../../firebase';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel} from '@/app/components/ui/select'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/app/components/ui/dropdown-menu"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,} from "@/app/components/ui/dialog"
@@ -22,9 +22,9 @@ import { Separator } from "@/app/components/ui/separator"
 import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group"
 import { Label } from "@/app/components/ui/label"
 import { Checkbox } from "@/app/components/ui/checkbox"
-import Toast from '../../../../app/components/myui/toast'
-import BlockDatesBtn from '../../../../app/components/myui/blockdatesbtn'
-import OutingRequest from '../../../../app/components/myui/outingrequest'
+
+import BlockDatesBtn from '../../../components/myui/blockdatesbtn'
+import OutingRequest from '../../../components/myui/outingrequest'
 const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
 import Image from 'next/image'
 // import fs from 'fs'
@@ -33,7 +33,11 @@ import path from 'path'
 
 
 // import { EnvelopeOpenIcon } from "@radix-ui/react-icons"
+import { Toaster } from "../../../../app/components/ui/sonner"
+import { toast, ToastAction } from "sonner"
+import Toast from '../../../../app/components/myui/toast'
 import { useToast } from "@/app/components/ui/use-toast"
+import { Textarea } from "@/app/components/ui/textarea"
 import { Button } from "@/app/components/ui/button"
 import {
     Table,
@@ -47,6 +51,16 @@ import {
   
 import {columns} from "./columns"
 import {DataTable} from "./data-table"
+import {
+    Sheet,
+    SheetClose,
+    SheetContent,
+    SheetDescription,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+  } from "../../../../app/components/ui/sheet"
 
 // import { columns } from "@/app/components/columns"
 // import { DataTable } from "@/app/components/data-table"
@@ -184,9 +198,31 @@ fetch("/api/requeststats/"+pass+"/"+role+"/"+branch+"/All/2/"+date, {
 });
 
 // get the requests for SuperAdmin
-const getAllRequestsDataAPI = async (pass, role, statuses, offset, collegeId, branches, requestType, platformType, year, campusId, dates, branchyears, course) => 
+// const getAllDealersDataAPI = async (pass, role, statuses, offset, collegeId, branches, requestType, platformType, year, campusId, dates, branchyears, course) => 
   
-fetch("/api/requests/"+pass+"/"+role+"/"+statuses+"/"+offset+"/"+collegeId+"/"+branches+"/"+requestType+"/"+platformType+"/"+year+"/"+campusId+"/"+dates+"/"+branchyears+"/"+course, {
+// fetch("/api/requests/"+pass+"/"+role+"/"+statuses+"/"+offset+"/"+collegeId+"/"+branches+"/"+requestType+"/"+platformType+"/"+year+"/"+campusId+"/"+dates+"/"+branchyears+"/"+course, {
+//     method: "GET",
+//     headers: {
+//         "Content-Type": "application/json",
+//         Accept: "application/json",
+//     },
+// });
+
+// get the dealers for SuperAdmin/Admin
+const getAllDealersDataAPI = async (pass, role, offset) => 
+  
+fetch("/api/v2/user/"+pass+"/U5/"+role+"/"+offset, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// get message to dealers
+const sendBroadcastMessage = async (pass, sender, receiver, sentAt, message, seen, state) => 
+  
+fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message+"/"+seen+"/"+state, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -206,6 +242,7 @@ export default function Outing() {
 
     // user state and requests variable
     const [user, setUser] = useState();
+    const [role, setRole] = useState('');
     const [offset, setOffset] = useState(0);
     const [completed, setCompleted] = useState(false);
     
@@ -252,6 +289,7 @@ export default function Outing() {
 
     const [dataFound, setDataFound] = useState(true); 
     const [searching, setSearching] = useState(false);
+    const [messaging, setMessaging] = useState(false);
 
     const [outingData, setOutingData] = useState();
     const [allRequests, setAllRequests] = useState([]);
@@ -272,21 +310,26 @@ export default function Outing() {
         console.log("Hello1");
     }
 
+    
+
 
     // get the user and fire the data fetch
     useEffect(()=>{
+
+
 
         let cookieValue = biscuits.get('sc_user_detail')
             if(cookieValue){
                 const obj = JSON.parse(decodeURIComponent(cookieValue)) // get the cookie data
 
                 // set the user state variable
-                setUser(obj)
+                setUser(obj);
+                setRole(obj.role);
                 
                 if(!completed){
-                    getCampusesData();
-                    getHostelsData();
-                    getHostelWiseStrengthsData();
+                    // getCampusesData();
+                    // getHostelsData();
+                    // getHostelWiseStrengthsData();
                     // getData();
                     // getDataDetails();
                     getAllRequests(currentStatus, initialDatesValues.from,initialDatesValues.to);
@@ -733,13 +776,13 @@ setTotalInHostelStrength(inHostelSum);
             else {
                 paramBranchYears = 'All';
             }
-            const result  = await getAllRequestsDataAPI(process.env.NEXT_PUBLIC_API_PASS, 
-                JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, 
-                status, 
-                0, 
-                JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'All', '111', '0', selectedCampus, dates,  paramBranchYears, selectedCourse)
+            const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS, 
+                JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, offset) 
+                // status, 
+                // 0, 
+                // JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'All', '111', '0', selectedCampus, dates,  paramBranchYears, selectedCourse)
             
-            // const result  = await getAllRequestsDataAPI(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, status, 0, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'CSE,IT', 'All', '111', '0', JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).campusId, dates, 'BTECH-IT-2,BTECH-IT-3')
+            // const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, status, 0, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'CSE,IT', 'All', '111', '0', JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).campusId, dates, 'BTECH-IT-2,BTECH-IT-3')
             const queryResult = await result.json() // get data
 
             console.log(queryResult);
@@ -861,108 +904,111 @@ function updateOffset(value) {
     setOffset(offset+20);
     getAllRequests(value, initialDatesValues.from,initialDatesValues.to);
 }
-const handleCampusChange = (newCampusId) => {
-    console.log(newCampusId);
-    setSelectedCampus(newCampusId);
 
-    campuses.map((campus) => {
-                    
-        if(campus.campusId == newCampusId){
-            setCourses(campus.courses.split(','));
-        }
-    })
-  };
-const handleCourseChange = (newCourse) => {
-    console.log(newCourse);
-    setSelectedCourse(newCourse);
-
-    campuses.map((campus) => {
-                    
-        if(campus.campusId == selectedCampus){
-            
-            let depts = campus.departments.split(',');
-            var selectedDepts = [];
-            depts.map((dept) => {
-                if(dept.includes(newCourse)){
-                    selectedDepts.push(dept);
-                }
-            })
-            setDepartments(selectedDepts);
-            console.log(selectedDepts);
-
-            setBranches(Array.from(new Set(selectedDepts.map(dept => dept.split('-')[1]))));
-            console.log(Array.from(new Set(selectedDepts.map(dept => dept.split('-')[1]))));
-
-            setBranchYears(Array.from(new Set(selectedDepts.map(dept => {
-                const parts = dept.split('-');
-                return `${parts[1]}-${parts[2]}`;
-              }))));
-            console.log(Array.from(new Set(selectedDepts.map(dept => {
-                const parts = dept.split('-');
-                return `${parts[1]}-${parts[2]}`;
-              }))));
-            
-        }
-    })
-  };
-
-  // used to update selected branch and select corresponding branch years
-  const handleBranchChange = (branch) => {
-    let updatedSelectedBranches = [...selectedBranches];
-    let updatedSelectedBranchYears = [...selectedBranchYears];
-  
-    if (updatedSelectedBranches.includes(branch)) {
-      updatedSelectedBranches = updatedSelectedBranches.filter(b => b !== branch);
-      updatedSelectedBranchYears = updatedSelectedBranchYears.filter(by => !by.startsWith(branch));
-    } else {
-      updatedSelectedBranches.push(branch);
-      const relatedBranchYears = branchYears.filter(by => by.startsWith(branch));
-      updatedSelectedBranchYears = [...new Set([...updatedSelectedBranchYears, ...relatedBranchYears])];
-    }
-  
-    setSelectedBranches(updatedSelectedBranches);
-    setSelectedBranchYears(updatedSelectedBranchYears);
-    console.log(updatedSelectedBranchYears);
-  };
-
-  // used to update branch years and select/deselect corresponding branches
-  const handleBranchYearChange = (branchYear) => {
-    let updatedSelectedBranchYears = [...selectedBranchYears];
-    const branch = branchYear.split('-')[0];
-  
-    if (updatedSelectedBranchYears.includes(branchYear)) {
-      updatedSelectedBranchYears = updatedSelectedBranchYears.filter(by => by !== branchYear);
-    } else {
-      updatedSelectedBranchYears.push(branchYear);
-    }
-  
-    const relatedBranchYears = branchYears.filter(by => by.startsWith(branch));
-    const isAllSelected = relatedBranchYears.every(by => updatedSelectedBranchYears.includes(by));
-  
-    let updatedSelectedBranches = [...selectedBranches];
-    if (isAllSelected) {
-      if (!updatedSelectedBranches.includes(branch)) {
-        updatedSelectedBranches.push(branch);
-      }
-    } else {
-      updatedSelectedBranches = updatedSelectedBranches.filter(b => b !== branch);
-    }
-  
-    setSelectedBranchYears(updatedSelectedBranchYears);
-    setSelectedBranches(updatedSelectedBranches);
-
-    console.log(updatedSelectedBranchYears);
-  };
     
+
+
+const sendMessageNow = async (e) => {
+    
+    setMessaging(true);
+    
+    try {    
+        
+
+        const result  = await sendBroadcastMessage(process.env.NEXT_PUBLIC_API_PASS, 
+            JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, 'All', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), document.getElementById('message').value,0,'-') 
+        const queryResult = await result.json() // get data
+
+        console.log(queryResult);
+        // check for the status
+        if(queryResult.status == 200){
+
+            setMessaging(false);
+            toast("Data is uploaded", {
+                description: "Message sent to all dealers",
+                action: {
+                  label: "Okay",
+                  onClick: () => console.log("Okay"),
+                },
+              });
+
+        }
+        else if(queryResult.status != 200) {
+            
+            setMessaging(false);
+        }
+    }
+    catch (e){
+        
+        // show and hide message
+        setMessaging(false);
+        setResultType('error');
+        setResultMessage('Issue loading. Please refresh or try again later!');
+        setTimeout(function(){
+            setResultType('');
+            setResultMessage('');
+        }, 3000);
+    }
+    
+}
   
     
   return (
     
-        <div className={styles.verticalsection} style={{height:'100vh',gap:'16px'}}>
+        // <div className={styles.verticalsection} style={{height:'100vh',gap:'16px'}}>
             
-          <div style={{height:'8vh',display:'flex',flexDirection:'column',justifyContent:'space-around'}}>
-              <h2 className="text-lg font-semibold">Outing</h2>
-              
+        //   <div style={{height:'8vh',display:'flex',flexDirection:'column',justifyContent:'space-around'}}>
+
+        <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px'}}>
+            
+          <div className='flex flex-row gap-2 items-center py-4' >
+              <h2 className="text-lg font-semibold">Dealers</h2>
+
+            {(!messaging) ?
+              <Sheet>
+                <SheetTrigger asChild>
+                    <Button>Broadcast message</Button>
+                </SheetTrigger>
+                <SheetContent>
+                    <SheetHeader>
+                    <SheetTitle>Broadcast message</SheetTitle>
+                    <SheetDescription>
+                        Enter your message to send it to all the dealers.
+                    </SheetDescription>
+                    </SheetHeader>
+                    <div className="grid gap-4 py-4">
+                        <br/>
+                        {/* <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="name" className="text-right">
+                            Name
+                            </Label>
+                            <Input id="name" value="Pedro Duarte" className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="username" className="text-right">
+                            Username
+                            </Label>
+                            <Input id="username" value="@peduarte" className="col-span-3" />
+                        </div> */}
+                        <div className="grid w-full max-w-sm items-center gap-1.5">
+                            <Label htmlFor="picture">Message</Label>
+                            <Textarea id="message" placeholder="Type your message here." />
+                            
+                        </div>
+                    </div>
+                    <SheetFooter>
+                    <SheetClose asChild>
+                        <Button type="submit" onClick={sendMessageNow}>Send now</Button>
+                    </SheetClose>
+                    </SheetFooter>
+                </SheetContent>
+                </Sheet>
+                :
+                <div>
+                    <Label htmlFor="picture">Broadcasting...</Label>
+                </div>
+                }
+              <Toaster />
           </div>      
 
             {/* <div style={{width:'100%',display:'flex', flexDirection:'row',justifyContent:'space-between'}}>
@@ -1003,7 +1049,7 @@ const handleCourseChange = (newCourse) => {
         </RadioGroup> */}
 
 
-<div className="p-2 border rounded flex flex-row " style={{height:'fit-content', gap: '40px'}}>
+{/* <div className="p-2 border rounded flex flex-row " style={{height:'fit-content', gap: '40px'}}>
         
     <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px',height:'fit-content'}}>
         <div className="flex-1 text-sm text-muted-foreground">Total Hostels Strength:</div>
@@ -1032,11 +1078,11 @@ const handleCourseChange = (newCourse) => {
         </div> : ''}
         <h1>{totalInHostelStrength}</h1>
     </div>
-</div>
+</div> */}
 
         {(viewTypeSelection == 'college') ? 
         <div className="flex items-center py-2" style={{gap:'10px'}}>
-            {(campuses.length != 0) ?
+            {/* {(campuses.length != 0) ?
             <div>
                 <div className="flex-1 text-sm text-muted-foreground">
                     Colleges:
@@ -1046,21 +1092,20 @@ const handleCourseChange = (newCourse) => {
                     <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent >
-                {/* <SelectGroup >
-                    <SelectLabel>Colleges</SelectLabel> */}
+                
                         <SelectItem value='All'>All</SelectItem>
                         {
                             campuses.map((campus) => <SelectItem key={campus.campusId} value={campus.campusId}>{campus.campusId}</SelectItem>)
                         }
-                {/* </SelectGroup> */}
+                
                 </SelectContent>
                 </Select>
             </div>
             : <br/>
-            }
+            } */}
 
             {/* show courses */}
-            {(selectedCampus!=null && selectedCampus != 'All' && courses.length > 0) ?
+            {/* {(selectedCampus!=null && selectedCampus != 'All' && courses.length > 0) ?
                 <div>
                     <div className="flex-1 text-sm text-muted-foreground">
                         Courses:
@@ -1074,15 +1119,14 @@ const handleCourseChange = (newCourse) => {
                             {
                                 courses.map((course) => <SelectItem key={course} value={course}>{course}</SelectItem>)
                             }
-                    {/* </SelectGroup> */}
                     </SelectContent>
                     </Select>
                 </div>
                 : <br/>
-            }
+            } */}
 
             {/* branches selection */}
-            {(branches.length) > 0 ?
+            {/* {(branches.length) > 0 ?
                 <Drawer>
                 <DrawerTrigger className="flex flex-col flex-start">
                     <div className="text-sm">
@@ -1155,21 +1199,21 @@ const handleCourseChange = (newCourse) => {
                     </DrawerFooter>
                 </DrawerContent>
                 </Drawer>
-            : null}
+            : null} */}
 
-        {(campuses.length != 0) ?
+        {/* {(campuses.length != 0) ?
         <div>
             <br/>
             <Button type="submit" size="sm" className="px-3" onClick={getLatestRequests}>Go</Button>
         </div>
-        : null }
+        : null } */}
 
         </div>
 
         :
 
         <div className="flex items-center py-2" style={{gap:'10px'}}>
-            {(hostels.length != 0) ?
+            {/* {(hostels.length != 0) ?
             <div>
                 <div className="flex-1 text-sm text-muted-foreground">
                     Hostels:
@@ -1179,17 +1223,14 @@ const handleCourseChange = (newCourse) => {
                     <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent >
-                {/* <SelectGroup >
-                    <SelectLabel>Colleges</SelectLabel> */}
                         <SelectItem value='All'>All</SelectItem>
                         {
                             hostels.map((hostel) => <SelectItem key={hostel.hostelId} value={hostel.hostelId}>{hostel.hostelName}</SelectItem>)
                         }
-                {/* </SelectGroup> */}
                 </SelectContent>
                 </Select>
             </div>
-            : null}
+            : null} */}
         </div>
     }
 

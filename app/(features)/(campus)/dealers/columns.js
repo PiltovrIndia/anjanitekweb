@@ -31,16 +31,16 @@ import {
 } from "@/app/components/ui/tooltip"
 // This type is used to define the shape of our data.
 // You can use a Zod schema here if you want.
-export const OutingRequest = {
-  requestId: string,
-  collegeId: string,
-  username: string,
-  description: string,
-  requestStatus: "Submitted" | "Approved" | "Issued" | "InOuting" | "Returned" | "Rejected" | "Cancelled",
-  requestFrom: date,
-  requestTo: date,
-  type: string
-}
+// export const OutingRequest = {
+//   requestId: string,
+//   userId: string,
+//   accountName: string,
+//   description: string,
+//   requestStatus: "Submitted" | "Approved" | "Issued" | "InOuting" | "Returned" | "Rejected" | "Cancelled",
+//   requestFrom: date,
+//   requestTo: date,
+//   type: string
+// }
 
 export const columns = [
   // selection
@@ -69,55 +69,55 @@ export const columns = [
 
   // columns
     // {
-    //     accessorKey: "collegeId",
-    //     header: "CollegeId",
+    //     accessorKey: "userId",
+    //     header: "userId",
     //     cell: ({ row }) => {
-    //       return <div>{row.getValue('collegeId')}<br/><span className="text-xs text-muted-foreground">{row.getValue('username')}</span></div>
+    //       return <div>{row.getValue('userId')}<br/><span className="text-xs text-muted-foreground">{row.getValue('accountName')}</span></div>
     //     },
     // },
     // {
-    //   accessorKey: "collegeId",
-    //   header: "CollegeId"
+    //   accessorKey: "userId",
+    //   header: "userId"
     // },
     
     {
-      accessorKey: "collegeId",
-      header: "Student",
+      accessorKey: "userId",
+      header: "Dealer",
       cell: ({ row }) => {
         return <div className="flex w-[100px] px-2 py-1 text-md focus:outline-none text-foreground"
         style={{cursor:'pointer'}}>
                  
                  <Sheet>
-                  <SheetTrigger className="text-green-700 underline underline-offset-4 text-md text-foreground">{ row.getValue("collegeId")}</SheetTrigger>
+                  <SheetTrigger className="text-green-700 underline underline-offset-4 text-md text-foreground">{ row.getValue("userId")}</SheetTrigger>
                   <SheetContent>
                     <SheetHeader>
-                      <SheetTitle>Student Details</SheetTitle>
+                      <SheetTitle>Dealer Details</SheetTitle>
                       <SheetDescription>
-                      <h1 className="text-black-700 text-xl text-foreground">{ row.getValue("username")}</h1>
-                      <h1 className="text-black-700 text-xl text-foreground">{ row.getValue("collegeId")}</h1>
+                      <p className="text-black-700 text-xl text-foreground">{ row.getValue("accountName")}</p>
+                      <p className="text-black-700 text-xl text-foreground">{ row.getValue("userId")}</p>
                       
                       <br/>
                       <br/>
 
                         <div className="flex flex-wrap justify-between items-center py-2.5">
-                            <p>Full name:</p>
-                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("username")}</p>
+                            <p>Account name:</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("accountName")}</p>
                         </div>
                         <Separator />
                         
                         <div className="flex flex-wrap justify-between items-center py-2.5">
-                            <p>College Regd Id:</p>
-                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("collegeId")}</p>
+                            <p>Dealer Id:</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("userId")}</p>
                         </div>
                         <Separator />
                         
                         <div className="flex flex-wrap justify-between items-center py-2.5">
-                            <p>Branch:</p>
-                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("year")} year, { row.getValue("branch")} Dept</p>
+                            <p>City,State:</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("city")}, { row.getValue("state")}</p>
                         </div>
                         <Separator />
                         
-                        {( row.getValue("type") == 'Hostel' || row.getValue("type") == 'hostel') ? 
+                        {/* {( row.getValue("type") == 'Hostel' || row.getValue("type") == 'hostel') ? 
                             <div style={{width:'100%'}}>
                                 <div className="flex flex-wrap justify-between items-center py-2.5">
                                     <p>Type:</p>
@@ -133,9 +133,9 @@ export const columns = [
                                 </div>
                                 <Separator />
                             </div>
-                        }
+                        } */}
 
-                        {( row.getValue("type") != '-') ? 
+                        {/* {( row.getValue("type") != '-') ? 
                             <div style={{width:'100%'}}>
                                 <div className="flex flex-wrap justify-between items-center py-2.5">
                                     <p>Outing type:</p>
@@ -145,17 +145,17 @@ export const columns = [
                             </div>
                             :
                             ''
-                        }
-                        <div className="flex flex-wrap justify-between items-center py-2.5">
+                        } */}
+                        {/* <div className="flex flex-wrap justify-between items-center py-2.5">
                             <p>Email:</p>
                             <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("email")}</p>
-                        </div>
-                        <Separator />
+                        </div> */}
+                        {/* <Separator /> */}
                         <div className="flex flex-wrap justify-between items-center py-2.5">
-                            <p>Mobile:</p>
-                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("phoneNumber")}</p>
+                            <p>Pending:</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">{ (row.getValue("pending") != null) ? row.getValue("pending") :'–'}</p>
                         </div>
-                        <Separator />
+                        {/* <Separator />
                         <div className="flex flex-wrap justify-between items-center py-2.5">
                             <p>Hostel:</p>
                             <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("hostelName")}</p>
@@ -165,7 +165,7 @@ export const columns = [
                             <p>Room number:</p>
                             <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("roomNumber")}</p>
                         </div>
-                        <Separator />
+                        <Separator /> */}
                       </SheetDescription>
                     </SheetHeader>
                   </SheetContent>
@@ -197,49 +197,56 @@ export const columns = [
 
    
     
+    // {
+    //   accessorKey: "campusId",
+    //   header: "College"
+    // },
+    // {
+    //   accessorKey: "hostelName",
+    //   header: "Hostel"
+    // },
+    // {
+    //   accessorKey: "roomNumber",
+    //   header: "Room"
+    // },
     {
-      accessorKey: "campusId",
-      header: "College"
+      accessorKey: "accountName",
+      header: "accountName"
     },
-    {
-      accessorKey: "hostelName",
-      header: "Hostel"
-    },
-    {
-      accessorKey: "roomNumber",
-      header: "Room"
-    },
-    {
-      accessorKey: "username",
-      header: "Username"
-    },
-    {
-      accessorKey: "requestStatus",
-      // header: "Status",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Current status
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-    },
+    // {
+    //   accessorKey: "pending",
+    //   // header: "Pending"
+    //   header: ({ column }) => {
+    //     return(
+    //       <div>
+    //        {(column.getValue("pending") != null) ? column.getValue("pending") :'–'}
+    //        </div>
+    //     )
+    //   }
+    // },
+    // {
+    //   accessorKey: "requestStatus",
+    //   // header: "Status",
+    //   header: ({ column }) => {
+    //     return (
+    //       <Button
+    //         variant="ghost"
+    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    //       >
+    //         Current status
+    //         <ArrowUpDown className="ml-2 h-4 w-4" />
+    //       </Button>
+    //     )
+    //   },
+    // },
     
     {
-      accessorKey: "requestType",
-      header: "Outing Type",
+      accessorKey: "pending",
+      header: "Pending",
       cell: ({ row }) => {
-        return <div className="flex w-[100px] rounded-md border px-2 py-1 text-xs font-semibold focus:outline-none text-foreground">
-                  { (row.getValue("requestType")==1) ? 
-                        <span>LOCAL</span> : 
-                          (row.getValue("requestType")==2) ? 
-                          <span>OUT-CITY</span> :  
-                              (row.getValue("requestType")==3) ? 
-                              <span>OFFICIAL</span> : <span>TEMPORARY</span>}
+        return <div className="flex w-[100px] text-xs font-semibold focus:outline-none text-foreground">
+                  { (row.getValue("pending")==null) ? 
+                        <span>-</span>  : <span>{row.getValue("pending")}</span>}
                 </div>
       },
     },
@@ -266,45 +273,45 @@ export const columns = [
     //     // return <div>{dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm A")}</div>
     //   },
     // },
+    // {
+    //   accessorKey: "requestFrom",
+    //   // header: "From",
+    //   header: ({ column }) => {
+    //     return (
+    //       <Button
+    //         variant="ghost"
+    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    //       >
+    //         From
+    //         <ArrowUpDown className="ml-2 h-4 w-4" />
+    //       </Button>
+    //     )
+    //   },
+    //   cell: ({ row }) => {
+    //     return <div>{dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm A")}</div>
+    //   },
+    // },
+    // {
+    //   accessorKey: "requestTo",
+    //   // header: "To",
+    //   header: ({ column }) => {
+    //     return (
+    //       <Button
+    //         variant="ghost"
+    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    //       >
+    //         To
+    //         <ArrowUpDown className="ml-2 h-4 w-4" />
+    //       </Button>
+    //     )
+    //   },
+    //   cell: ({ row }) => {
+    //     return <div>{dayjs(row.getValue("requestTo")).format("DD/MM/YY hh:mm A")}</div>
+    //   },
+    // },
     {
-      accessorKey: "requestFrom",
-      // header: "From",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            From
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => {
-        return <div>{dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm A")}</div>
-      },
-    },
-    {
-      accessorKey: "requestTo",
-      // header: "To",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            To
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => {
-        return <div>{dayjs(row.getValue("requestTo")).format("DD/MM/YY hh:mm A")}</div>
-      },
-    },
-    {
-      accessorKey: "description",
-      header: "Description",
+      accessorKey: "address1",
+      header: "Address",
       // header: ({ column }) => (
       //   <DataTableColumnHeader column={column} title="Description" />
       // ),
@@ -322,11 +329,11 @@ export const columns = [
           <TooltipProvider className="flex space-x-2 truncate">
               <Tooltip>
                 <TooltipTrigger className="max-w-[200px] truncate"> 
-                    {row.getValue("description")}
+                    {row.getValue("address1")}
                 </TooltipTrigger>
                 <TooltipContent>
                   {/* <p>Add to library</p> */}
-                  {row.getValue("description")}
+                  {row.getValue("address1")}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -335,117 +342,124 @@ export const columns = [
         )
       }
     },
-    {
-      accessorKey: "requestDate",
-      // header: "Submitted",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Submitted
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => {
-        return <div>{dayjs(row.getValue("requestDate")).format("DD/MM/YY hh:mm A")}</div>
-      },
-    },
+    // {
+    //   accessorKey: "requestDate",
+    //   // header: "Submitted",
+    //   header: ({ column }) => {
+    //     return (
+    //       <Button
+    //         variant="ghost"
+    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    //       >
+    //         Submitted
+    //         <ArrowUpDown className="ml-2 h-4 w-4" />
+    //       </Button>
+    //     )
+    //   },
+    //   cell: ({ row }) => {
+    //     return <div>{dayjs(row.getValue("requestDate")).format("DD/MM/YY hh:mm A")}</div>
+    //   },
+    // },
 
-    {
-      accessorKey: "checkoutOn",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Check out
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => {
-        return (row.getValue("checkoutOn")!=null) ? 
-        <div>{dayjs(row.getValue("checkoutOn")).format("DD/MM/YY hh:mm A")}</div> : 
-        <div>––</div> 
-      },
-    },
+    // {
+    //   accessorKey: "checkoutOn",
+    //   header: ({ column }) => {
+    //     return (
+    //       <Button
+    //         variant="ghost"
+    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    //       >
+    //         Check out
+    //         <ArrowUpDown className="ml-2 h-4 w-4" />
+    //       </Button>
+    //     )
+    //   },
+    //   cell: ({ row }) => {
+    //     return (row.getValue("checkoutOn")!=null) ? 
+    //     <div>{dayjs(row.getValue("checkoutOn")).format("DD/MM/YY hh:mm A")}</div> : 
+    //     <div>––</div> 
+    //   },
+    // },
 
-    {
-      accessorKey: "returnedOn",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Returned
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
-      cell: ({ row }) => {
-        return (row.getValue("returnedOn")!=null) ? 
-        <div>{dayjs(row.getValue("returnedOn")).format("DD/MM/YY hh:mm A")}</div> : 
-        <div>––</div> 
-      },
-    },
+    // {
+    //   accessorKey: "returnedOn",
+    //   header: ({ column }) => {
+    //     return (
+    //       <Button
+    //         variant="ghost"
+    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    //       >
+    //         Returned
+    //         <ArrowUpDown className="ml-2 h-4 w-4" />
+    //       </Button>
+    //     )
+    //   },
+    //   cell: ({ row }) => {
+    //     return (row.getValue("returnedOn")!=null) ? 
+    //     <div>{dayjs(row.getValue("returnedOn")).format("DD/MM/YY hh:mm A")}</div> : 
+    //     <div>––</div> 
+    //   },
+    // },
     
     {
-      accessorKey: "branch",
-      header: "Branch",
+      accessorKey: "city",
+      header: "City",
       // cell: ({ row }) => {
       //   return <div>{dayjs(row.getValue("branch")).format("DD/MM/YY hh:mm A")}</div>
       // },
     },
     {
-      accessorKey: "year",
-      // header: "Year",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Year
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
+      accessorKey: "state",
+      header: "State",
       // cell: ({ row }) => {
-      //   return <div>{dayjs(row.getValue("year")).format("DD/MM/YY hh:mm A")}</div>
+      //   return <div>{dayjs(row.getValue("branch")).format("DD/MM/YY hh:mm A")}</div>
       // },
     },
+    // {
+    //   accessorKey: "year",
+    //   // header: "Year",
+    //   header: ({ column }) => {
+    //     return (
+    //       <Button
+    //         variant="ghost"
+    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    //       >
+    //         Year
+    //         <ArrowUpDown className="ml-2 h-4 w-4" />
+    //       </Button>
+    //     )
+    //   },
+    //   // cell: ({ row }) => {
+    //   //   return <div>{dayjs(row.getValue("year")).format("DD/MM/YY hh:mm A")}</div>
+    //   // },
+    // },
 
     /// HIDDEN COLUMNS
        
-    {
-      accessorKey: "type",
-      header: ({ column }) => { return ( <div hidden> Type </div> ) },
-      cell: ({ row }) => { return <div hidden>{row.getValue('type')}</div>
-      },
-  },
-  {
-      accessorKey: "email",
-      header: ({ column }) => { return ( <div hidden> email </div> ) },
-      cell: ({ row }) => { return <div hidden>{row.getValue('email')}</div>
-      },
-  },
-  {
-      accessorKey: "phoneNumber",
-      header: ({ column }) => { return ( <div hidden> phoneNumber </div> ) },
-      cell: ({ row }) => { return <div hidden>{row.getValue('phoneNumber')}</div>
-      },
-  },
-  {
-      accessorKey: "outingType",
-      header: ({ column }) => { return ( <div hidden> outingType </div> ) },
-      cell: ({ row }) => { return <div hidden>{row.getValue('outingType')}</div>
-      },
-  },
+  //   {
+  //     accessorKey: "type",
+  //     header: ({ column }) => { return ( <div hidden> Type </div> ) },
+  //     cell: ({ row }) => { return <div hidden>{row.getValue('type')}</div>
+  //     },
+  // },
+  // {
+  //     accessorKey: "email",
+  //     header: ({ column }) => { return ( <div hidden> email </div> ) },
+  //     cell: ({ row }) => { return <div hidden>{row.getValue('email')}</div>
+  //     },
+  // },
+  // {
+  //     accessorKey: "phoneNumber",
+  //     header: ({ column }) => { return ( <div hidden> phoneNumber </div> ) },
+  //     cell: ({ row }) => { return <div hidden>{row.getValue('phoneNumber')}</div>
+  //     },
+  // },
+  // {
+  //     accessorKey: "outingType",
+  //     header: ({ column }) => { return ( <div hidden> outingType </div> ) },
+  //     cell: ({ row }) => { return <div hidden>{row.getValue('outingType')}</div>
+  //     },
+  // },
  
 
     // {
