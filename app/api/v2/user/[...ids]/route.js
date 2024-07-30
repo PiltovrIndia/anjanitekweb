@@ -27,6 +27,7 @@ export async function GET(request,{params}) {
             // update the player Id for the user
             if(params.ids[1] == 'U1'){
                 try {
+                    console.log('UPDATE users SET gcm_regId ="'+params.ids[3]+'" where userId = "'+params.ids[2]+'"');
                     const [rows, fields] = await connection.execute('UPDATE users SET gcm_regId ="'+params.ids[3]+'" where userId = "'+params.ids[2]+'"');
                     connection.release();
                     // return successful update
@@ -38,6 +39,9 @@ export async function GET(request,{params}) {
             // get details of the dealer by name
             else if(params.ids[1] == 'U2'){
                 try {
+                    console.log(params.ids[2]);
+                    console.log(params.ids[3]);
+                    console.log('SELECT * from users WHERE role="dealer" AND name LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3]);
                     const [rows, fields] = await connection.execute('SELECT * from users WHERE role="dealer" AND name LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
                     // return successful update
@@ -50,7 +54,7 @@ export async function GET(request,{params}) {
                     }
                     else {
                         // user doesn't exist in the system
-                        return Response.json({status: 201, message:'No parents data found!'}, {status: 200})
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
                     }
                 } catch (error) { // error updating
                     return Response.json({status: 404, message:'No user found!'+error}, {status: 200})

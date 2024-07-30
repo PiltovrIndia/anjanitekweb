@@ -1,46 +1,90 @@
-import { ColumnDef } from "@tanstack/react-table"
-import { date, string } from "yup"
 import dayjs from 'dayjs'
-
-import { ArrowUpDown, MoreHorizontal } from "lucide-react" 
 import { Button } from "@/app/components/ui/button"
 import { Checkbox } from "@/app/components/ui/checkbox"
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
 } from "@/app/components/ui/sheet"
 import { Separator } from "@/app/components/ui/separator"
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/app/components/ui/dropdown-menu"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/app/components/ui/tooltip"
-// This type is used to define the shape of our data.
-// You can use a Zod schema here if you want.
-// export const OutingRequest = {
-//   requestId: string,
-//   userId: string,
-//   accountName: string,
-//   description: string,
-//   requestStatus: "Submitted" | "Approved" | "Issued" | "InOuting" | "Returned" | "Rejected" | "Cancelled",
-//   requestFrom: date,
-//   requestTo: date,
-//   type: string
-// }
+import { Label } from "@/app/components/ui/label"
+import { Textarea } from "@/app/components/ui/textarea"
+// get message to dealers
+const sendDealerMessage = async (pass, sender, receiver, sentAt, message, seen, state) => 
+  
+  fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message+"/"+seen+"/"+state, {
+      method: "GET",
+      headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+      },
+  });
+  
+
+
+
+const sendMessageNow = async (e) => {
+    
+  setMessaging(true);
+  
+  try {    
+      
+      const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS, 
+          JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, 'All', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), document.getElementById('message').value,0,'-') 
+      const queryResult = await result.json() // get data
+
+      console.log(queryResult);
+      // check for the status
+      if(queryResult.status == 200){
+
+          setMessaging(false);
+          toast("Data is uploaded", {
+              description: "Message sent to all dealers",
+              action: {
+                label: "Okay",
+                onClick: () => console.log("Okay"),
+              },
+            });
+
+      }
+      else if(queryResult.status != 200) {
+          
+          setMessaging(false);
+      }
+  }
+  catch (e){
+      
+      // show and hide message
+      setMessaging(false);
+      setResultType('error');
+      setResultMessage('Issue loading. Please refresh or try again later!');
+      setTimeout(function(){
+          setResultType('');
+          setResultMessage('');
+      }, 3000);
+  }
+  
+}
+
+    
+// Create an instance of Intl.NumberFormat for Indian numbering system with two decimal places
+const formatter = new Intl.NumberFormat('en-IN', {
+  style: 'decimal',  // Use 'currency' for currency formatting
+  minimumFractionDigits: 2,  // Minimum number of digits after the decimal
+  maximumFractionDigits: 2   // Maximum number of digits after the decimal
+});
+
 
 export const columns = [
   // selection
@@ -94,7 +138,7 @@ export const columns = [
                       <SheetTitle>Dealer Details</SheetTitle>
                       <SheetDescription>
                       <p className="text-black-700 text-xl text-foreground">{ row.getValue("accountName")}</p>
-                      <p className="text-black-700 text-xl text-foreground">{ row.getValue("userId")}</p>
+                      {/* <p className="text-black-700 text-xl text-foreground">{ row.getValue("userId")}</p> */}
                       
                       <br/>
                       <br/>
@@ -117,55 +161,12 @@ export const columns = [
                         </div>
                         <Separator />
                         
-                        {/* {( row.getValue("type") == 'Hostel' || row.getValue("type") == 'hostel') ? 
-                            <div style={{width:'100%'}}>
-                                <div className="flex flex-wrap justify-between items-center py-2.5">
-                                    <p>Type:</p>
-                                    <p className="text-black-700 text-md ont-semibold text-foreground">Hosteler</p>
-                                </div>
-                                <Separator />
-                            </div>
-                            : 
-                            <div style={{width:'100%'}}>
-                                <div className="flex flex-wrap justify-between items-center py-2.5">
-                                    <p>Type:</p>
-                                    <p className="text-black-700 text-md ont-semibold text-foreground">Day scholar</p>
-                                </div>
-                                <Separator />
-                            </div>
-                        } */}
-
-                        {/* {( row.getValue("type") != '-') ? 
-                            <div style={{width:'100%'}}>
-                                <div className="flex flex-wrap justify-between items-center py-2.5">
-                                    <p>Outing type:</p>
-                                    <p className="text-black-700 text-md ont-semibold text-foreground">{( row.getValue("outingType") == 'yes') ? 'Self permitted' : 'Not-self permitted'}</p>
-                                </div>
-                                <Separator />
-                            </div>
-                            :
-                            ''
-                        } */}
-                        {/* <div className="flex flex-wrap justify-between items-center py-2.5">
-                            <p>Email:</p>
-                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("email")}</p>
-                        </div> */}
+                  
                         {/* <Separator /> */}
                         <div className="flex flex-wrap justify-between items-center py-2.5">
                             <p>Pending:</p>
-                            <p className="text-black-700 text-md ont-semibold text-foreground">{ (row.getValue("pending") != null) ? row.getValue("pending") :'–'}</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">₹{ (row.getValue("pending") != null) ? formatter.format(row.getValue("pending")) :'–'}</p>
                         </div>
-                        {/* <Separator />
-                        <div className="flex flex-wrap justify-between items-center py-2.5">
-                            <p>Hostel:</p>
-                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("hostelName")}</p>
-                        </div>
-                        <Separator />
-                        <div className="flex flex-wrap justify-between items-center py-2.5">
-                            <p>Room number:</p>
-                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("roomNumber")}</p>
-                        </div>
-                        <Separator /> */}
                       </SheetDescription>
                     </SheetHeader>
                   </SheetContent>
@@ -175,140 +176,23 @@ export const columns = [
                 </div>
       },
     },
-    // {
-    //   // accessorKey: "type",
-    //   accessorKey: ({val}) =>{
-    //     <div>{val}</div>
-    //   },
-    //   // header: "type",
-    //   header: ({ column }) => {
-    //     return (
-    //       <div hidden>
-    //         Type
-            
-    //       </div>
-    //     )
-    //   },
-      
-    //   enableHiding: true,
-    //   isVisible: false,
-    //   show: false
-    // },
-
    
-    
-    // {
-    //   accessorKey: "campusId",
-    //   header: "College"
-    // },
-    // {
-    //   accessorKey: "hostelName",
-    //   header: "Hostel"
-    // },
-    // {
-    //   accessorKey: "roomNumber",
-    //   header: "Room"
-    // },
     {
       accessorKey: "accountName",
       header: "accountName"
     },
-    // {
-    //   accessorKey: "pending",
-    //   // header: "Pending"
-    //   header: ({ column }) => {
-    //     return(
-    //       <div>
-    //        {(column.getValue("pending") != null) ? column.getValue("pending") :'–'}
-    //        </div>
-    //     )
-    //   }
-    // },
-    // {
-    //   accessorKey: "requestStatus",
-    //   // header: "Status",
-    //   header: ({ column }) => {
-    //     return (
-    //       <Button
-    //         variant="ghost"
-    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    //       >
-    //         Current status
-    //         <ArrowUpDown className="ml-2 h-4 w-4" />
-    //       </Button>
-    //     )
-    //   },
-    // },
-    
+   
     {
       accessorKey: "pending",
       header: "Pending",
       cell: ({ row }) => {
         return <div className="flex w-[100px] text-xs font-semibold focus:outline-none text-foreground">
                   { (row.getValue("pending")==null) ? 
-                        <span>-</span>  : <span>{row.getValue("pending")}</span>}
+                        <span>-</span>  : <span>₹{formatter.format(row.getValue("pending"))}</span>}
                 </div>
       },
     },
-    // {
-    //   accessorKey: "requestFrom",
-    //   header: "From",
-    //   cell: ({ row }) => {
-    //     return <div className="flex space-x-2">
-                
-    //           <TooltipProvider className="flex space-x-2 truncate">
-    //             <Tooltip>
-    //               <TooltipTrigger className="max-w-[200px] truncate"> 
-    //               {dayjs(row.getValue("requestFrom")).format("DD/MM/YY")} - {dayjs(row.getValue("requestTo")).format("DD/MM/YY")}
-    //               </TooltipTrigger>
-    //               <TooltipContent>
-    //                 {dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm A")} - {dayjs(row.getValue("requestTo")).format("DD/MM/YY hh:mm A")}
-    //               </TooltipContent>
-    //             </Tooltip>
-    //           </TooltipProvider>
-    //         </div>
-    //     // <div className="max-w-[400px]">
-    //     // <div className="text-xs text-muted-foreground">{dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm A")}<br/>{dayjs(row.getValue("requestTo")).format("DD/MM/YY hh:mm A")}</div>
-    //     // </div>
-    //     // return <div>{dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm A")}</div>
-    //   },
-    // },
-    // {
-    //   accessorKey: "requestFrom",
-    //   // header: "From",
-    //   header: ({ column }) => {
-    //     return (
-    //       <Button
-    //         variant="ghost"
-    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    //       >
-    //         From
-    //         <ArrowUpDown className="ml-2 h-4 w-4" />
-    //       </Button>
-    //     )
-    //   },
-    //   cell: ({ row }) => {
-    //     return <div>{dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm A")}</div>
-    //   },
-    // },
-    // {
-    //   accessorKey: "requestTo",
-    //   // header: "To",
-    //   header: ({ column }) => {
-    //     return (
-    //       <Button
-    //         variant="ghost"
-    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    //       >
-    //         To
-    //         <ArrowUpDown className="ml-2 h-4 w-4" />
-    //       </Button>
-    //     )
-    //   },
-    //   cell: ({ row }) => {
-    //     return <div>{dayjs(row.getValue("requestTo")).format("DD/MM/YY hh:mm A")}</div>
-    //   },
-    // },
+   
     {
       accessorKey: "address1",
       header: "Address",
@@ -320,12 +204,6 @@ export const columns = [
   
         return (
           <div className="flex space-x-2">
-            {/* {label && <Badge variant="outline">{label.label}</Badge>} */}
-            {/* <span className="max-w-[200px] truncate">
-              {row.getValue("description")}
-            </span> */}
-            
-
           <TooltipProvider className="flex space-x-2 truncate">
               <Tooltip>
                 <TooltipTrigger className="max-w-[200px] truncate"> 
@@ -342,178 +220,61 @@ export const columns = [
         )
       }
     },
-    // {
-    //   accessorKey: "requestDate",
-    //   // header: "Submitted",
-    //   header: ({ column }) => {
-    //     return (
-    //       <Button
-    //         variant="ghost"
-    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    //       >
-    //         Submitted
-    //         <ArrowUpDown className="ml-2 h-4 w-4" />
-    //       </Button>
-    //     )
-    //   },
-    //   cell: ({ row }) => {
-    //     return <div>{dayjs(row.getValue("requestDate")).format("DD/MM/YY hh:mm A")}</div>
-    //   },
-    // },
-
-    // {
-    //   accessorKey: "checkoutOn",
-    //   header: ({ column }) => {
-    //     return (
-    //       <Button
-    //         variant="ghost"
-    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    //       >
-    //         Check out
-    //         <ArrowUpDown className="ml-2 h-4 w-4" />
-    //       </Button>
-    //     )
-    //   },
-    //   cell: ({ row }) => {
-    //     return (row.getValue("checkoutOn")!=null) ? 
-    //     <div>{dayjs(row.getValue("checkoutOn")).format("DD/MM/YY hh:mm A")}</div> : 
-    //     <div>––</div> 
-    //   },
-    // },
-
-    // {
-    //   accessorKey: "returnedOn",
-    //   header: ({ column }) => {
-    //     return (
-    //       <Button
-    //         variant="ghost"
-    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    //       >
-    //         Returned
-    //         <ArrowUpDown className="ml-2 h-4 w-4" />
-    //       </Button>
-    //     )
-    //   },
-    //   cell: ({ row }) => {
-    //     return (row.getValue("returnedOn")!=null) ? 
-    //     <div>{dayjs(row.getValue("returnedOn")).format("DD/MM/YY hh:mm A")}</div> : 
-    //     <div>––</div> 
-    //   },
-    // },
     
     {
       accessorKey: "city",
       header: "City",
-      // cell: ({ row }) => {
-      //   return <div>{dayjs(row.getValue("branch")).format("DD/MM/YY hh:mm A")}</div>
-      // },
     },
     {
       accessorKey: "state",
       header: "State",
-      // cell: ({ row }) => {
-      //   return <div>{dayjs(row.getValue("branch")).format("DD/MM/YY hh:mm A")}</div>
-      // },
     },
-    // {
-    //   accessorKey: "year",
-    //   // header: "Year",
-    //   header: ({ column }) => {
-    //     return (
-    //       <Button
-    //         variant="ghost"
-    //         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    //       >
-    //         Year
-    //         <ArrowUpDown className="ml-2 h-4 w-4" />
-    //       </Button>
-    //     )
-    //   },
-    //   // cell: ({ row }) => {
-    //   //   return <div>{dayjs(row.getValue("year")).format("DD/MM/YY hh:mm A")}</div>
-    //   // },
-    // },
+    {
+      accessorKey: "dealerId",
+      header: "Message",
+      cell: ({ row }) => {
+        return (
+          <div className="flex space-x-2">
 
-    /// HIDDEN COLUMNS
-       
-  //   {
-  //     accessorKey: "type",
-  //     header: ({ column }) => { return ( <div hidden> Type </div> ) },
-  //     cell: ({ row }) => { return <div hidden>{row.getValue('type')}</div>
-  //     },
-  // },
-  // {
-  //     accessorKey: "email",
-  //     header: ({ column }) => { return ( <div hidden> email </div> ) },
-  //     cell: ({ row }) => { return <div hidden>{row.getValue('email')}</div>
-  //     },
-  // },
-  // {
-  //     accessorKey: "phoneNumber",
-  //     header: ({ column }) => { return ( <div hidden> phoneNumber </div> ) },
-  //     cell: ({ row }) => { return <div hidden>{row.getValue('phoneNumber')}</div>
-  //     },
-  // },
-  // {
-  //     accessorKey: "outingType",
-  //     header: ({ column }) => { return ( <div hidden> outingType </div> ) },
-  //     cell: ({ row }) => { return <div hidden>{row.getValue('outingType')}</div>
-  //     },
-  // },
- 
+          {(!messaging) ?
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="outline">Message now</Button>
+                </SheetTrigger>
+                <SheetContent>
+                    <SheetHeader>
+                    <SheetTitle>Send message</SheetTitle>
+                    <SheetDescription>
+                    <p className="text-black-700 text-xl text-foreground">To { row.getValue("accountName")}</p>
+                        {/* To {row.getValue("accountName")}. */}
+                    </SheetDescription>
+                    </SheetHeader>
+                    <div className="grid gap-4 py-4">
+                        <br/>
+                        <div className="grid w-full max-w-sm items-center gap-1.5">
+                            <Label htmlFor="picture">Message</Label>
+                            <Textarea id="message" placeholder="Type your message here." />
+                            
+                        </div>
+                    </div>
+                    <SheetFooter>
+                    <SheetClose asChild>
+                        <Button type="submit" onClick={sendMessageNow}>Send now</Button>
+                        {/* <Button type="submit" onClick={sendMessageNow}>Send now</Button> */}
+                    </SheetClose>
+                    </SheetFooter>
+                </SheetContent>
+                </Sheet>
+                :
+                <div>
+                    <Label htmlFor="picture">Broadcasting...</Label>
+                </div>
+      }
+          </div>
 
-    // {
-    //   accessorKey: "requestFrom",
-    //   // header: "Request dates"
-    //   header: () => <div>Request dates</div>,
-    //   cell: ({ row }) => {
-    //     console.log(dayjs(row.getValue("requestFrom")).format("DD/MM/YY"));
-    //     const formatted = (dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm A") + '\n' + dayjs(row.getValue("requestTo")).format("DD/MM/YY hh:mm A"))
-    //     // const formatted = (dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm:ss") + '-' + row.getValue("requestTo"))
-    //     // const formatted = (dayjs(row.getValue("requestFrom")).format("DD/MM/YY hh:mm:ss") + '-' + dayjs(row.getValue("requestTo")).format("DD/MM/YY"))
-    //     // const formatted = new Intl.NumberFormat("en-US", {
-    //     //   style: "currency",
-    //     //   currency: "USD",
-    //     // }).format(amount)
-  
-    //     return <div>{formatted}</div>
-    //   },
-    // },
-
-
-
-
-    ///////////////////
-    // ACTIONS OF A ROW
-    ///////////////////
-    // {
-    //   id: "actions",
-    //   cell: ({ row }) => {
-    //     const payment = row.original
-   
-    //     return (
-    //       <DropdownMenu>
-    //         <DropdownMenuTrigger asChild>
-    //           <Button variant="ghost" className="h-8 w-8 p-0">
-    //             <span className="sr-only">Open menu</span>
-    //             <MoreHorizontal className="h-4 w-4" />
-    //           </Button>
-    //         </DropdownMenuTrigger>
-    //         <DropdownMenuContent align="end">
-    //           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-    //           <DropdownMenuItem
-    //             onClick={() => navigator.clipboard.writeText(payment.id)}
-    //           >
-    //             Copy payment ID
-    //           </DropdownMenuItem>
-    //           <DropdownMenuSeparator />
-    //           <DropdownMenuItem>View customer</DropdownMenuItem>
-    //           <DropdownMenuItem>View payment details</DropdownMenuItem>
-    //         </DropdownMenuContent>
-    //       </DropdownMenu>
-    //     )
-    //   },
-    // },
+        )
+      }
+    },
 
   ]
   

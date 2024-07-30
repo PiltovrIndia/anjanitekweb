@@ -1,14 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { ArrowDown, CalendarBlank } from 'phosphor-react'
-import { addDays, format } from "date-fns"
-import dayjs from 'dayjs'
-import { DateRange } from "react-day-picker"
+import { ArrowDown, CalendarBlank, SpinnerGap } from 'phosphor-react'
 import {
-  ColumnDef,
-  SortingState,
-  ColumnFiltersState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -16,7 +10,6 @@ import {
   getPaginationRowModel,
   getSortedRowModel
 } from "@tanstack/react-table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs"
 import {
   Table,
   TableBody,
@@ -25,16 +18,387 @@ import {
   TableHeader,
   TableRow
 } from "@/app/components/ui/table"
-import {
-  Popover, PopoverContent, PopoverTrigger
-} from "@/app/components/ui/popover"
-import { cn } from "@/app/lib/utils"
-import { Label } from "@/app/components/ui/label"
 import { Button } from "@/app/components/ui/button"
 import { Input } from "@/app/components/ui/input"
-import { Calendar } from "@/app/components/ui/calendar"
+import styles from '../../../../app/page.module.css'
 
-export function DataTable({ columns, data, status, changeStatus, downloadNow, initialDates, dates, requestAgain }) {
+import Biscuits from 'universal-cookie'
+const biscuits = new Biscuits
+import dayjs from 'dayjs'
+import { Checkbox } from "@/app/components/ui/checkbox"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/app/components/ui/sheet"
+import { Separator } from "@/app/components/ui/separator"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/app/components/ui/tooltip"
+import { Label } from "@/app/components/ui/label"
+import { Textarea } from "@/app/components/ui/textarea"
+import { Toaster } from "../../../../app/components/ui/sonner"
+import { useToast } from "@/app/components/ui/use-toast"
+
+export function DataTable({ data, status, changeStatus, downloadNow, initialDates, dates, requestAgain, loadingIds, handleMessageSendClick}) {
+// export function DataTable({ columns, data, status, changeStatus, downloadNow, initialDates, dates, requestAgain }) {
+  
+const [messaging, setMessaging] = React.useState(false);
+const today = new dayjs();
+const { toast } = useToast();
+
+  //////////////////
+  ////////This is Columns data
+  //////////////////
+
+  
+  
+
+
+// const sendMessageNow = async (e) => {
+    
+//   setMessaging(true);
+  
+//   try {    
+      
+//       const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS, 
+//           JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, 'All', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), document.getElementById('message').value,0,'-') 
+//       const queryResult = await result.json() // get data
+
+//       console.log(queryResult);
+//       // check for the status
+//       if(queryResult.status == 200){
+
+//           setMessaging(false);
+//           toast("Data is uploaded", {
+//               description: "Message sent to all dealers",
+//               action: {
+//                 label: "Okay",
+//                 onClick: () => console.log("Okay"),
+//               },
+//             });
+
+//       }
+//       else if(queryResult.status != 200) {
+          
+//           setMessaging(false);
+//       }
+//   }
+//   catch (e){
+//       console.log(e);
+//       // show and hide message
+//       setMessaging(false);
+//       setResultType('error');
+//       setResultMessage('Issue loading. Please refresh or try again later!');
+//       setTimeout(function(){
+//           setResultType('');
+//           setResultMessage('');
+//       }, 3000);
+//   }
+  
+// }
+
+    
+// Create an instance of Intl.NumberFormat for Indian numbering system with two decimal places
+const formatter = new Intl.NumberFormat('en-IN', {
+  style: 'decimal',  // Use 'currency' for currency formatting
+  minimumFractionDigits: 2,  // Minimum number of digits after the decimal
+  maximumFractionDigits: 2   // Maximum number of digits after the decimal
+});
+
+
+const columns = [
+  // selection
+  {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
+
+  // columns
+    // {
+    //     accessorKey: "userId",
+    //     header: "userId",
+    //     cell: ({ row }) => {
+    //       return <div>{row.getValue('userId')}<br/><span className="text-xs text-muted-foreground">{row.getValue('accountName')}</span></div>
+    //     },
+    // },
+    // {
+    //   accessorKey: "userId",
+    //   header: "userId"
+    // },
+    
+    {
+      accessorKey: "userId",
+      header: "Dealer",
+      cell: ({ row }) => {
+        return <div className="flex w-[100px] px-2 py-1 text-md focus:outline-none text-foreground"
+        style={{cursor:'pointer'}}>
+                 
+                 <Sheet>
+                  <SheetTrigger className="text-green-700 underline underline-offset-4 text-md text-foreground">{ row.getValue("userId")}</SheetTrigger>
+                  <SheetContent>
+                    <SheetHeader>
+                      <SheetTitle>Dealer Details</SheetTitle>
+                      <SheetDescription>
+                      <p className="text-black-700 text-xl text-foreground">{ row.getValue("accountName")}</p>
+                      {/* <p className="text-black-700 text-xl text-foreground">{ row.getValue("userId")}</p> */}
+                      
+                      <br/>
+                      <br/>
+
+                        <div className="flex flex-wrap justify-between items-center py-2.5">
+                            <p>Account name:</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("accountName")}</p>
+                        </div>
+                        <Separator />
+                        
+                        <div className="flex flex-wrap justify-between items-center py-2.5">
+                            <p>Dealer Id:</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("userId")}</p>
+                        </div>
+                        <Separator />
+                        
+                        <div className="flex flex-wrap justify-between items-center py-2.5">
+                            <p>City,State:</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">{ row.getValue("city")}, { row.getValue("state")}</p>
+                        </div>
+                        <Separator />
+                        
+                  
+                        {/* <Separator /> */}
+                        <div className="flex flex-wrap justify-between items-center py-2.5">
+                            <p>Pending:</p>
+                            <p className="text-black-700 text-md ont-semibold text-foreground">₹{ (row.getValue("pending") != null) ? formatter.format(row.getValue("pending")) :'–'}</p>
+                        </div>
+                      </SheetDescription>
+                    </SheetHeader>
+                  </SheetContent>
+                </Sheet>
+
+                  
+                </div>
+      },
+    },
+   
+    {
+      accessorKey: "accountName",
+      header: "accountName"
+    },
+   
+    {
+      accessorKey: "pending",
+      header: "Pending",
+      cell: ({ row }) => {
+        return <div className="flex w-[100px] text-xs font-semibold focus:outline-none text-foreground">
+                  { (row.getValue("pending")==null) ? 
+                        <span>-</span>  : <span>₹{formatter.format(row.getValue("pending"))}</span>}
+                </div>
+      },
+    },
+   
+    {
+      accessorKey: "address1",
+      header: "Address",
+      // header: ({ column }) => (
+      //   <DataTableColumnHeader column={column} title="Description" />
+      // ),
+      cell: ({ row }) => {
+        // const label = labels.find(label => label.value === row.original.label)
+  
+        return (
+          <div className="flex space-x-2">
+          <TooltipProvider className="flex space-x-2 truncate">
+              <Tooltip>
+                <TooltipTrigger className="max-w-[200px] truncate"> 
+                    {row.getValue("address1")}
+                </TooltipTrigger>
+                <TooltipContent>
+                  {/* <p>Add to library</p> */}
+                  {row.getValue("address1")}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
+        )
+      }
+    },
+    
+    {
+      accessorKey: "city",
+      header: "City",
+    },
+    {
+      accessorKey: "state",
+      header: "State",
+    },
+    // {
+    //   accessorKey: "dealerId",
+    //   header: "Message",
+    //   cell: ({ row }) => {
+    //     return (
+    //       <div className="flex space-x-2">
+
+    //       {/* {(!messaging) ? */}
+    //       {loadingIds.has(row.original.dealerId) ? (
+    //         <SpinnerGap className={`${styles.icon} ${styles.load}`} />  // Placeholder for your progress indicator
+    //     ) :
+    //         <Sheet>
+    //             <SheetTrigger asChild>
+    //                 <Button variant="outline">Message now</Button>
+    //             </SheetTrigger>
+    //             <SheetContent>
+    //                 <SheetHeader>
+    //                 <SheetTitle>Send message</SheetTitle>
+    //                 <SheetDescription>
+    //                 <p className="text-black-700 text-xl text-foreground">To { row.getValue("accountName")}</p>
+    //                     {/* To {row.getValue("accountName")}. */}
+    //                 </SheetDescription>
+    //                 </SheetHeader>
+    //                 <div className="grid gap-4 py-4">
+    //                     <br/>
+    //                     <div className="grid w-full max-w-sm items-center gap-1.5">
+    //                         <Label htmlFor="picture">Message</Label>
+    //                         <Textarea id="message" placeholder="Type your message here." />
+                            
+    //                     </div>
+    //                 </div>
+    //                 <SheetFooter>
+    //                 <SheetClose asChild>
+    //                     <Button type="submit" onClick={handleMessageSendClick(row)}>Send now</Button>
+    //                     {/* <Button type="submit" onClick={sendMessageNow}>Send now</Button> */}
+    //                 </SheetClose>
+    //                 </SheetFooter>
+    //             </SheetContent>
+    //             </Sheet>
+    //             // :
+    //             // <div>
+    //             //     <Label htmlFor="picture">Sending...</Label>
+    //             // </div>
+    //   }
+    //       </div>
+
+    //     )
+    //   }
+    // },
+
+
+
+
+     ///////////////////
+    // ACTIONS OF A ROW
+    ///////////////////
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        // const payment = row.original
+  //  console.log(payment);
+        
+        return <div>
+              
+                  {loadingIds.has(row.original.userId) ? 
+                  <SpinnerGap className={`${styles.icon} ${styles.load}`} />  // Placeholder for your progress indicator
+                  :     (
+                      // <Button onClick={() => handleCompleteClick(row)}>Mark as complete</Button>
+                      // <Dialog>
+                      //   <DialogTrigger asChild>
+                      //     <Button>Mark as complete</Button>
+                      //   </DialogTrigger>
+                      //   <DialogContent className="sm:max-w-[425px]">
+                      //     <DialogHeader>
+                      //       <DialogTitle>Meeting notes</DialogTitle>
+                      //       <DialogDescription>
+                      //         Update notes for this meeting here. It will help to recollect this discussion for later.
+                      //       </DialogDescription>
+                      //     </DialogHeader>
+                      //     <div className="grid gap-4 py-4">
+                      //       <div className="items-center gap-4">
+                      //         <Label htmlFor="username" className="text-right">
+                      //           Notes
+                      //         </Label>
+                      //         <Textarea ref={textareaRef} id="appointmentnotes" placeholder="Type your notes here." />
+                      //       </div>
+                      //     </div>
+                      //     <DialogFooter>
+                      //       <Button type="submit" onClick={() => handleNotesSaveChanges(row)}>Save changes</Button>
+                      //       {/* <Button type="submit" onClick={() => handleCompleteClick(row, notes)}>Save changes</Button> */}
+                      //     </DialogFooter>
+                      //   </DialogContent>
+                      // </Dialog>
+
+                      <Sheet>
+                      <SheetTrigger asChild>
+                          <Button variant="outline">Message now</Button>
+                      </SheetTrigger>
+                      <SheetContent>
+                          <SheetHeader>
+                          <SheetTitle>Send message</SheetTitle>
+                          <SheetDescription>
+                          <p className="text-black-700 text-xl text-foreground">To { row.getValue("accountName")}</p>
+                              {/* To {row.getValue("accountName")}. */}
+                          </SheetDescription>
+                          </SheetHeader>
+                          <div className="grid gap-4 py-4">
+                              <br/>
+                              <div className="grid w-full max-w-sm items-center gap-1.5">
+                                  <Label htmlFor="picture">Message</Label>
+                                  <Textarea id="message" placeholder="Type your message here." />
+                                  
+                              </div>
+                          </div>
+                          <SheetFooter>
+                          <SheetClose asChild>
+                              <Button type="submit" onClick={()=>handleMessageSendClick(row)}>Send now</Button>
+                              {/* <Button type="submit" onClick={sendMessageNow}>Send now</Button> */}
+                          </SheetClose>
+                          </SheetFooter>
+                      </SheetContent>
+                      </Sheet>
+                      // <Button onClick={() => handleAcceptClick(row.original.appointmentId)}>Accept</Button>
+                  )
+                  
+                  }
+              
+        </div>
+        
+        // <div>
+        //       Start
+        // </div>
+
+      },
+    },
+
+  ]
+  /////////////////
+  /////End of columns data
+  /////////////////
+
   const [sorting, setSorting] = React.useState([]) // sorting
   const [columnFilters, setColumnFilters] = React.useState([]) // filtering
   const [rowSelection, setRowSelection] = React.useState([]) // for cell selection
@@ -109,7 +473,7 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
       {/* search input for filtering columns */}
       <div className="flex items-center py-2" style={{display:'flex', justifyContent:'space-between'}}>
         <Input
-          placeholder="Filter students by userId"
+          placeholder="Filter dealers by Id"
           value={(table.getColumn("userId")?.getFilterValue()) ?? ""}
           onChange={(event) =>
             table.getColumn("userId")?.setFilterValue(event.target.value)
@@ -238,10 +602,10 @@ export function DataTable({ columns, data, status, changeStatus, downloadNow, in
             size="sm"
             onClick={() => {
               // console.log('ppppppppppp');
-              console.log(table.getRowModel().rows.length);
+              // console.log(table.getRowModel().rows.length);
               setRowsCount(rowsCount + table.getRowModel().rows.length)
-              console.log(rowsCount);
-              console.log(data.length);
+              // console.log(rowsCount);
+              // console.log(data.length);
               if(rowsCount == data.length){
                 // console.log('kkkkkkk');
               // if(!table.getCanNextPage()){

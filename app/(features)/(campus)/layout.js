@@ -1,7 +1,7 @@
 'use client'
 import { Inter } from 'next/font/google'
 import styles from '../../../app/page.module.css'
-import { Monitor, UserFocus, ArrowSquareOut, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files } from 'phosphor-react'
+import { Monitor, UserFocus, Chats, ArrowSquareOut, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files } from 'phosphor-react'
 import Image from 'next/image'
 import Biscuits from 'universal-cookie'
 const biscuits = new Biscuits
@@ -114,10 +114,10 @@ const inter = Inter({ subsets: ['latin'] })
       setSelectedTab('Dealers')
       router.push('/dealers')
     }
-    function navigateOuting(){
+    function navigateMessages(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Outing Requests')
-      router.push('/outing')
+      setSelectedTab('Messages')
+      router.push('/messages')
     }
     function navigateOutingReports(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
@@ -169,6 +169,7 @@ const inter = Inter({ subsets: ['latin'] })
               <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dashboard' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDashboard.bind(this)} style={{cursor:'pointer'}}><Monitor className={styles.menuicon}/> Dashboard</div> : <div></div>}
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealers.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers</div>
+                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Messages' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateMessages.bind(this)} style={{cursor:'pointer'}}><Chats className={styles.menuicon}/> Messages</div>
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Requests' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOuting.bind(this)} style={{cursor:'pointer'}}><PersonSimpleRun className={styles.menuicon}/> Outing Requests</div> */}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOutingReports.bind(this)} style={{cursor:'pointer'}}><Files className={styles.menuicon}/> Outing Reports</div> */}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} style={{cursor:'pointer'}}><ArrowSquareOut className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Outing</div>

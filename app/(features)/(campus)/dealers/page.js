@@ -231,6 +231,17 @@ fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message
 });
 
 
+// get message to dealers
+const sendDealerMessage = async (pass, sender, receiver, sentAt, message, seen, state) => 
+  
+    fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message+"/"+seen+"/"+state, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+    });
+
 
 // pass state variable and the method to update state variable
 export default function Outing() {
@@ -245,6 +256,7 @@ export default function Outing() {
     const [role, setRole] = useState('');
     const [offset, setOffset] = useState(0);
     const [completed, setCompleted] = useState(false);
+    const [loadingIds, setLoadingIds] = useState(new Set());
     
     // branch type selection whether all branches and years or specific ones
     const [viewTypeSelection, setViewTypeSelection] = useState('college');
@@ -310,6 +322,58 @@ export default function Outing() {
         console.log("Hello1");
     }
 
+    ///////////////////////////////
+    // IMPORTANT
+    ///////////////////////////////
+    // handle accept click to update a row
+    const handleMessageSendClick = (row) => {
+        
+        setLoadingIds(prev => new Set(prev.add(row.getValue('userId'))));
+
+        // Simulate API call
+        sendSingleMessageNow(row.getValue('userId'), () => {
+            setLoadingIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(row.getValue('userId'));
+                return newSet;
+            });
+
+            toast({description: "Message Sent!",});
+        });
+        
+    };
+
+
+  async function sendSingleMessageNow(dealerId, callback){
+
+    try {    
+        var updatedOn = dayjs(new dayjs()).format("YYYY-MM-DD");
+        
+        console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId+"/"+dealerId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/0/-");
+        // console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/1/"+row.getValue('appointmentId')+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).username+"/"+updatedOn+"/"+row.getValue('collegeId'));
+        const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,dealerId,dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),document.getElementById('message').value,"0","-");
+        // const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId+"/All"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/0/-");
+        const queryResult = await result.json() // get data
+
+        // check for the status
+        if(queryResult.status == 200){
+
+          // toast({description: "Appointment updated!",});
+        //   handleRemoveAppointment(row);
+          callback();
+          
+        }
+        else if(queryResult.status == 201) {
+            
+            // setSearching(false);
+            // setDataFound(false);
+            // setCompleted(true);
+        }
+    }
+    catch (e){
+      //   console.log(e);
+    }
+  }
     
 
 
@@ -924,7 +988,7 @@ const sendMessageNow = async (e) => {
         if(queryResult.status == 200){
 
             setMessaging(false);
-            toast("Data is uploaded", {
+            toast("Message sent!", {
                 description: "Message sent to all dealers",
                 action: {
                   label: "Okay",
@@ -1248,7 +1312,8 @@ const sendMessageNow = async (e) => {
 <div className="mx-auto" style={{width:'100%',height:'100%'}}>
 {/* <div className="container mx-auto py-10"> */}
 {/* <div>{allRequests.length}</div> */}
-      <DataTable columns={columns} data={allRequests} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset}/>
+      <DataTable data={allRequests} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset} loadingIds={loadingIds} handleMessageSendClick={handleMessageSendClick}/>
+      {/* <DataTable columns={columns} data={allRequests} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset}/> */}
       
     </div>
     {/* : null} */}

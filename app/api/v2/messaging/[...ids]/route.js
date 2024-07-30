@@ -13,9 +13,9 @@ const client = new OneSignal.Client(process.env.ONE_SIGNAL_APPID, process.env.ON
 
 // what is used to understand what the request is about – whether to send data back or create data
 // what – If it is 0, then create
-// what – If it is 1, fetch data for all branches – Super admin
-// what – If it is 2, fetch data for specific branch – Department Admin
-// what – If it is 3, fetch data for specific branch and year – student
+// what – If it is 1, // This is onHold
+// what – If it is 2, // This is onHold
+// what – If it is 3, fetch data of receivers list for admin.
 export async function GET(request,{params}) {
 
     // get the pool connection to db
@@ -119,6 +119,85 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No data!'}, {status: 200})
                 }
             }
+            else if(params.ids[1] == 3){ // fetch data for all receivers who got messages to show as list for – Super admin 
+              // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
+              // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
+              const [rows, fields] = await connection.execute('SELECT DISTINCT(n.receiver),u.name FROM `notifications` n JOIN users u ON n.receiver=u.userId where n.sender="'+params.ids[2]+'"');
+              connection.release();
+          
+              // check if user is found
+              if(rows.length > 0){
+                  // return the requests data
+                  return Response.json({status: 200, message:'Data found!', data: rows}, {status: 200})
+
+              }
+              else {
+                  // user doesn't exist in the system
+                  return Response.json({status: 404, message:'No data!'}, {status: 200})
+              }
+          }
+            else if(params.ids[1] == 4){ // fetch data for all messages sent and received from a specific receiver to show to – Super admin 
+              // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
+              // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
+              var query = '';
+              if(params.ids[3] == "All"){
+                query = 'SELECT * FROM notifications WHERE sender ="'+params.ids[2]+'" AND receiver = "'+params.ids[3]+'" ORDER BY sentAt ASC';
+              }
+              else {
+                query = 'SELECT n.*,u.name as receiverName FROM notifications n JOIN users u ON n.receiver=u.userId WHERE (n.sender IN ("'+params.ids[2]+'", "'+params.ids[3]+'") AND n.receiver = "'+params.ids[3]+'") OR (n.receiver IN ("'+params.ids[2]+'", "'+params.ids[3]+'") AND n.sender = "'+params.ids[3]+'") ORDER BY n.sentAt ASC';
+              }
+              const [rows, fields] = await connection.execute(query);
+              connection.release();
+          
+              // check if user is found
+              if(rows.length > 0){
+                  // return the requests data
+                  return Response.json({status: 200, message:'Data found!', data: rows}, {status: 200})
+
+              }
+              else {
+                  // user doesn't exist in the system
+                  return Response.json({status: 404, message:'No data!'}, {status: 200})
+              }
+          }
+          else if(params.ids[1] == 5){ // fetch count of unread messages for specific dealer
+                
+            var q = 'SELECT count(*) as count from notifications WHERE sentAt < "'+params.ids[3]+'" AND (receiver="'+params.ids[2]+'" OR receiver="All") AND seen = 0 ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[4];
+            
+            const [rows, fields] = await connection.execute(q);
+            // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" AND branch = "All" or FIND_IN_SET("'+params.ids[4]+'", branch)>0 ORDER BY createdOn DESC');
+            connection.release();
+        
+            // check if user is found
+            if(rows.length > 0){
+                // return the requests data
+                return Response.json({status: 200, message:'Data found!', data: rows}, {status: 200})
+
+            }
+            else {
+                // user doesn't exist in the system
+                return Response.json({status: 404, message:'No data!'}, {status: 200})
+            }
+          }
+          else if(params.ids[1] == 6){ // update the notification as SEEN by the dealer
+                
+            var q = 'UPDATE notifications set seen=1 WHERE notificationId = '+params.ids[2];
+            
+            const [rows, fields] = await connection.execute(q);
+            // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" AND branch = "All" or FIND_IN_SET("'+params.ids[4]+'", branch)>0 ORDER BY createdOn DESC');
+            connection.release();
+        
+            // check if user is found
+            if(rows.affectedRows > 0){
+                // return the requests data
+                return Response.json({status: 200, message:'Seen!', data: rows}, {status: 200})
+
+            }
+            else {
+                // user doesn't exist in the system
+                return Response.json({status: 404, message:'No data!'}, {status: 200})
+            }
+          }
         }
         else {
             // wrong secret key
