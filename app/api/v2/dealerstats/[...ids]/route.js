@@ -17,13 +17,45 @@ export async function GET(request,{params}) {
             // authorize secret key
             if(params.ids[1] == '0'){
 
-              const [rows, fields] = await connection.execute(
-                `SELECT d.state, 
-                  count(CASE WHEN i.status NOT IN ('Paid') THEN d.userId END) as count, 
-                  COUNT(DISTINCT d.userId) AS dealers,
-                  COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') THEN i.pending END), 0) AS pending
-                  FROM dealers d LEFT JOIN invoices i ON i.billTo = d.userId GROUP BY d.state`);
-              // const [rows, fields] = await connection.execute('SELECT DISTINCT(state),count(*) as count FROM dealers group by state');
+              var query =
+                `SELECT 
+                    'All' AS state, 
+                    COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
+                    COUNT(DISTINCT d.dealerId) AS dealers,
+                    COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
+                    COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL, 
+                    COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL 
+                FROM 
+                    dealer d 
+                LEFT JOIN 
+                    invoices i ON i.billTo = d.dealerId
+                
+                UNION ALL
+
+                SELECT 
+                    d.state, 
+                    COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
+                    COUNT(DISTINCT d.dealerId) AS dealers,
+                    COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
+                    COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL,
+                    COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL
+                FROM 
+                    dealer d 
+                LEFT JOIN 
+                    invoices i ON i.billTo = d.dealerId 
+                GROUP BY 
+                    d.state;`;
+
+
+              // const [rows, fields] = await connection.execute(
+              //   `SELECT d.state, 
+              //     count(CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) as invoices, 
+              //     COUNT(DISTINCT d.dealerId) AS dealers,
+              //     COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersdue,
+              //     COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') THEN i.pending END), 0) AS pending
+              //     FROM dealer d LEFT JOIN invoices i ON i.billTo = d.dealerId GROUP BY d.state`);
+              // const [rows, fields] = await connection.execute('SELECT DISTINCT(state),count(*) as count FROM dealer group by state');
+              const [rows, fields] = await connection.execute(query);
               connection.release();
 
               // send the notification
@@ -34,7 +66,7 @@ export async function GET(request,{params}) {
             }
             else{
                 
-              const [rows, fields] = await connection.execute('SELECT * FROM dealers where state=?',[params.ids[2]]);
+              const [rows, fields] = await connection.execute('SELECT * FROM dealer where state=?',[params.ids[2]]);
               connection.release();
               
               // check if user is found

@@ -28,7 +28,7 @@ export async function GET(request,{params}) {
         // authorize secret key
         if(await Keyverify(params.ids[0])){
 
-            if(params.ids[1] == 0){ // create official / blocked dates data
+            if(params.ids[1] == 0){ 
                 try {
                     // create query for insert
                     const q = 'INSERT INTO officialrequest (oRequestId, oType, duration, oFrom, oTo, oBy,oByName, description, campusId, branch, year, createdOn) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';

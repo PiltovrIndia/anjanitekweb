@@ -36,8 +36,8 @@ export async function GET(request,{params}) {
         // authorize secret key
         if(await Keyverify(params.ids[0])){
 
-            let q = 'SELECT * from `users` WHERE mobile = "'+params.ids[1]+'"';
-            // let q = 'SELECT u.*, IFNULL(d.fatherName, "") AS fatherName, IFNULL(d.fatherPhoneNumber, "") AS fatherPhoneNumber, IFNULL(d.motherName, "") AS motherName, IFNULL(d.motherPhoneNumber, "") AS motherPhoneNumber, IFNULL(d.address, "") AS address, IFNULL(d.guardianName, "") AS guardianName, IFNULL(d.guardianPhoneNumber, "") AS guardianPhoneNumber, IFNULL(d.guardian2Name, "") AS guardian2Name, IFNULL(d.guardian2PhoneNumber, "") AS guardian2PhoneNumber, IFNULL(d.hostelId, "") AS hostelId, IFNULL(d.roomNumber, "") AS roomNumber, IFNULL(h.hostelName, "") AS hostelName FROM users u LEFT JOIN user_details d ON u.userId = d.userId LEFT JOIN `hostel` h ON d.hostelId = h.hostelId WHERE u.userId = "'+params.ids[1]+'"';
+            let q = 'SELECT * from `user` WHERE mobile = "'+params.ids[1]+'"';
+            // let q = 'SELECT u.*, IFNULL(d.fatherName, "") AS fatherName, IFNULL(d.fatherPhoneNumber, "") AS fatherPhoneNumber, IFNULL(d.motherName, "") AS motherName, IFNULL(d.motherPhoneNumber, "") AS motherPhoneNumber, IFNULL(d.address, "") AS address, IFNULL(d.guardianName, "") AS guardianName, IFNULL(d.guardianPhoneNumber, "") AS guardianPhoneNumber, IFNULL(d.guardian2Name, "") AS guardian2Name, IFNULL(d.guardian2PhoneNumber, "") AS guardian2PhoneNumber, IFNULL(d.hostelId, "") AS hostelId, IFNULL(d.roomNumber, "") AS roomNumber, IFNULL(h.hostelName, "") AS hostelName FROM user u LEFT JOIN user_details d ON u.userId = d.userId LEFT JOIN `hostel` h ON d.hostelId = h.hostelId WHERE u.userId = "'+params.ids[1]+'"';
             // 'SELECT u.*,d.* FROM user u LEFT JOIN user_details d ON u.userId = d.userId WHERE u.userId = "'+params.ids[1]+'"'
      
             // search for user based on the provided mobile
@@ -70,7 +70,7 @@ export async function GET(request,{params}) {
                         
                             // increment the session
                             const updateSession = 'UPDATE user_sessions SET loginCount = loginCount + 1, deviceId = ?, lastActivityTime = ? WHERE userId=?'
-                            const [rowsUpdateSession, fieldsUpdateSession] = await connection.execute(updateSession, [ params.ids[3], currentDate, rows[0].userId]);
+                            const [rowsUpdateSession, fieldsUpdateSession] = await connection.execute(updateSession, [ params.ids[3], currentDate, rows[0].id]);
                             // const updateSession = 'UPDATE user_sessions SET loginCount = loginCount + 1, lastActivityTime = ? WHERE userId=? and deviceId = ?'
                             // const [rowsUpdateSession, fieldsUpdateSession] = await connection.execute(updateSession, [ currentDate, params.ids[1], params.ids[3]]);
 
@@ -121,7 +121,7 @@ export async function GET(request,{params}) {
                         // Insert new session
                         const q1 = 'INSERT INTO user_sessions (userId, deviceId, sessionToken, loginCount, lastActivityTime) VALUES ( ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE loginCount = loginCount + 1, lastActivityTime = "'+currentDate+'";';
                         // create new request
-                        const [rows1, fields] = await connection.execute(q1, [ rows[0].userId, params.ids[3], randomUUID(), 1, currentDate]);
+                        const [rows1, fields] = await connection.execute(q1, [ rows[0].id, params.ids[3], randomUUID(), 1, currentDate]);
 
                         // check if email is present
                         // if(rows[0].email.length > 2){
@@ -151,7 +151,7 @@ export async function GET(request,{params}) {
                     // return the user data
                     // if user is a dealer, get dealer details
                     if(rows[0].role == 'dealer'){
-                        let p = 'SELECT * from dealers WHERE userId ="'+rows[0].userId+'"';
+                        let p = 'SELECT * from dealer WHERE userId ="'+rows[0].id+'"';
                         const [drows, dfields] = await connection.execute(p);
                         return Response.json({status: 200, message:'User found!', data: rows[0], data1: drows[0]}, {status: 200})
                     }

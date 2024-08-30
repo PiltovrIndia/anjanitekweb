@@ -45,7 +45,7 @@ import {
 } from "@/app/components/ui/tooltip"
 import { Label } from "@/app/components/ui/label"
 import { Textarea } from "@/app/components/ui/textarea"
-import { Toaster } from "../../../../app/components/ui/sonner"
+import { Toaster } from "../../../components/ui/sonner"
 import { useToast } from "@/app/components/ui/use-toast"
 
 export function DataTable({ data, dataOffset, status, changeStatus, downloadNow, initialDates, dates, requestAgain, loadingIds, handleMessageSendClick}) {

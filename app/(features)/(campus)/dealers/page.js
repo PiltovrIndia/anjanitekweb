@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { Check, Info, SpinnerGap, X, Plus } from 'phosphor-react'
+import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus } from 'phosphor-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
@@ -22,6 +22,8 @@ import { Separator } from "@/app/components/ui/separator"
 import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group"
 import { Label } from "@/app/components/ui/label"
 import { Checkbox } from "@/app/components/ui/checkbox"
+import { Input } from "@/app/components/ui/input"
+import { Skeleton } from "@/app/components/ui/skeleton"
 
 import BlockDatesBtn from '../../../components/myui/blockdatesbtn'
 import OutingRequest from '../../../components/myui/outingrequest'
@@ -52,6 +54,9 @@ import {
 import {columns} from "./columns"
 import {DataTable} from "./data-table"
 import {
+    Card
+  } from "../../../../app/components/ui/card"
+import {
     Sheet,
     SheetClose,
     SheetContent,
@@ -62,162 +67,50 @@ import {
     SheetTrigger,
   } from "../../../../app/components/ui/sheet"
 
-// import { columns } from "@/app/components/columns"
-// import { DataTable } from "@/app/components/data-table"
-import { UserNav } from "@/app/components/user-nav"
-// import { taskSchema } from "@/app/data/schema"
 
-// import data from '@/app/data/'
+// create user
+const createUser = async (pass, role, updateDataBasic) =>   
+    fetch("/api/v2/user/"+pass+"/U12/"+role+"/"+updateDataBasic, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+    });
 
-
-const metadata = {
-    title: "Tasks",
-    description: "A task and issue tracker build using Tanstack Table."
-  }
-  // Simulate a database read for tasks.
-   function getTasks() {
-    // const data =  fs.readFile(
-    //   path.join(process.cwd(), "src/app/data/tasks.json")
-    // )
-  
-    // const tasks = JSON.parse(data.toString())
-
-    var tasks = [
-        {
-          "id": "TASK-5207",
-          "title": "The SMS interface is down, copy the bluetooth bus so we can quantify the VGA card!",
-          "status": "Approved",
-          "label": "bug",
-          "priority": "low"
-        }
-      ]
-  
-    return JSON.parse(JSON.stringify(tasks))
-    // return array( taskSchema.validate(tasks))
-    // return array(taskSchema).parse(tasks)
-  
-  // parse and assert validity
-  // const user = await taskSchema.validate(tasks);
-  
-  
-  }
-const xlsx = require('xlsx');
-// import {jsPDF} from 'jsPDF';
-// Default export is a4 paper, portrait, using millimeters for units
-// const doc = new jsPDF();
-
-// Create styles
-// const styles1 = StyleSheet.create({
-//     page: {
-//       flexDirection: 'row',
-//       backgroundColor: '#E4E4E4'
-//     },
-//     section: {
-//       margin: 10,
-//       padding: 10,
-//       flexGrow: 1
-//     }
-//   });
-
-
-
-// Hostels and strengths
-// SELECT h.hostelName, h.hostelId, COUNT(ud.collegeId) AS userCount FROM hostel h LEFT JOIN user_details ud ON h.hostelId = ud.hostelId JOIN user u ON ud.collegeId = u.collegeId and u.type='hostel' and u.role='student' GROUP BY h.hostelName, h.hostelId
-
-// Inouting count from each hostel
-// SELECT h.hostelName, h.hostelId, COUNT(r.collegeId) AS userCount FROM hostel h LEFT JOIN user_details ud ON h.hostelId = ud.hostelId JOIN request r ON ud.collegeId = r.collegeId and r.requestStatus='InOuting' GROUP BY h.hostelName, h.hostelId
-
-// InHostel Count, InOuting count from each hostel
-// SELECT h.hostelName, h.hostelId, COUNT(DISTINCT ud.collegeId) AS userCount, SUM(CASE WHEN r.requestStatus='InOuting' THEN 1 ELSE 0 END) AS outingCount, COUNT(DISTINCT ud.collegeId) - SUM(CASE WHEN r.requestStatus='InOuting' THEN 1 ELSE 0 END) AS inHostel FROM hostel h LEFT JOIN user_details ud ON h.hostelId = ud.hostelId LEFT JOIN user u ON ud.collegeId = u.collegeId AND u.type='hostel' AND u.role='student' LEFT JOIN request r ON ud.collegeId = r.collegeId GROUP BY h.hostelName, h.hostelId
-
-// to download hostelwise student status
-// SELECT u.collegeId, u.username, (CASE WHEN r.requestStatus='InOuting' THEN 'InOuting' ELSE 'InHostel' END) as status FROM user u JOIN user_details ud ON u.collegeId = ud.collegeId JOIN request r ON u.collegeId = r.collegeId WHERE ud.hostelId = 'H09u23jidw' ORDER BY `status` DESC
-
-// Child references can also take paths delimited by '/'
-const spaceRef = ref(storage, '/');
-
-// get all campuses
-const getCampuses = async (pass) => 
-fetch("/api/campuses/"+pass+"/0", {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-// get all hostels
-const getHostels = async (pass) => 
-fetch("/api/hostels/"+pass+"/U1", {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-// get all college wise strengths
-const getCollegeWiseStrengths = async (pass) => 
-fetch("/api/hostels/"+pass+"/U5", {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-// get all hostel wise strengths
-const getHostelWiseStrengths = async (pass) => 
-fetch("/api/hostels/"+pass+"/U4", {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-// const spaceRef = ref(storage, 'images/space.jpg');
-// check for the user
-const getStats = async (pass, role, branch) => 
-  
-fetch("/api/requeststats/"+pass+"/"+role+"/"+branch+"/All/1", {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-// const spaceRef = ref(storage, 'images/space.jpg');
-// check for the user
-const getDetailedStats = async (pass, role, branch, date) => 
-  
-fetch("/api/requeststats/"+pass+"/"+role+"/"+branch+"/All/2/"+date, {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-// get the requests for SuperAdmin
-// const getAllDealersDataAPI = async (pass, role, statuses, offset, collegeId, branches, requestType, platformType, year, campusId, dates, branchyears, course) => 
-  
-// fetch("/api/requests/"+pass+"/"+role+"/"+statuses+"/"+offset+"/"+collegeId+"/"+branches+"/"+requestType+"/"+platformType+"/"+year+"/"+campusId+"/"+dates+"/"+branchyears+"/"+course, {
-//     method: "GET",
-//     headers: {
-//         "Content-Type": "application/json",
-//         Accept: "application/json",
-//     },
-// });
+// update user
+const updateUser = async (pass, role, id, updateDataBasic) =>   
+    fetch("/api/v2/user/"+pass+"/U13/"+role+"/"+id+"/"+updateDataBasic, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+    });
 
 // get the dealers for SuperAdmin/Admin
 const getAllDealersDataAPI = async (pass, role, offset) => 
   
-fetch("/api/v2/user/"+pass+"/U5/"+role+"/"+offset, {
+fetch("/api/v2/user/"+pass+"/U6/"+role+"/"+offset, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
     },
 });
+
+
+// get the SalesManagers for SalesExecutives
+const getAllSalesPersonsDataAPI = async (pass, role, offset) => 
+  
+    fetch("/api/v2/user/"+pass+"/U7/"+role+"/"+offset, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+    });
+
 
 // get message to dealers
 const sendBroadcastMessage = async (pass, sender, receiver, sentAt, message, seen, state) => 
@@ -231,16 +124,7 @@ fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message
 });
 
 
-// get message to dealers
-const sendDealerMessage = async (pass, sender, receiver, sentAt, message, seen, state) => 
-  
-    fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message+"/"+seen+"/"+state, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-    });
+
 
 
 // pass state variable and the method to update state variable
@@ -254,57 +138,29 @@ export default function Outing() {
     // user state and requests variable
     const [user, setUser] = useState();
     const [role, setRole] = useState('');
+    const [selectedState, setSelectedState] = useState('All');
+    const [selectedMapToPerson, setSelectedMapToPerson] = useState('');
     const [offset, setOffset] = useState(0);
     const [completed, setCompleted] = useState(false);
+    const [creatingPerson, setCreatingPerson] = useState(false);
+    const [updatingPerson, setupdatingPerson] = useState(false);
+    const [searching, setSearching] = useState(true);
+    const [searchingSales, setSearchingSales] = useState(false);
     const [loadingIds, setLoadingIds] = useState(new Set());
     
     // branch type selection whether all branches and years or specific ones
-    const [viewTypeSelection, setViewTypeSelection] = useState('college');
+    const [updateEmail, setUpdateEmail] = useState('');
+    const [updateMobile, setUpdateMobile] = useState('');
         
-    // for populating filters/selections
-    const [campuses, setCampuses] = useState([]); const [selectedCampus, setSelectedCampus] = useState('All');
-    const [hostels, setHostels] = useState([]);
-    const [hostelStrengths, setHostelStrengths] = useState([]);
-    const [courses, setCourses] = useState(); const [selectedCourse, setSelectedCourse] = useState(null);
-    const [departments, setDepartments] = useState(); const [selectedDepartment, setSelectedDepartment] = useState(null);
-    
-    // branch type selection whether all branches and years or specific ones
-    const [branchTypeSelection, setBranchTypeSelection] = useState('all');
-    
-    const [branches, setBranches] = useState([]); const [selectedBranch, setSelectedBranch] = useState(null);
-    const [branchYears, setBranchYears] = useState(); //const [selectedBranchYears, setSelectedBranchYears] = useState(null);
-    const [years, setYears] = useState();
+    // get all sales people for changing the value
+    const [allSalesPeople, setAllSalesPeople] = useState([]);
 
-    // branches selection
-    const [selectedBranches, setSelectedBranches] = useState([]);
-    const [selectedBranchYears, setSelectedBranchYears] = useState([]);
-
-    // const [selectedBranches, setSelectedBranches] = useState(new Set());
-    // const [selectedBranchYears, setSelectedBranchYears] = useState(new Set());
-    // const [intermediateBranches, setIntermediateBranches] = useState(new Set());
-
-    // basic stats
-    const [totalStudents, setTotalStudents] = useState(0);
-    const [studentsInCampus, setStudentsInCampus] = useState(0);
-    const [requestsInOuting, setRequestsInOuting] = useState(0);
-    const [requestsIssued, setRequestsIssued] = useState(0);
-    const [requestsApproved, setRequestsApproved] = useState(0);
-    const [requestsPending, setRequestsPending] = useState(0);
-
-    // hostel wise
-    const [totalHostelsStrength, setTotalHostelsStrength] = useState(0);
-    const [totalInOutingStrength, setTotalInOutingStrength] = useState(0);
-    const [totalInHostelStrength, setTotalInHostelStrength] = useState(0);
-
-    const [resultType, setResultType] = useState('');
-    const [resultMessage, setResultMessage] = useState('');
-
-    const [dataFound, setDataFound] = useState(true); 
-    const [searching, setSearching] = useState(false);
+    const [dataFound, setDataFound] = useState(false);
     const [messaging, setMessaging] = useState(false);
-
-    const [outingData, setOutingData] = useState();
-    const [allRequests, setAllRequests] = useState([]);
+    const [creating, setCreating] = useState(false);
+    const [allDealers, setAllDealers] = useState([]);
+    const [allDealersFiltered, setAllDealersFiltered] = useState([]);
+    const [allStates, setAllStates] = useState([]);
     const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
     const [initialDatesValues, setInititalDates] = React.useState({from: dayjs().subtract(0,'day'),to: dayjs(),});
@@ -328,13 +184,13 @@ export default function Outing() {
     // handle accept click to update a row
     const handleMessageSendClick = (row) => {
         
-        setLoadingIds(prev => new Set(prev.add(row.getValue('userId'))));
+        setLoadingIds(prev => new Set(prev.add(row.getValue('dealerId'))));
 
         // Simulate API call
-        sendSingleMessageNow(row.getValue('userId'), () => {
+        sendSingleMessageNow(row.getValue('dealerId'), () => {
             setLoadingIds(prev => {
                 const newSet = new Set(prev);
-                newSet.delete(row.getValue('userId'));
+                newSet.delete(row.getValue('dealerId'));
                 return newSet;
             });
 
@@ -349,10 +205,9 @@ export default function Outing() {
     try {    
         var updatedOn = dayjs(new dayjs()).format("YYYY-MM-DD");
         
-        console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId+"/"+dealerId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/0/-");
-        // console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/1/"+row.getValue('appointmentId')+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).username+"/"+updatedOn+"/"+row.getValue('collegeId'));
-        const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,dealerId,dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),document.getElementById('message').value,"0","-");
-        // const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId+"/All"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/0/-");
+        // console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+dealerId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/0/-");
+        const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id,dealerId,dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),document.getElementById('message').value,"0","-");
+        
         const queryResult = await result.json() // get data
 
         // check for the status
@@ -391,42 +246,13 @@ export default function Outing() {
                 setRole(obj.role);
                 
                 if(!completed){
-                    // getCampusesData();
-                    // getHostelsData();
-                    // getHostelWiseStrengthsData();
-                    // getData();
-                    // getDataDetails();
-                    getAllRequests(currentStatus, initialDatesValues.from,initialDatesValues.to);
+                    
+                    getAllDealers(initialDatesValues.from,initialDatesValues.to);
                 }
                 else {
                     console.log("DONE READING");
                 }
                 
-                // get the requests data if doesnot exist
-                // if(!requests){
-
-                //     // set the view by status based on the role
-                //     if(obj.role == 'Student'){
-                //         console.log('Student');
-                //         setViewByStatus('Returned')
-                //         getData(obj.role, 'Returned', obj.collegeId, obj.branch);
-                //     }
-                //     else if(obj.role == 'SuperAdmin' || obj.role == 'Admin'){
-                //         console.log('SuperAdmin');
-                //         setViewByStatus('Submitted')
-                //         getData(obj.role, 'Submitted', obj.collegeId, obj.branch);
-                //     }
-                //     else if(obj.role == 'OutingAdmin' || obj.role == 'OutingIssuer'){
-                //         console.log('OutingAdmin');
-                //         setViewByStatus('Approved')
-                //         getData(obj.role, 'Approved', obj.collegeId, obj.branch);
-                //     }
-                //     else if(obj.role == 'OutingAssistant'){
-                //         console.log('OutingAssistant');
-                //         setViewByStatus('Issued')
-                //         getData(obj.role, 'Issued', obj.collegeId, obj.branch);
-                //     }   
-                // }
             }
             else{
                 console.log('Not found')
@@ -444,409 +270,16 @@ export default function Outing() {
 
     },[]);
 
-    // }, [webcamRef]);
-   
-
-
-    // get the campuses data
-    // list of campuses will be used for filters
-    async function getCampusesData(){
-        
-        setSearching(true);
-        
-        try {    
-            const campusesResult  = await getCampuses(process.env.NEXT_PUBLIC_API_PASS)
-            const queryCResult = await campusesResult.json() // get data
-
-            // check for the status
-            if(queryCResult.status == 200){
-
-                // check if data exits
-                if(queryCResult.data.length > 0){
-
-                    // set the state
-                    setCampuses(queryCResult.data)
-                    setDataFound(true);
-                }
-                else {                    
-                    setDataFound(false);
-                }
-
-                setSearching(false);
-                setCompleted(false);
-            }
-            else {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-        }
-        catch (e){
-            
-            // show and hide message
-            setResultType('error');
-            setResultMessage('Issue loading. Please refresh or try again later!');
-            console.log(e.message);
-            setTimeout(function(){
-                setResultType('');
-                setResultMessage('');
-            }, 3000);
-        }
-}
-
-    // get the hostels data
-    // list of hostels will be used for filters
-    async function getHostelsData(){
-        
-        setSearching(true);
-        
-        try {    
-            const hostelsResult  = await getHostels(process.env.NEXT_PUBLIC_API_PASS)
-            const queryHResult = await hostelsResult.json() // get data
-
-            // check for the status
-            if(queryHResult.status == 200){
-
-                // check if data exits
-                if(queryHResult.data.length > 0){
-
-                    // set the state
-                    setHostels(queryHResult.data)
-                    setDataFound(true);
-                }
-                else {                    
-                    setDataFound(false);
-                }
-
-                setSearching(false);
-                setCompleted(false);
-            }
-            else {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-        }
-        catch (e){
-            
-            // show and hide message
-            setResultType('error');
-            setResultMessage('Issue loading. Please refresh or try again later!');
-            console.log(e.message);
-            setTimeout(function(){
-                setResultType('');
-                setResultMessage('');
-            }, 3000);
-        }
-}
-    // get the hostels wise strengths data
-    async function getHostelWiseStrengthsData(){
-        
-        setSearching(true);
-        
-        try {    
-            const hostelsResult  = await getHostelWiseStrengths(process.env.NEXT_PUBLIC_API_PASS)
-            const queryHResult = await hostelsResult.json() // get data
-
-            // check for the status
-            if(queryHResult.status == 200){
-
-                // check if data exits
-                if(queryHResult.data.length > 0){
-
-let totalSum = 0;
-let inOutingSum = 0;
-let inHostelSum = 0;
-
-// Calculate the sums
-queryHResult.data.forEach(hostel => {
-    totalSum += hostel.total;
-    inOutingSum += parseInt(hostel.InOuting);
-    inHostelSum += parseInt(hostel.InHostel);
-});
-
-setTotalHostelsStrength(totalSum);
-setTotalInOutingStrength(inOutingSum);
-setTotalInHostelStrength(inHostelSum);
-
-// Create the new object
-// const allHostelsSummary = {
-//   hostelName: 'All',
-//   total: totalHostelsStrength,
-//   InOuting: totalInOutingStrength,
-//   InHostel: totalInHostelStrength
-// };
-
-// Add the new object to the start of the array
-// queryHResult.data.unshift(allHostelsSummary);
-
-                    // if(studentsList==null){
-                    //    setStudentsList(queryResult.data)
-                    // }
-                    // else {
-                    //     setStudentsList((studentsList) => [...studentsList, ...queryResult.data]);
-                    // }
-
-                    // set the state
-                    // queryHResult.data.push(HostelStrength);
-                    setHostelStrengths(queryHResult.data)
-                    setDataFound(true);
-                }
-                else {                    
-                    setDataFound(false);
-                }
-
-                setSearching(false);
-                setCompleted(false);
-            }
-            else {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-        }
-        catch (e){
-            
-            // show and hide message
-            setResultType('error');
-            setResultMessage('Issue loading. Please refresh or try again later!');
-            console.log(e.message);
-            setTimeout(function(){
-                setResultType('');
-                setResultMessage('');
-            }, 3000);
-        }
-}
-
-    // get basic stats
-    async function getData(){
-        
-        setSearching(true);
-        setOffset(offset+10); // update the offset for every call
-
-        try {    
-            const result  = await getStats(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).branch)
-            const queryResult = await result.json() // get data
-
-            // check for the status
-            if(queryResult.status == 200){
-
-                // check if data exits
-                if(queryResult.data.length > 0){
-
-                    // set the state
-                    // total students
-                    // const result = queryResult.data;
-
-                    // const worksheet = xlsx.utils.json_to_sheet(result);
-                    // const workbook = xlsx.utils.book_new();
-                    // xlsx.utils.book_append_sheet(workbook,worksheet,'Sheet 123');
-                    // xlsx.writeFile(workbook, 'sample1234.xlsx');
-
-
-                    // Create a document
-                    // var doc = new PDFDocument();
-                    // var stream = doc.pipe(blobStream());
-                    // doc.fontSize(25).text('Here is some vector graphics...', 100, 80);
-                    // // end and display the document in the iframe to the right
-                    // doc.end();
-                    // stream.on('finish', function() {
-                    // iframe.src = stream.toBlobURL('application/pdf');
-                    // });
-//                     doc.text("Hello world!", 10, 10);
-// doc.save("a4.pdf");
-
-                    // Initialize counters
-                    let inHostel = 0;
-                    let totalStrength = 0;
-
-                    // Iterate through the array
-                    for (const element of result) {
-                        if (element.requestStatus === 'InOuting') {
-                            inHostel += element.count;
-                        }
-
-                        if (element.requestStatus === 'InCampus') {
-                            totalStrength += element.count;
-                            setTotalStudents(element.count)
-                        }
-                        if (element.requestStatus === 'InOuting') {
-                            setRequestsInOuting(element.count)
-                        }
-                        if (element.requestStatus === 'Issued') {
-                            setRequestsIssued(element.count)
-                        }
-                        if (element.requestStatus === 'Approved') {
-                            setRequestsApproved(element.count)
-                        }
-                        if (element.requestStatus === 'Submitted') {
-                            setRequestsPending(element.count)
-                        }
-                    }
-
-                    // Calculate studentsInCampus
-                    setStudentsInCampus(totalStrength - inHostel);
-                    
-                    
-                    // setStudentsGraph({name:'Total',value: totalStrength},{name: 'In campus',value:studentsInCampus});
-                    
-                    // setTotalStudents(result[0].requestStatus);
-                    // setStudentsInCampus(result[0].requestStatus);
-                    // setStudentsInCampus(queryResult.data[7].count);
-
-                    // check if students are present and accordingly add students list
-                    // if(studentsList==null){
-                    //    setStudentsList(queryResult.data)
-                    // }
-                    // else {
-                    //     setStudentsList((studentsList) => [...studentsList, ...queryResult.data]);
-                    // }
-                    // set data found
-                    setDataFound(true);
-                }
-                else {
-                    
-                    setDataFound(false);
-                }
-
-                setSearching(false);
-                setCompleted(false);
-            }
-            else if(queryResult.status == 401) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-            else if(queryResult.status == 404) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-            else if(queryResult.status == 201) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-        }
-        catch (e){
-            
-            // show and hide message
-            setResultType('error');
-            setResultMessage('Issue loading. Please refresh or try again later!');
-            console.log(e.message);
-            setTimeout(function(){
-                setResultType('');
-                setResultMessage('');
-            }, 3000);
-        }
-}
-
-    // get the requests data
-    // for the user based on their role.
-    // the actions will be seen that are specific to the role and by the selected status
-    async function getDataDetails(){
-        
-        setSearching(true);
-        setOffset(offset+10); // update the offset for every call
-
-        try {    
-            const result  = await getDetailedStats(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).branch, dayjs(today.toDate()).format("YYYY-MM-DD"))
-            console.log(result);
-            const queryResult = await result.json() // get data
-            console.log(queryResult);
-
-            // check for the status
-            if(queryResult.status == 200){
-
-                // check if data exits
-                if(queryResult.data.length > 0){
-
-                    // set the state
-                    // outing data
-                    setOutingData(queryResult.data.slice(0, 4).reverse());
-                    
-                    setDataFound(true);
-                }
-                else {
-                    
-                    setDataFound(false);
-                }
-
-                setSearching(false);
-                setCompleted(false);
-            }
-            else if(queryResult.status == 401) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-            else if(queryResult.status == 404) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-            else if(queryResult.status == 201) {
-                
-                setSearching(false);
-                setDataFound(false);
-                setCompleted(true);
-            }
-        }
-        catch (e){
-            
-            // show and hide message
-            setResultType('error');
-            setResultMessage('Issue loading. Please refresh or try again later!');
-            setTimeout(function(){
-                setResultType('');
-                setResultMessage('');
-            }, 3000);
-        }
-}
-
 
     // Get requests for a particular role
     // role – SuperAdmin
-    // 2 requestStatus – Approved, Issued or All
-    // 3 offset – 0
-    // 4 collegeId - Super33
-    // 5 branches – IT, CSE or All
-    // 6 requestType – 1,2,3 or All
-    // 7 platformType – 111 (web) or 000 (mobile)
-    // 8 year – 1,2,3,4 or All
-    // 9 campusId - SVECW or All
-    // 10 dates – from,to
-    async function getAllRequests(status, from, to){
+    async function getAllDealers(from, to){
         
         setSearching(true);
-        setOffset(offset+0); // update the offset for every call
+        // setOffset(offset+0); // update the offset for every call
 
         try {    
-            // var dates = dayjs(today.toDate()).format("YYYY-MM-DD") + "," + dayjs(today.toDate()).format("YYYY-MM-DD");
-            var dates = dayjs(from).format("YYYY-MM-DD") + "," + dayjs(to).format("YYYY-MM-DD");
-            
-            var paramBranchYears;
-            if(selectedBranchYears.length > 0){
-                paramBranchYears = selectedBranchYears.map(branchYear => `${selectedCourse}-${branchYear}`)
-            }
-            else {
-                paramBranchYears = 'All';
-            }
-            const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS, 
-                JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, offset) 
-                // status, 
-                // 0, 
-                // JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'All', '111', '0', selectedCampus, dates,  paramBranchYears, selectedCourse)
-            
-            // const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, status, 0, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId, 'CSE,IT', 'All', '111', '0', JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).campusId, dates, 'BTECH-IT-2,BTECH-IT-3')
+            const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, offset) 
             const queryResult = await result.json() // get data
 
             console.log(queryResult);
@@ -856,16 +289,34 @@ setTotalInHostelStrength(inHostelSum);
                 // check if data exits
                 if(queryResult.data.length > 0){
 
-                    // set the state
-                    // outing data
-                    
-                    setAllRequests(queryResult.data);
-                    // if(allRequests.length > 0){
-                    //     setAllRequests(allRequests.push(queryResult.data));
-                    // }
-                    // else{
-                    //     setAllRequests(queryResult.data);
-                    // }
+                    if(allDealers.length > 0){
+                        setAllDealers(allDealers.push(queryResult.data));
+                        setAllDealersFiltered(allDealers.push(queryResult.data));
+                    }
+                    else{
+                        setAllDealers(queryResult.data);
+                        setAllDealersFiltered(queryResult.data);
+
+                        const getDistinctStates = (list) => {
+                            // Use reduce to accumulate distinct states
+                            const distinctStates = list.reduce((acc, person) => {
+                            if (!acc.includes(person.state)) {
+                                acc.push(person.state);
+                            }
+                            return acc;
+                            }, []);
+                        
+                            // Add "All" at the beginning of the array
+                            distinctStates.unshift("All");
+                        
+                            return distinctStates;
+                        };
+                          
+                          // Usage
+                          const distinctStates = getDistinctStates(queryResult.data);
+                          
+                          setAllStates(distinctStates);
+                    }
                     
                     setDataFound(true);
                 }
@@ -883,7 +334,7 @@ setTotalInHostelStrength(inHostelSum);
                 setCompleted(true);
             }
             else if(queryResult.status == 404) {
-                setAllRequests([]);
+                setAllDealers([]);
                 toast({
                     description: "No more requests with "+status+" status",
                   })
@@ -900,76 +351,336 @@ setTotalInHostelStrength(inHostelSum);
             }
         }
         catch (e){
+            console.log(e);
             
             // show and hide message
-            setResultType('error');
-            setResultMessage('Issue loading. Please refresh or try again later!');
-            setTimeout(function(){
-                setResultType('');
-                setResultMessage('');
-            }, 3000);
+            // setResultType('error');
+            // setResultMessage('Issue loading. Please refresh or try again later!');
+            toast({
+                description: "Issue loading. Please refresh or try again later!",
+              })
+            // setTimeout(function(){
+            //     setResultType('');
+            //     setResultMessage('');
+            // }, 3000);
         }
 }
 
-function downloadRequestsNow() {
-    const result = allRequests;
 
-    const worksheet = xlsx.utils.json_to_sheet(result);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook,worksheet,'Sheet 123');
-    xlsx.writeFile(workbook, selectedCampus+'_'+currentStatus+'_'+dayjs(from).format("YYYY-MM-DD") + "," + dayjs(to).format("YYYY-MM-DD")+'.xlsx');
-}
 
-function downloadHostelsDataNow() {
-    console.log("Downloading...");
-    const result = hostelStrengths;
-    const strengthsExcludingHostelId = hostelStrengths.map(({ hostelId, ...rest }) => rest);
+    // Get all sales people data
+    // role – SuperAdmin
+    async function getSalesPersons(){
+        
+        setSearchingSales(true);
 
-// console.log(strengthsExcludingHostelId);
+        try {    
+            
+            const result  = await getAllSalesPersonsDataAPI(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, 'SalesManager', offset) 
+            const queryResult = await result.json() // get data
 
-    const worksheet = xlsx.utils.json_to_sheet(strengthsExcludingHostelId);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook,worksheet,'All Hostels');
-    xlsx.writeFile(workbook, 'HostelStrength_'+dayjs(today.toDate()).format("DD-MM-YYYY").toString()+'.xlsx');
-}
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
 
-// update the date selection
-function changeDatesSelection(value) {
-// console.log(initialDatesValues.from);
-// console.log((initialDatesValues.to!=null));
+                // check if data exits
+                if(queryResult.data.length > 0){
+                    
+                    setAllSalesPeople(queryResult.data);
+                    
+                    setDataFound(true);
+                }
+                else {
+                    setAllSalesPeople([]);
+                    setDataFound(false);
+                }
 
-setInititalDates({from:dayjs(value.from),  to:dayjs((value.to!=null)?value.to:value.from)});
-// setInititalDates(dayjs(new Date(value.from)).format('YYYY-MM-DD HH:mm:ss'),  dayjs(new Date(value.from)).format('YYYY-MM-DD HH:mm:ss'));
-// console.log(value.from);
-// console.log(value.to);
-// console.log('bro');
-// console.log(initialDatesValues.to);
-
-    getAllRequests(currentStatus, dayjs(value.from),dayjs((value.to!=null)?value.to:value.from));
-}
-
-// update the currentStatus variable
-function getLatestRequests() {
-    // console.log(value);
-    // setCurrentStatus(value);
-    getAllRequests(currentStatus, initialDatesValues.from,initialDatesValues.to);
-}
-
-// update the currentStatus variable
-function updateStatus(value) {
-    getAllRequests(value, initialDatesValues.from,initialDatesValues.to);
-    
-    setCurrentStatus(value);
-    
-}
-// update the currentStatus variable
-function updateOffset(value) {
-    // console.log(offset);
-    setOffset(offset+20);
-    getAllRequests(value, initialDatesValues.from,initialDatesValues.to);
-}
+                setSearchingSales(false);
+                setCompleted(false);
+            }
+            else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                setAllSalesPeople([]);
+                setSearchingSales(false);
+                setDataFound(false);
+                setCompleted(true);
+            }
+            else if(queryResult.status == 404) {
+                setAllSalesPeople([]);
+                toast({
+                    description: "No more requests with "+status+" status",
+                  })
+                  
+                  setSearchingSales(false);
+                setDataFound(false);
+                setCompleted(true);
+            }
+        }
+        catch (e){
+            
+            toast({ description: "Issue loading. Please refresh or try again later!", })
+        }
+    }
 
     
+    const getNextId = (list) => {
+        // Extract numeric part from each ID and find the highest number
+        const maxIdNumber = list.reduce((max, item) => {
+        const currentIdNumber = parseInt(item.id.slice(1)); // Remove the prefix 'A' and parse the rest as an integer
+        return Math.max(max, currentIdNumber);
+        }, 0);
+    
+        // Increment the highest number to generate the next ID
+        const nextIdNumber = maxIdNumber + 1;
+    
+        // Format the next ID by adding leading zeros if necessary (assuming IDs are always 4 characters long)
+        const nextId = `A${String(nextIdNumber).padStart(3, '0')}`;
+    
+        return nextId;
+    };
+
+    // create Dealer
+    async function createDealer(){
+        
+        // receiver is always the dealer
+        try{
+            if(document.getElementById('name').value.length > 0 && 
+            document.getElementById('email').value.length > 0 && 
+            document.getElementById('mobile').value.length > 0 && 
+            document.getElementById('address1').value.length > 0 && 
+            document.getElementById('address2').value.length > 0 && 
+            document.getElementById('address3').value.length > 0 && 
+            document.getElementById('city').value.length > 0 && 
+            document.getElementById('district').value.length > 0 && 
+            document.getElementById('state').value.length > 0 && 
+            document.getElementById('gst').value.length > 0){
+                
+                setCreatingPerson(true);
+
+                // show and hide message
+                toast({description: "Creating Dealer. Please wait ...",});
+
+                var id = getNextId(allDealers); // get the next salesID
+                var name = document.getElementById('name').value;
+                var emailaddress = document.getElementById('email').value;
+                var mobilenumber = document.getElementById('mobile').value;
+                var address1 = document.getElementById('address1').value;
+                var address2 = document.getElementById('address2').value;
+                var address3 = document.getElementById('address3').value;
+                var city = document.getElementById('city').value;
+                var district = document.getElementById('district').value;
+                var state = document.getElementById('state').value;
+                var gst = document.getElementById('gst').value;
+
+                const updateDataBasic = {
+                    id: id,
+                    name: name,
+                    designation: "Dealer",
+                    email: emailaddress,
+                    mobile: mobilenumber,
+                    role: 'Dealer',
+                    mapTo: selectedMapToPerson,
+                    userImage: '-',
+                    gcm_regId: '-',
+                    isActive: 1
+                };
+                const updateDataDealer = {
+                    dealerId: id,
+                    accountName: name,
+                    salesId: selectedMapToPerson,
+                    address1: address1,
+                    address2: address2,
+                    address3: address3,
+                    city: city,
+                    district: district,
+                    state: state,
+                    gst: gst
+                };
+                
+                if (Object.keys(updateDataBasic).length > 0 && Object.keys(updateDataDealer).length > 0) {
+
+                    console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U12/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role+"/"+JSON.stringify(updateDataBasic)+"/"+JSON.stringify(updateDataDealer));
+                    const result  = await createUser(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.stringify(updateDataBasic)+"/"+JSON.stringify(updateDataDealer))
+                    const queryResult = await result.json() // get data
+                    console.log(queryResult);
+                    
+                    // check if query result status is 200
+                    if(queryResult.status == 200) {
+                        // set the state variables with the user data
+                        
+                        allDealers([updateDataBasic, ...allDealers]);
+                        // setAllSalesPeople([...allSalesPeople, updateDataBasic]);
+                        toast({description: "Dealer created and added to the list",});
+                        setCreatingPerson(false);
+
+                    } else if(queryResult.status == 404) {
+                        setCreatingPerson(false);
+                        // show and hide message
+                        toast({description: "Facing issues, try again later!",});
+                    }
+
+                }
+            }
+            else {
+                // show and hide message
+                toast({description: "Fill in all the fields to submit.",});
+            }
+        }
+            
+        catch (e){
+            console.log(e);
+            
+            // show and hide message
+            toast({description: "Facing issues, try again later!",});
+        }
+    }
+    
+    // Filter the dealers list by states
+    async function filterByStates(e){
+        
+        setSelectedState(e);
+
+        if(e == 'All'){
+            setAllDealersFiltered(allDealers);
+        }
+        else {
+            const filteredDealers = allDealers.filter(dealer => dealer.state === e);
+            setAllDealersFiltered(filteredDealers);
+        }
+    }
+    
+    // select Dealer to Update
+    async function selectDealerForUpdate(row){
+        console.log("Checking");
+        console.log(row.name);
+        
+        if(allSalesPeople.length == 0) {
+            getSalesPersons()
+        }
+
+        setUpdateEmail(row.email);
+        setUpdateMobile(row.mobile);
+        setSelectedMapToPerson(row.salesperson);
+
+    }
+
+    // update Dealer
+    async function updateDealer(id){
+        
+        // receiver is always the dealer
+        try{
+            if(updateEmail.length > 0 && updateMobile.length > 0){
+                
+                setupdatingPerson(true);
+
+                // show and hide message
+                toast({description: "Updating. Please wait ...",});
+
+                const updateDataBasic = {
+                    email: updateEmail,
+                    mobile: updateMobile,
+                    mapTo: selectedMapToPerson,
+                };
+
+                
+                if (Object.keys(updateDataBasic).length > 0) {
+
+                    console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U13/"+role+"/"+id+"/"+JSON.stringify(updateDataBasic));
+                    
+                    const result  = await updateUser(process.env.NEXT_PUBLIC_API_PASS, role, id, JSON.stringify(updateDataBasic))
+                    const queryResult = await result.json() // get data
+                    console.log(queryResult);
+                    
+                    // check if query result status is 200
+                    if(queryResult.status == 200) {
+                        
+                        // update the dealer inline
+                        const updatedDealerPeople = allDealers.map((dealer) => {
+                            if (dealer.id === id) {
+                              // Update the specific object with the new name
+                              return { ...dealer, email: updateEmail, mobile: updateMobile, mapTo: selectedMapToPerson, salesperson: allSalesPeople.find(item => item.id === selectedMapToPerson).name };
+                            }
+                            return dealer; // Keep other objects unchanged
+                          });
+                      
+                          setAllDealers(updatedDealerPeople);
+
+                        toast({description: "Update success!",});
+                        setupdatingPerson(false);
+
+                    } else if(queryResult.status == 404) {
+                        setupdatingPerson(false);
+                        // show and hide message
+                        toast({description: "Facing issues, try again later!",});
+                    }
+
+                }
+            }
+            else {
+                // show and hide message
+                toast({description: "Fill in all the fields to submit.",});
+            }
+        }
+            
+        catch (e){
+            console.log(e);
+            
+            // show and hide message
+            toast({description: "Facing issues, try again later!",});
+        }
+    }
+
+
+    // Activiate or Deactivate
+    async function updateActiveStatus(id, isActive){
+        
+        try {    
+            // show and hide message
+            if(isActive == 1) {
+                toast({description: "Activating dealer. Please wait ...",})
+            }
+            else {
+                toast({description: "Deactivating dealer. Please wait ...",})
+            }
+
+            const updateDataBasic = {
+                isActive: isActive,
+            };
+            const result  = await updateUser(process.env.NEXT_PUBLIC_API_PASS,role, id, JSON.stringify(updateDataBasic)) 
+            const queryResult = await result.json() // get data
+
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                // update the dealer inline
+                const updatedDealerPeople = allDealers.map((dealer) => {
+                    if (dealer.id === id) {
+                      // Update the specific object with the new name
+                      return { ...dealer, isActive: isActive };
+                    }
+                    return dealer; // Keep other objects unchanged
+                  });
+              
+                  setAllDealers(updatedDealerPeople);
+                  toast({description: "Update success!",});
+            }
+            else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                
+                toast({description: "Facing issues, try again later!",});
+            }
+            else if(queryResult.status == 404) {
+                
+                toast({description: "Facing issues, try again later!",});
+            }
+        }
+        catch (e){
+            
+            toast({ description: "Issue loading. Please refresh or try again later!", })
+        }
+    }
+
+    
+
 
 
 const sendMessageNow = async (e) => {
@@ -980,21 +691,22 @@ const sendMessageNow = async (e) => {
         
 
         const result  = await sendBroadcastMessage(process.env.NEXT_PUBLIC_API_PASS, 
-            JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, 'All', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), document.getElementById('message').value,0,'-') 
+            JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, 'All', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), document.getElementById('message').value,0,'-') 
         const queryResult = await result.json() // get data
 
-        console.log(queryResult);
+        // console.log(queryResult);
         // check for the status
         if(queryResult.status == 200){
 
             setMessaging(false);
-            toast("Message sent!", {
-                description: "Message sent to all dealers",
-                action: {
-                  label: "Okay",
-                  onClick: () => console.log("Okay"),
-                },
-              });
+            toast({description: "Message sent to all dealers",});
+            // toast("Message sent!", {
+            //     description: "Message sent to all dealers",
+            //     action: {
+            //       label: "Okay",
+            //       onClick: () => console.log("Okay"),
+            //     },
+            //   });
 
         }
         else if(queryResult.status != 200) {
@@ -1023,15 +735,15 @@ const sendMessageNow = async (e) => {
             
         //   <div style={{height:'8vh',display:'flex',flexDirection:'column',justifyContent:'space-around'}}>
 
-        <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px'}}>
+        <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px', overflow:'scroll'}}>
             
           <div className='flex flex-row gap-2 items-center py-4' >
-              <h2 className="text-lg font-semibold">Dealers</h2>
+              <h2 className="text-xl font-semibold mr-4">Dealers</h2>
 
             {(!messaging) ?
               <Sheet>
                 <SheetTrigger asChild>
-                    <Button>Broadcast message</Button>
+                    <Button className="text-white bg-green-600">Broadcast message</Button>
                 </SheetTrigger>
                 <SheetContent>
                     <SheetHeader>
@@ -1042,18 +754,6 @@ const sendMessageNow = async (e) => {
                     </SheetHeader>
                     <div className="grid gap-4 py-4">
                         <br/>
-                        {/* <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="name" className="text-right">
-                            Name
-                            </Label>
-                            <Input id="name" value="Pedro Duarte" className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="username" className="text-right">
-                            Username
-                            </Label>
-                            <Input id="username" value="@peduarte" className="col-span-3" />
-                        </div> */}
                         <div className="grid w-full max-w-sm items-center gap-1.5">
                             <Label htmlFor="picture">Message</Label>
                             <Textarea id="message" placeholder="Type your message here." />
@@ -1070,6 +770,127 @@ const sendMessageNow = async (e) => {
                 :
                 <div>
                     <Label htmlFor="picture">Broadcasting...</Label>
+                </div>
+                }
+            
+            {(!creating) ?
+              <Sheet>
+                <SheetTrigger asChild>
+                    <Button className="text-white bg-blue-700" onClick={()=>{allSalesPeople.length > 0 ? null : getSalesPersons()}}>Create Dealer</Button>
+                </SheetTrigger>
+                <SheetContent>
+                    <SheetHeader>
+                    <SheetTitle>Create Dealer</SheetTitle>
+                    <SheetDescription>
+                        Enter dealer details below and Click on Create.
+                    
+                    <div className="grid gap-4 px-1 py-4" style={{overflow:'scroll', height:'80vh'}}>
+                        <br/>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="name" className="text-right">
+                            Dealer ID: (Auto-generated)
+                            </Label>
+                            <p className='font-semibold text-black'>{getNextId(allDealers)}</p>
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="name" className="text-right">
+                            Dealer Account Name:
+                            </Label>
+                            <Input id="name" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="email" className="text-right">
+                            Email:
+                            </Label>
+                            <Input id="email" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="mobile" className="text-right">
+                            Mobile:
+                            </Label>
+                            <Input id="mobile" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="gst" className="text-right">
+                            GST number:
+                            </Label>
+                            <Input id="gst" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="gst" className="text-right">
+                            Sales Person:
+                            </Label>
+                            {searchingSales ?
+                                <div className="flex flex-row m-12">    
+                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                                    <p className={`${inter.className} ${styles.text3}`}>Loading sales persons...</p> 
+                                </div>
+                                :
+                                <Select onValueChange={(e)=>setSelectedMapToPerson(e)}>
+                                    <SelectTrigger className="text-black">
+                                        <SelectValue placeholder="Select Sales Person" className="text-black" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                        <SelectLabel className="text-black">Select Sales Person</SelectLabel>
+                                            {allSalesPeople.map((row) => (
+                                                <SelectItem key={row.id} value={row.id} className="text-black">{row.name}</SelectItem>))}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
+                            }
+                        </div>
+                        <Separator />
+                        <p className='text-black font-semibold'>Address Details</p>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="address1" className="text-right">
+                            Address 1:
+                            </Label>
+                            <Input id="address1" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="address2" className="text-right">
+                            Address 2:
+                            </Label>
+                            <Input id="address2" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="address3" className="text-right">
+                            Address 3:
+                            </Label>
+                            <Input id="address3" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="city" className="text-right">
+                            City:
+                            </Label>
+                            <Input id="city" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="district" className="text-right">
+                            District:
+                            </Label>
+                            <Input id="district" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="state" className="text-right">
+                            State:
+                            </Label>
+                            <Input id="state" className="col-span-3 text-black" />
+                        </div>
+                    </div>
+                    </SheetDescription>
+                    </SheetHeader>
+                    <SheetFooter>
+                        <SheetClose asChild>
+                            <Button type="submit" onClick={createDealer}>Send now</Button>
+                        </SheetClose>
+                    </SheetFooter>
+                </SheetContent>
+                </Sheet>
+                :
+                <div>
+                    <Label htmlFor="picture">Creating Dealer...</Label>
                 </div>
                 }
               <Toaster />
@@ -1098,224 +919,155 @@ const sendMessageNow = async (e) => {
          
     <div className={styles.verticalsection} style={{height:'80vh', width:'100%',gap:'8px'}}>
 
-        {/* <div className={styles.horizontalsection} style={{height:'100%', width:'100%'}}> */}
-
-        {/* <RadioGroup defaultValue={(viewTypeSelection == 'college') ? "college" : "hostel"} value={viewTypeSelection} onValueChange={setViewTypeSelection} className="flex flex-row items-center">
-            <Label className="text-sm text-muted-foreground">View by:</Label>
-            <div className="flex items-center space-x-2">
-                <RadioGroupItem value="college" id="r11" />
-                <Label htmlFor="r11" className="text-md font-medium">Colleges</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-                <RadioGroupItem value="hostel" id="r22" />
-                <Label htmlFor="r22" className="text-md font-medium">Hostels</Label>
-            </div>
-        </RadioGroup> */}
-
-
-{/* <div className="p-2 border rounded flex flex-row " style={{height:'fit-content', gap: '40px'}}>
-        
-    <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px',height:'fit-content'}}>
-        <div className="flex-1 text-sm text-muted-foreground">Total Hostels Strength:</div>
-        {searching ? <div className={styles.horizontalsection}>
-            <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-        </div> : ''}
-        <h1>{totalHostelsStrength}</h1>
-    </div>
-    
-    <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px',height:'fit-content'}}>
-        
-        <div className="flex-1 text-sm text-muted-foreground">In Outing:</div>
-        {searching ? <div className={styles.horizontalsection}>
-            <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-        </div> : ''}
-        <h1>{totalInOutingStrength}</h1>
-    </div>
-    <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px',height:'fit-content'}}>
-        
-        <div className="flex-1 text-sm text-muted-foreground">In Hostel:</div>
-        {searching ? <div className={styles.horizontalsection}>
-            <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-        </div> : ''}
-        <h1>{totalInHostelStrength}</h1>
-    </div>
-</div> */}
-
-        {(viewTypeSelection == 'college') ? 
-        <div className="flex items-center py-2" style={{gap:'10px'}}>
-            {/* {(campuses.length != 0) ?
-            <div>
-                <div className="flex-1 text-sm text-muted-foreground">
-                    Colleges:
-                </div>
-                <Select onValueChange={handleCampusChange} defaultValue="All">
-                <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent >
-                
-                        <SelectItem value='All'>All</SelectItem>
-                        {
-                            campuses.map((campus) => <SelectItem key={campus.campusId} value={campus.campusId}>{campus.campusId}</SelectItem>)
-                        }
-                
-                </SelectContent>
-                </Select>
-            </div>
-            : <br/>
-            } */}
-
-            {/* show courses */}
-            {/* {(selectedCampus!=null && selectedCampus != 'All' && courses.length > 0) ?
-                <div>
-                    <div className="flex-1 text-sm text-muted-foreground">
-                        Courses:
-                    </div>
-                    <Select onValueChange={handleCourseChange} >
-                    <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="All" />
-                    </SelectTrigger>
-                    <SelectContent>
-                            <SelectItem value='All'>All</SelectItem>
-                            {
-                                courses.map((course) => <SelectItem key={course} value={course}>{course}</SelectItem>)
-                            }
-                    </SelectContent>
-                    </Select>
-                </div>
-                : <br/>
-            } */}
-
-            {/* branches selection */}
-            {/* {(branches.length) > 0 ?
-                <Drawer>
-                <DrawerTrigger className="flex flex-col flex-start">
-                    <div className="text-sm">
-                    Branches and Years:
-                    </div>
-                    {(branchTypeSelection != 'all') ? 
-                        <Button variant="outline">{(selectedBranchYears.length > 0) ? selectedBranchYears.length+' Selected' : 'Select Branches and Years'}</Button>
-                        : <Button variant="outline">All Branches & years Selected</Button>
-                    }
-                </DrawerTrigger>
-                <DrawerContent>
-                    <DrawerHeader>
-                    <DrawerTitle>Select branches</DrawerTitle>
-                    <DrawerDescription>Select all or group of branches and their years.</DrawerDescription>
-                    </DrawerHeader>    
-            
-                    <div className="p-4 pb-0">
-                        
-                        <RadioGroup defaultValue={(branchTypeSelection == 'all') ? "all" : "notall"} value={branchTypeSelection} onValueChange={setBranchTypeSelection}>
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="all" id="r1" />
-                                <Label htmlFor="r1" className="text-md font-medium">All branches & years</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="notall" id="r2" />
-                                <Label htmlFor="r2" className="text-md font-medium">Select branches & years</Label>
-                            </div>
-                        </RadioGroup>
-                        <br/>
-                        {(branchTypeSelection != 'all') ? 
-
-                            <div style={{display: 'flex',flexDirection:'column',gap:'20px'}}>
-
-                                <div style={{display: 'flex',flexDirection:'row',gap:'20px'}}>
-                                    {branches.map(branch => (
-                                        <div className="flex items-center space-x-2" style={{cursor:'pointer',width:'fit-content'}}  key={branch}>
-                                            <Checkbox id={branch} checked={selectedBranches.includes(branch)} onCheckedChange={()=>handleBranchChange(branch)}/>
-                                            <label htmlFor={branch} className="text-md font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                                {branch}
-                                            </label>
-                                        </div>
-                                    ))}
-                                </div>
-                                <Separator className="my-4" />
-                                <div style={{display: 'flex',flexDirection:'column',flexWrap:'wrap',gap:'20px',height:'240px'}}>
-                                    {branchYears.map(branchYear => (
-
-                                        <div className="flex items-center space-x-2" style={{ cursor:'pointer'}}  key={branchYear}>
-                                        <Checkbox id={branchYear} checked={selectedBranchYears.includes(branchYear)} onCheckedChange={()=>handleBranchYearChange(branchYear)}/>
-                                        <label htmlFor={branchYear} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                            {branchYear}
-                                        </label>
-                                        </div>
-                                        
-                                    ))}
-                                </div>
-                            </div>
-                            : null
-                        }
-
-
-                    </div>
-                    <Separator className="my-4" />
-                    <DrawerFooter>
-                    
-                    <DrawerClose className="sm:justify-start">
-                        <Button type="submit" size="sm" className="px-3">Save</Button>&nbsp;&nbsp;
-                        <Button variant="outline">Cancel</Button>
-                    </DrawerClose>
-                    </DrawerFooter>
-                </DrawerContent>
-                </Drawer>
-            : null} */}
-
-        {/* {(campuses.length != 0) ?
-        <div>
-            <br/>
-            <Button type="submit" size="sm" className="px-3" onClick={getLatestRequests}>Go</Button>
-        </div>
-        : null } */}
-
-        </div>
-
-        :
-
-        <div className="flex items-center py-2" style={{gap:'10px'}}>
-            {/* {(hostels.length != 0) ?
-            <div>
-                <div className="flex-1 text-sm text-muted-foreground">
-                    Hostels:
-                </div>
-                <Select onValueChange={handleCampusChange} defaultValue="All">
-                <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent >
-                        <SelectItem value='All'>All</SelectItem>
-                        {
-                            hostels.map((hostel) => <SelectItem key={hostel.hostelId} value={hostel.hostelId}>{hostel.hostelName}</SelectItem>)
-                        }
-                </SelectContent>
-                </Select>
-            </div>
-            : null} */}
-        </div>
-    }
-
-
-
-{/*     
-<Select
-      value={selectedCampus}
-      onChange={setSelectedCampus}
-      items={campusItems}
-    /> */}
-
-
-{/* {(allRequests.length !=0) ? */}
+{!searching ?
 <div className="mx-auto" style={{width:'100%',height:'100%'}}>
 {/* <div className="container mx-auto py-10"> */}
-{/* <div>{allRequests.length}</div> */}
-      <DataTable data={allRequests} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset} loadingIds={loadingIds} handleMessageSendClick={handleMessageSendClick}/>
-      {/* <DataTable columns={columns} data={allRequests} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset}/> */}
+
+<div className='flex flex-row justify-between items-center mb-2'>
+    <div className='pb-2 text-slate-700 font-semibold'>{allDealers.length} Dealers in total</div>
+    
+    {(selectedState == 'All') ?
+    <div className='pb-2 text-slate-700 font-semibold'></div>
+    : <div className='pb-2 text-green-700 font-semibold'>{allDealersFiltered.length} Dealers in {selectedState.split('-')[1]}</div>
+    }
+    {allStates.length == 0 ?
+        <div className="flex flex-row m-12">    
+            <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+            <p className={`${inter.className} ${styles.text3}`}>Loading sales persons...</p> 
+        </div>
+        :
+        // setSelectedMapToPerson(e.target.value)
+        <Select defaultValue={selectedState} onValueChange={(e)=>filterByStates(e)} >
+            <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by state" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectGroup>
+                {/* <SelectLabel>All</SelectLabel> */}
+                {allStates.map((row) => (
+                <SelectItem key={row} value={row} >{row}</SelectItem>))}
+                </SelectGroup>
+            </SelectContent>
+        </Select>
+    }
+</div>
+
+<Card>
+    <Table>
+        <TableHeader>
+            <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Sales Person</TableHead>
+                <TableHead>State</TableHead>
+                <TableHead></TableHead>
+            </TableRow>
+        </TableHeader>
+        <TableBody>
+            {allDealersFiltered.map((row) => (
+                <TableRow key={row.id}>
+                    <TableCell className="py-2">{row.accountName}<br/>
+                        <p className="text-muted-foreground">
+                            {row.id} 
+                        </p>
+                    </TableCell>
+                    <TableCell onClick={()=>console.log(row.mapTo)}>
+                        <div className="text-sm text-slate-500 bg-slate-50 px-1 py-1 w-fit border border-slate-200 rounded">
+                            {row.salesperson}
+                        </div>
+                        </TableCell>
+                    <TableCell>{row.state}</TableCell>
+                    <TableCell>
+                    {/* {allSalesPeople.length == 0 ? getSalesPersons() : null}} */}
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button variant='outline' className="mx-2 px-2 text-green-600" onClick={()=>selectDealerForUpdate(row)}><PencilSimpleLine size={24} className="text-green-600"/> &nbsp;Edit</Button>            
+                                </SheetTrigger>
+                                <SheetContent>
+                                    <SheetHeader>
+                                    <SheetTitle>Edit {row.accountName}</SheetTitle>
+                                    <SheetDescription>
+                                        Edit details below and click update.
+                                    </SheetDescription>
+                                    </SheetHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <br/>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="name" className="text-right">
+                                            Name
+                                            </Label>
+                                            <Input id="name" disabled value={row.accountName} className="col-span-3" />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="email" className="text-right">
+                                            Email
+                                            </Label>
+                                            <Input id="email" value={updateEmail} className="col-span-3" onChange={(e)=>setUpdateEmail(e.target.value)} />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="mobile" className="text-right">
+                                            Mobile
+                                            </Label>
+                                            <Input id="mobile" value={updateMobile} className="col-span-3" onChange={(e)=>setUpdateMobile(e.target.value)} />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="mobile" className="text-right">
+                                            Map To:
+                                            </Label>
+                                            {searchingSales ?
+                                                <div className="flex flex-row m-12">    
+                                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                                                    <p className={`${inter.className} ${styles.text3}`}>Loading sales persons...</p> 
+                                                </div>
+                                                :
+                                                // setSelectedMapToPerson(e.target.value)
+                                                <Select defaultValue={row.mapTo} onValueChange={(e)=>setSelectedMapToPerson(e)} >
+                                                    <SelectTrigger className="w-[180px]">
+                                                        <SelectValue placeholder="Select a fruit" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectGroup>
+                                                        {/* <SelectLabel>Fruits</SelectLabel> */}
+                                                        {allSalesPeople.map((row) => (
+                                                        <SelectItem key={row.id} value={row.id} >{row.name}</SelectItem>))}
+                                                        </SelectGroup>
+                                                    </SelectContent>
+                                                </Select>
+                                            }
+                                        </div>
+                                    </div>
+                                    <SheetFooter>
+                                    <SheetClose asChild>
+                                        <Button type="submit" className="bg-blue-600 text-white" onClick={()=>updateDealer(row.id)}>Update</Button>
+                                    </SheetClose>
+                                    </SheetFooter>
+                                </SheetContent>
+                            </Sheet>
+                        {row.isActive == 1 ?
+                            <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>updateActiveStatus(row.id, 0)}><UserMinus size={24} className="text-red-600"/> &nbsp;Deactivate</Button>
+                            : <Button variant='outline' className="mx-2 px-2 text-blue-600" onClick={()=>updateActiveStatus(row.id, 1)}><UserPlus size={24} className="text-blue-600"/> &nbsp;Activate</Button>
+                        }
+                    </TableCell>
+                </TableRow>
+            ))}
+        </TableBody>
+    </Table>
+</Card>
+      {/* <DataTable data={allDealers} dataOffset={offset} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset} loadingIds={loadingIds} handleMessageSendClick={handleMessageSendClick}/> */}
+      {/* <DataTable columns={columns} data={allDealers} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset}/> */}
       
     </div>
+:
+<Skeleton className="h-4 w-[500px] h-[120px]" >
+    <div className="flex flex-row m-12">    
+        <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+        <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+    </div>
+</Skeleton> 
+    
+
+
+}
+
     {/* : null} */}
 
 
@@ -1348,7 +1100,7 @@ const sendMessageNow = async (e) => {
             <UserNav />
           </div>
         </div>
-        <DataTable data={allRequests} columns={columns} />
+        <DataTable data={allDealers} columns={columns} />
       </div> 
 
                  <div className={styles.carddatasection} key={12345} style={{height:'100%',overflow:'scroll'}}>

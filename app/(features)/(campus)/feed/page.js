@@ -16,18 +16,18 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-  } from "../../../../app/components/ui/card"
-  import { Input } from "../../../../app/components/ui/input"
-  import { Label } from "../../../../app/components/ui/label"
-  import { Button } from "../../../../app/components/ui/button"
-  import { Skeleton } from "../../../../app/components/ui/skeleton"
-  import { ScrollArea } from "../../../../app/components/ui/scroll-area"
-  import { Separator } from "../../../../app/components/ui/separator"
-  import { Textarea } from "../../../../app/components/ui/textarea"
-  import { Popover, PopoverContent, PopoverTrigger, } from "../../../../app/components/ui/popover"
-  import { Avatar, AvatarFallback, AvatarImage } from "../../../../app/components/ui/avatar"
+  } from "../../../components/ui/card"
+  import { Input } from "../../../components/ui/input"
+  import { Label } from "../../../components/ui/label"
+  import { Button } from "../../../components/ui/button"
+  import { Skeleton } from "../../../components/ui/skeleton"
+  import { ScrollArea } from "../../../components/ui/scroll-area"
+  import { Separator } from "../../../components/ui/separator"
+  import { Textarea } from "../../../components/ui/textarea"
+  import { Popover, PopoverContent, PopoverTrigger, } from "../../../components/ui/popover"
+  import { Avatar, AvatarFallback, AvatarImage } from "../../../components/ui/avatar"
   
-  import { Toaster } from "../../../../app/components/ui/sonner"
+  import { Toaster } from "../../../components/ui/sonner"
     import { useToast } from "@/app/components/ui/use-toast"
 
 
@@ -40,7 +40,8 @@ import {
     SheetHeader,
     SheetTitle,
     SheetTrigger,
-  } from "../../../../app/components/ui/sheet"
+  } from "../../../components/ui/sheet"
+import Image from 'next/image'
 // const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
 
 
@@ -55,8 +56,8 @@ import {
 
 ////////// APIS /////////
 // get the list of users who the admin sent messages
-const getSenders = async (pass, sender) => 
-fetch("/api/v2/messaging/"+pass+"/3/"+sender, {
+const getFeed = async (pass, offset) => 
+fetch("/api/v2/feed/"+pass+"/1/"+offset, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -91,6 +92,17 @@ fetch("/api/v2/user/"+pass+"/U2/"+dealer+"/"+offset, {
         Accept: "application/json",
     },
 });
+
+// send a post to the feed
+const sendFeedPost = async (pass, sender, sentAt, message, media) => 
+  
+    fetch("/api/v2/feed/"+pass+"/0/"+sender+"/"+sentAt+"/"+message+"/"+media, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+    });
 
 
 
@@ -145,9 +157,8 @@ export default function Messages() {
     const [items, setItems] = useState([]);
     const [file, setFile] = useState(null); 
     
-    const [selectedReceiver, setSelectedReceiver] = useState({});
-    const [receiversList, setReceiversList] = useState([]);
-    const [senderMessagesList, setSenderMessagesList] = useState([]);
+    
+    const [feedList, setfeedList] = useState([]);
     const [searchedList, setSearchedList] = useState([]);
     const [openSearch, setOpenSearch] = useState(false);
     const lastItemRef = useRef(null);
@@ -162,6 +173,7 @@ export default function Messages() {
     const [searching, setSearching] = useState(false);
     const [searchingMessages, setSearchingMessages] = useState(false);
     const [sendingMessage, setSendingMessage] = useState(false);
+    const [messaging, setMessaging] = useState(false);
 
     const [outingData, setOutingData] = useState();
     // const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
@@ -191,23 +203,17 @@ export default function Messages() {
                 setUser(obj)
 
                 // get if receivers data is present
-                if(receiversList.length == 0){
+                if(feedList.length == 0){
                     getData();
                 }
                 
-                // fetch the selected receiver's messages
-                if(selectedReceiver!=null){
-                    getSenderMessagesData(selectedReceiver.receiver);
-                }
-                else {
-                    // console.log("DONE READING");
-                }
+                
             }
             else{
                 console.log('Not found')
                 router.push('/')
             }
-    },[selectedReceiver]);
+    },[]);
 
     // get the senders data
     // for the user based on their role.
@@ -218,8 +224,7 @@ export default function Messages() {
         // setOffset(offset+10); // update the offset for every call
 
         try {    
-            console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/3/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id);
-            const result  = await getSenders(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id)
+            const result  = await getFeed(process.env.NEXT_PUBLIC_API_PASS, offset)
             const queryResult = await result.json() // get data
             console.log(queryResult);
             // check for the status
@@ -231,9 +236,8 @@ export default function Messages() {
                     // set the state
                     // total students
                         
-                    setReceiversList(queryResult.data);
-                    setSelectedReceiver(queryResult.data[0]) // set the first user from the list to fetch messages.
-                   
+                    setfeedList(queryResult.data);
+                    
                     setDataFound(true);
                     setSearching(false);
                 }
@@ -268,11 +272,11 @@ export default function Messages() {
     async function getSenderMessagesData(receiver){
         
         setSearchingMessages(true);
-        setSenderMessagesList([]);
+        setfeedList([]);
         // setOffset(offset+10); // update the offset for every call
 
         try {    
-            const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, receiver)
+            const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, receiver)
             const queryResult = await result.json() // get data
             console.log(queryResult);
             // check for the status
@@ -282,7 +286,7 @@ export default function Messages() {
                 if(queryResult.data.length > 0){
                     
                     // get the messages list of the receiver
-                    setSenderMessagesList(queryResult.data);
+                    setfeedList(queryResult.data);
                     
                     setDataFound(true);
                     setSearchingMessages(false);
@@ -319,16 +323,16 @@ export default function Messages() {
         var message = document.getElementById('message').value;
 
         try {    
-            console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+selectedReceiver.receiver+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+message+"/0/-");
+            console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId+"/"+selectedReceiver.receiver+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+message+"/0/-");
             // console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/1/"+row.getValue('appointmentId')+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).username+"/"+updatedOn+"/"+row.getValue('collegeId'));
-            const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id,selectedReceiver.receiver,dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),message,"0","-");
+            const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,selectedReceiver.receiver,dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),message,"0","-");
         
             // const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, receiver)
             const queryResult = await result.json() // get data
             console.log(queryResult);
             var sentObj = {
                 notificationId: 100000,
-                sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id,
+                sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,
                 receiver: selectedReceiver.receiver,
                 sentAt: dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),
                 message: document.getElementById('message').value,
@@ -343,7 +347,7 @@ export default function Messages() {
                 
                     
                     // get the messages list of the receiver
-                    setSenderMessagesList([...senderMessagesList, sentObj]);
+                    setfeedList([...feedList, sentObj]);
                     document.getElementById('message').value = ''; // clear the value
                     
                     toast({description: "Message Sent!",});
@@ -376,87 +380,60 @@ export default function Messages() {
         }
 }
 
-    // search a dealer by name
-    async function searchDealerByNameData(){
+const sendPostNow = async (e) => {
+    
+    setMessaging(true);
+    
+    try {    
         
-        if(document.getElementById('search').value.length == 0){
-            toast({description: "Enter a name to search!",});
-        }
-        else {
-            setDealerSearching(true);
-            console.log("offset : ");
-            console.log(offset);
-            // setOffset(offset+10); // update the offset for every call
-            var searchTerm = document.getElementById('search').value;
+        console.log(process.env.NEXT_PUBLIC_API_PASS+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/-");
 
-            try {    
-                console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U2/"+searchTerm+"/0");
-                // console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/1/"+row.getValue('appointmentId')+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).username+"/"+updatedOn+"/"+row.getValue('collegeId'));
-                const result  = await searchDealerByName(process.env.NEXT_PUBLIC_API_PASS,searchTerm,offset);
+        const result  = await sendFeedPost(process.env.NEXT_PUBLIC_API_PASS, 
+            JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), document.getElementById('message').value,'-') 
+        const queryResult = await result.json() // get data
+
+        var obj = {
+            id: 100000,
+            sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,
+            sentAt: dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),
+            message: document.getElementById('message').value,
+            media: '-'
+        };
+        
+        setfeedList([...feedList, obj]);
+
+        // check for the status
+        if(queryResult.status == 200){
+
+            setMessaging(false);
+            toast("Posted to feed!", {
+                description: "To be seen by all dealers",
+                action: {
+                  label: "Okay",
+                  onClick: () => console.log("Okay"),
+                },
+              });
+
+        }
+        else if(queryResult.status != 200) {
             
-                // const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, receiver)
-                const queryResult = await result.json() // get data
-                console.log(queryResult);
-                // var sentObj = {
-                //     notificationId: 100000,
-                //     sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,
-                //     receiver: selectedReceiver.receiver,
-                //     sentAt: dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),
-                //     message: document.getElementById('message').value,
-                //     seen: 0,
-                //     state: '-'
-                // };
-                
-                // check for the status
-                if(queryResult.status == 200){
-                
-                    setSearchedList(queryResult.data);
-                    
-                    setDataFound(true);
-                    setDealerSearching(false);
-                
-                    setCompleted(false);
-                }
-                else {
-                    
-                    setDealerSearching(false);
-                    setDataFound(false);
-                    setCompleted(true);
-                }
-            }
-            catch (e){
-                // show and hide message
-                setResultType('error');
-                setResultMessage('Issue loading. Please refresh or try again later!');
-                setTimeout(function(){
-                    setResultType('');
-                    setResultMessage('');
-                }, 3000);
-            }
+            setMessaging(false);
         }
-}
-
-    function selectTheSearchItem(searchItem){
-        console.log("Selected Search ITEM: "+searchItem.name);
-        
-        // set the object
-        var obj = {name:searchItem.name, receiver:searchItem.userId};
-        // set the selected receiver
-        setSelectedReceiver(obj);
-
-        // check if the selected searchItem is already present in the list
-        const existingReceiver = receiversList.find(receiver => receiver.receiver === obj.receiver);
-        if (!existingReceiver) {
-            console.log("NON EXISTS");
-            setReceiversList([...receiversList, obj]);
-        }
-        else {
-            console.log("EXISTS");
-        }
-        
-        // close the search popover
-        setOpenSearch(false);
     }
+    catch (e){
+        
+        // show and hide message
+        setMessaging(false);
+        setResultType('error');
+        setResultMessage('Issue loading. Please refresh or try again later!');
+        setTimeout(function(){
+            setResultType('');
+            setResultMessage('');
+        }, 3000);
+    }
+    
+}
+  
 
 
     // get the requests data
@@ -467,7 +444,7 @@ export default function Messages() {
         setUploadProgress(true);
         
         try {    
-            const result  = await updateUploadData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id)
+            const result  = await updateUploadData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId)
             const queryResult = await result.json() // get data
             console.log("Call2 for Upload...");
             // check for the status
@@ -513,45 +490,6 @@ const handleFileSelect = (e) => {
     }
 };
 
-const processData = (e) => {
-    console.log("Uploading...");
-    
-    if (file) {
-        const reader = new FileReader();
-
-        reader.onload = (event) => {
-            const binaryString = event.target.result;
-            const workbook = XLSX.read(binaryString, {type: 'binary'});
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            
-            // Specify date format directly in the read operation
-            const data = XLSX.utils.sheet_to_json(worksheet, {
-                dateNF: 'yyyy-mm-dd hh:mm:ss', // Format date columns
-                raw: false, // Do not use raw values (this ensures that dates are processed)
-            });
-            
-            // Optionally process amounts to ensure they are decimals with two decimal places
-            const processedData = data.map(item => ({
-                ...item,
-                amount: typeof item.amount === 'number' ? parseFloat(item.amount.toFixed(2)) : item.amount,
-            }));
-
-
-            setItems(data);
-            getDataDetails(data);
-            // const data = XLSX.utils.sheet_to_json(worksheet);
-            // setItems(data);
-            // getDataDetails(data);
-        };
-
-        reader.readAsBinaryString(file);
-    } else {
-        console.log("Please select a file first.");
-    }
-    
-}
-
 
     
   return (
@@ -559,33 +497,52 @@ const processData = (e) => {
         <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'500vh',gap:'8px'}}>
             
           <div className='flex flex-row gap-2 items-center py-4' >
-              <h1 className='text-xl font-bold'>Messages</h1>
+              <h1 className='text-xl font-bold'>Feed</h1>
               
-              {/* <Sheet>
+              {(!messaging) ?
+              <Sheet>
                 <SheetTrigger asChild>
-                    <Button>Upload data</Button>
+                    <Button>Post Update</Button>
                 </SheetTrigger>
                 <SheetContent>
                     <SheetHeader>
-                    <SheetTitle>File upload</SheetTitle>
+                    <SheetTitle>Post to the feed</SheetTitle>
                     <SheetDescription>
-                        Make sure you use the correct format. Click Upload now when file is selected.
+                        Enter your message for posting it to the feed.
                     </SheetDescription>
                     </SheetHeader>
                     <div className="grid gap-4 py-4">
                         <br/>
+                        {/* <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="name" className="text-right">
+                            Name
+                            </Label>
+                            <Input id="name" value="Pedro Duarte" className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="username" className="text-right">
+                            Username
+                            </Label>
+                            <Input id="username" value="@peduarte" className="col-span-3" />
+                        </div> */}
                         <div className="grid w-full max-w-sm items-center gap-1.5">
-                            <Label htmlFor="picture">Data file</Label>
-                            <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
+                            <Label htmlFor="picture">Message</Label>
+                            <Textarea id="message" placeholder="Type your message here." />
+                            
                         </div>
                     </div>
                     <SheetFooter>
                     <SheetClose asChild>
-                        <Button type="submit" onClick={processData}>Upload now</Button>
+                        <Button type="submit" onClick={sendPostNow}>Post</Button>
                     </SheetClose>
                     </SheetFooter>
                 </SheetContent>
-                </Sheet> */}
+                </Sheet>
+                :
+                <div>
+                    <Label htmlFor="picture">Posting...</Label>
+                </div>
+                }
           </div>      
 
             {/* <div style={{width:'100%',display:'flex', flexDirection:'row',justifyContent:'space-between'}}>
@@ -629,15 +586,14 @@ const processData = (e) => {
                     {/* <div className='flex flex-row gap-2' style={{width:'100%',overflow:'scroll'}}> */}
                         
                     {/* {searching ? <Skeleton className="h-4 w-[100px] h-[20px]" /> :  */}
-                    <ScrollArea className="w-fit rounded-md border">
+                    {/* <ScrollArea className="w-fit rounded-md border">
                         <div className="p-4">
                             <h4 className="mb-4 text-sm font-medium leading-none">SENT</h4>
                             <div className='flex flex-row items-center gap-2'>
                                 <Input type="text" id="search" placeholder="Type dealer name to search" className="my-2 "/>
-                                {/* {dealerSearching ?
-                                    <div className='flex flex-row text-sm text-gray-400'><SpinnerGap className={`${styles.icon} ${styles.load}`} /> Searching...</div> */}
+                                
                                     <Popover open={openSearch} onOpenChange={setOpenSearch}>
-                                        <PopoverTrigger asChild><Button variant="outline" onClick={searchDealerByNameData}>Search</Button></PopoverTrigger>
+                                        <PopoverTrigger asChild><Button variant="outline" >Search</Button></PopoverTrigger>
                                         <PopoverContent>
                                         {
                                             dealerSearching ? 
@@ -646,9 +602,7 @@ const processData = (e) => {
                                             <div>
                                                 {searchedList.map((searchItem, index) => (
                                                 <>
-                                                    <li className="flex py-4 first:pt-0 last:pb-0 cursor-pointer" key={index} onClick={()=>{selectTheSearchItem(searchItem)}}>
-                                                    {/* <li className="flex py-4 first:pt-0 last:pb-0" key={index} onClick={()=>{setSelectedReceiver(receiver)}}> */}
-                                                    {/* <img class="h-10 w-10 rounded-full" src="" alt="" /> */}
+                                                    <li className="flex py-4 first:pt-0 last:pb-0 cursor-pointer" key={index} >
                                                     <Avatar>
                                                         <AvatarImage src="" alt="dealer_image" />
                                                         <AvatarFallback>{searchItem.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
@@ -669,25 +623,17 @@ const processData = (e) => {
                                         </PopoverContent>
                                     </Popover>
                                   
-                                    {/* // <Button variant="outline" onClick={searchDealerByNameData}>Search</Button> */}
-                                {/* } */}
                             </div>
                             {searching ? <Skeleton className="h-4 w-[100px] h-[20px]" /> : 
                             <ul role="list" className="py-2 divide-y divide-slate-200">
-                            {receiversList.map((receiver, index) => (
+                            {feedList.map((receiver, index) => (
                             <>  
-                                <li className="flex px-2 py-4 first:pt-0 last:pb-0 cursor-pointer border-l-2 border-blue-600" key={index} onClick={()=>{setSelectedReceiver(receiver)}} style={{borderLeft: (selectedReceiver.receiver == receiver.receiver) ? '2px solid blue': '2px solid white'}}>
-                                {/* <img class="h-10 w-10 rounded-full" src="" alt="" /> */}
-                                <Avatar>
-                                    <AvatarImage src="" alt="dealer_image" />
-                                    <AvatarFallback>{receiver.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
-                                </Avatar>
+                                <li className="flex px-2 py-4 first:pt-0 last:pb-0 cursor-pointer border-l-2 border-blue-600" key={index} >
                                 <div className="ml-3 overflow-hidden w-max">
-                                    {(selectedReceiver.receiver == receiver.receiver) ?
-                                        <p className="text-sm font-medium text-blue-600">{receiver.name}</p>
-                                        : <p className="text-sm font-medium text-slate-900">{receiver.name}</p>
-                                    }
-                                    <p className="text-sm text-slate-500 truncate">{receiver.receiver}</p>
+                                    
+                                        <p className="text-sm font-medium text-blue-600">{receiver.sender}</p>
+                                       
+                                    <p className="text-sm text-slate-500 truncate">{receiver.sender}</p>
                                 </div>
                                 </li>
                             </>
@@ -696,50 +642,48 @@ const processData = (e) => {
                             </ul>}
                             
                         </div>
-                    </ScrollArea>
+                    </ScrollArea> */}
                     
 
-                        <div className="w-[580px] flex flex-col flex-1 rounded-md border p-4 gap-4">
-                            <div className="flex flex-1 flex-col gap-2">
-                                {searchingMessages ? <Skeleton className="h-4 w-[100px] h-[20px]" /> : <CardTitle className="text-blue-600">{selectedReceiver.name}</CardTitle>}
-                                <CardDescription>Dealer ID: {selectedReceiver.receiver}</CardDescription>
-                            </div>
+                        <div className="w-[580px] flex flex-col flex-1 gap-4 items-center">
+                            {/* <div className="flex flex-1 flex-col gap-2">
+                                {searching ? <Skeleton className="h-4 w-[100px] h-[20px]" /> 
+                                : <CardTitle className="text-blue-600">Feed</CardTitle>}
+                                <CardDescription>Messages</CardDescription>
+                            </div> */}
                             
                                 
                                 {/* <div className="grid w-full items-center gap-4"> */}
-                                    {searchingMessages ? <Skeleton className="h-4 w-[300px] h-[100px]" /> :
-                                        <div className="flex flex-col flex-auto overflow-scroll justify-stretch gap-2">
-                                        {senderMessagesList.length > 0 ?
-                                        senderMessagesList.map((message, index) => (
-                                            <div key={index} className="w-fit flex flex-col rounded-md border p-2" style={(message.sender==JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id) ? {alignSelf:'self-end'} : {alignSelf:'self-start'}} ref={index === senderMessagesList.length - 1 ? lastItemRef : null}>
-                                                <Label className="p-1">{message.message}</Label>
+                                    {searching ? <Skeleton className="h-4 w-[300px] h-[100px]" /> :
+                                        <div className="w-[580px] flex flex-col flex-auto overflow-scroll justify-stretch gap-2">
+                                        {feedList.length > 0 ?
+                                        feedList.map((message, index) => (
+                                            <div key={index} className="flex flex-col rounded-md border p-2 gap-4" ref={index === feedList.length - 1 ? lastItemRef : null}>
+                                                <Avatar>
+                                                    <AvatarImage src="" alt="dealer_image" />
+                                                    <AvatarFallback>{message.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
+                                                </Avatar>
+                                                <Image src="/gvt.jpg" alt="Anjani Tek" width={280} height={150} priority style={{height:'auto'}}/>
+                                                <p className="text-l p-1">{message.message}</p>
                                                 {/* <Label className="text-gray-500 p-1">{message.sender}</Label> */}
                                                 <p className="text-xs text-gray-500 p-1">{dayjs(message.sentAt).format('MMMM D, YYYY h:mm A')}</p>
                                                 
-                                                {(message.sender==JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id) ? 
-                                                (message.seen == 1) ? 
-                                                    <p className="text-xs text-green-500 p-1 flex gap-1 items-center"><Checks className="text-green-600"/> Seen</p>
-                                                    : <p className="text-xs text-gray-500 p-1 flex gap-1 items-center"><Check className="text-gray-600"/> Not seen</p>
-                                                
-                                                : <></>
-                                                }
                                             </div>
                                         ))
-                                        : <p className="text-xs text-gray-500 p-1">No messages sent yet!</p>
+                                        : <p className="text-xs text-gray-500 p-1">No posts yet!</p>
                                         }
                                         </div>
                                     }
                                     
                                 {/* </div> */}
                             
-                            <div className="flex flex-1 flex-row justify-between gap-2">
-                                {/* <Button variant='outline' onClick={()=>getData()}>Refresh</Button> */}
+                            {/* <div className="flex flex-1 flex-row justify-between gap-2">
                                 <Textarea id="message" placeholder="Type your message here." />
                                 {sendingMessage ? 
                                     <div className='flex flex-row'><SpinnerGap className={`${styles.icon} ${styles.load}`} /> Sending...</div>
                                     : <Button variant='outline' onClick={()=>sendMessageData()} className="text-blue-600"><PaperPlaneRight className="text-blue-600"/> &nbsp; Send Message</Button>
                                 }
-                            </div>
+                            </div> */}
                         </div>
                         {/* </div> */}
                         

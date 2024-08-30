@@ -50,22 +50,27 @@ export async function GET(request,{params}) {
 
           // is it a single operation of bulk from web
           if(params.ids[1] == 'mobile'){
-
             // apply payment to multiple invoices at a time
             await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
+            return Response.json({status: 200, message:'Success!'}, {status: 200})
+          }
+          if(params.ids[1] == 'websingle'){
+            // apply payment to multiple invoices at a time
+            // applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular)
+            await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[9], params.ids[5], paymentDate1, params.ids[7], params.ids[8]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           else {
 
             // apply payment to multiple invoices at a time
-            // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
+            // id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
             // Parse the JSON string into an array
             const decodedItems = decodeURIComponent(params.ids[2]);
             const items = JSON.parse(decodedItems);
             
             items.forEach(async (item, index) => {
               console.log(`Item ${index}:`, item);
-              await applyPayment(item.dealerId, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+              await applyPayment(item.id, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
             });
 
             // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
@@ -86,8 +91,8 @@ export async function GET(request,{params}) {
 
 
   // apply payment to the invoices one by one
-  // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
-  async function applyPayment(userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular) {
+  // id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
+  async function applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular) {
     
     var amount = paymentAmount;
 
@@ -105,7 +110,7 @@ export async function GET(request,{params}) {
         // 3. update the payments table with the transaction of selected invoices
 
         // 1
-        const [invoices] = await connection.query('SELECT invoiceNo, pending FROM invoices WHERE billTo = "'+userId+'" AND pending > 0 ORDER BY invoiceDate ASC',[]);
+        const [invoices] = await connection.query('SELECT invoiceNo, pending FROM invoices WHERE billTo = "'+id+'" AND pending > 0 ORDER BY invoiceDate ASC',[]);
 
         // 2
         // collect the invoices list for updating in payments table
@@ -136,20 +141,21 @@ export async function GET(request,{params}) {
         }
 
         // 3
-        const [balance] = await connection.query('SELECT balance FROM payments WHERE userId = "'+userId+'" ORDER BY paymentDate DESC LIMIT 1',[]);
-        // console.log(balance[0].balance);
+        const [balance] = await connection.query('SELECT balance FROM payments WHERE id = "'+id+'" ORDER BY paymentDate DESC LIMIT 1',[]);
+        // console.log(balance);
+        // console.log("plpl"+balance[0].balance);
         // console.log(paymentDate);
 
         // 4
         var bal = 0;
         if(type == 'credit'){
-            bal = parseFloat(balance[0].balance) - parseFloat(amount);
+            bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) - parseFloat(amount);
         }
         else {
-            bal = parseFloat(balance[0].balance) + parseFloat(amount);
+            bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
         }
-        const q = 'INSERT INTO payments (amount, type, userId, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
-        const [payments] = await connection.query(q,[amount, type, userId,invcs,transactionId,paymentDate,adminId, particular, bal]);
+        const q = 'INSERT INTO payments (amount, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+        const [payments] = await connection.query(q,[amount, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
 
         
 

@@ -32,48 +32,49 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 0){ // create notification
                 try {
                     // create query for insert
-                    const q = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
+                    const q = 'INSERT INTO feed (sender, sentAt, message, media) VALUES ( ?, ?, ?, ?)';
                     // create new notification
-                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], params.ids[7] ]);
+                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], decodeURIComponent(params.ids[4]), params.ids[5] ]);
                     
 
-                    // send notification to notification specific dealer
+                    // send notification to notification specific dealers
 
                     // get the gcm_regIds of Students to notify
                         // Split the branches string into an array
                         var conditionsString = '';
-                        var query = '';
-                        if(params.ids[3]!='All'){ // check for the student type
-                            // conditionsString = conditionsString + ' userId="'+params.ids[3]+'" ';
-                            query = 'SELECT gcm_regId FROM user where id="'+params.ids[3]+'" AND CHAR_LENGTH(gcm_regId) > 3';
-                        }
-                        else {
-                            // conditionsString = conditionsString + ' role="dealer" ';
-                            query = 'SELECT u.gcm_regId from user u JOIN dealer d where d.dealerId=u.id AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
-                        }
+                        // var query = '';
+                        // if(params.ids[3]!='All'){ // check for the student type
+                        //     // conditionsString = conditionsString + ' userId="'+params.ids[3]+'" ';
+                        //     query = 'SELECT gcm_regId FROM users where userId="'+params.ids[3]+'" AND CHAR_LENGTH(gcm_regId) > 3';
+                        // }
+                        // else {
+                        //     // conditionsString = conditionsString + ' role="dealer" ';
+                        //     query = 'SELECT u.gcm_regId from users u JOIN dealers d where d.userId=u.userId AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
+                        // }
                         
-                        // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
-                        const [nrows, nfields] = await connection.execute(query);
+                        // // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
+                        // const [nrows, nfields] = await connection.execute(query);
                         connection.release();
-                        // console.log(`SELECT gcm_regId FROM user where ${conditionsString} `);
+                        // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         
                         // get the gcm_regIds list from the query result
-                        var gcmIds = [];
-                        for (let index = 0; index < nrows.length; index++) {
-                          const element = nrows[index].gcm_regId;
-                        //   console.log(element)
-                          if(element.length > 3)
-                            gcmIds.push(element); 
-                        }
+                        // var gcmIds = [];
+                        // for (let index = 0; index < nrows.length; index++) {
+                        //   const element = nrows[index].gcm_regId;
+                        // //   console.log(element)
+                        //   if(element.length > 3)
+                        //     gcmIds.push(element); 
+                        // }
 
                         // var gcmIds = 
-                        console.log(gcmIds);
+                        // console.log(gcmIds);
 
                         // send the notification
-                        const notificationResult = gcmIds.length > 0 ? await send_notification(params.ids[5], gcmIds, 'Multiple') : null;
+                        // const notificationResult = gcmIds.length > 0 ? await send_notification(params.ids[5], gcmIds, 'Multiple') : null;
                             
                         // return successful update
-                        return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
+                        return Response.json({status: 200, message:'Posted to feed!'}, {status: 200})
+                        // return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
 
 
                     // return the user data
@@ -86,7 +87,7 @@ export async function GET(request,{params}) {
             else if(params.ids[1] == 1){ // fetch data for all notifications – Super admin 
                 // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
                 // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
-                const [rows, fields] = await connection.execute('SELECT * from notifications ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[2]);
+                const [rows, fields] = await connection.execute('SELECT f.*,u.* from feed f JOIN users u ON f.sender=u.userId ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[2]);
                 connection.release();
             
                 // check if user is found
@@ -122,7 +123,7 @@ export async function GET(request,{params}) {
             else if(params.ids[1] == 3){ // fetch data for all receivers who got messages to show as list for – Super admin 
               // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
               // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
-              const [rows, fields] = await connection.execute('SELECT DISTINCT(n.receiver),u.name FROM `notifications` n JOIN user u ON n.receiver=u.id where n.sender="'+params.ids[2]+'"');
+              const [rows, fields] = await connection.execute('SELECT DISTINCT(n.receiver),u.name FROM `notifications` n JOIN users u ON n.receiver=u.userId where n.sender="'+params.ids[2]+'"');
               connection.release();
           
               // check if user is found
@@ -144,7 +145,7 @@ export async function GET(request,{params}) {
                 query = 'SELECT * FROM notifications WHERE sender ="'+params.ids[2]+'" AND receiver = "'+params.ids[3]+'" ORDER BY sentAt ASC';
               }
               else {
-                query = 'SELECT n.*,u.name as receiverName FROM notifications n JOIN user u ON n.receiver=u.id WHERE (n.sender IN ("'+params.ids[2]+'", "'+params.ids[3]+'") AND n.receiver = "'+params.ids[3]+'") OR (n.receiver IN ("'+params.ids[2]+'", "'+params.ids[3]+'") AND n.sender = "'+params.ids[3]+'") ORDER BY n.sentAt ASC';
+                query = 'SELECT n.*,u.name as receiverName FROM notifications n JOIN users u ON n.receiver=u.userId WHERE (n.sender IN ("'+params.ids[2]+'", "'+params.ids[3]+'") AND n.receiver = "'+params.ids[3]+'") OR (n.receiver IN ("'+params.ids[2]+'", "'+params.ids[3]+'") AND n.sender = "'+params.ids[3]+'") ORDER BY n.sentAt ASC';
               }
               const [rows, fields] = await connection.execute(query);
               connection.release();
@@ -215,7 +216,7 @@ export async function GET(request,{params}) {
 
 
   // send the notification using onesignal.
-  // use the playerIds of the user.
+  // use the playerIds of the users.
   // check if playerId length > 2
   async function send_notification(message, playerId, type) {
     // console.log(playerId);

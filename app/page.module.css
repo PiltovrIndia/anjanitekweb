@@ -209,9 +209,10 @@
 
 .menuicon {
   
-  color: #0f172a;
+  color: #04703c;
+  /* color: #0f172a; */
   border-radius: 50%;
-  padding: 6px;
+  padding: 2px;
   width: 32px;
   height: 32px;
 }
@@ -226,23 +227,26 @@
 }
 
 .leftMenuItem {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 400;
   color: #666666;
-  /* padding: 8px 20px; */
+  padding: 8px 16px;
   cursor: pointer;
   border-radius: 4px;
   transition: color .2s ease;
 }
 .leftMenuItem_selected {
   font-size: 16px;
-  font-weight: 500;
-  color: #0f172a;
-  /* padding: 8px 20px; */
+  font-weight: 600;
+  color: #04703c;
+  /* color: #d15a00; */
+  padding: 8px 16px;
   cursor: pointer;
-  border-radius: 4px;
+  /* border-radius: 4px; */
   transition: color .2s ease;
-  background-color: #00000010;
+  background-color: #ceedde;
+  border-left: 4px solid #04703c;
+  /* background-color: #ffe3ce; */
 }
 
 .leftMenuItem:hover {
@@ -616,8 +620,8 @@
 }
 
 .icon {
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     color: #999999;
     /* padding: 8px; */
     /* cursor: pointer; */
@@ -636,7 +640,8 @@
 }
 
 .load {
-  animation: 6s rotate linear infinite;
+  color: #2845E0;
+  animation: 0.5s rotate linear infinite;
 }
 .code {
   font-weight: 700;

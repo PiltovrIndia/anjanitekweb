@@ -1,7 +1,7 @@
 'use client'
 
 import Registration from '../../(features)/(campus)/registration/form/page'
-import Dashboard from '../../(features)/(campus)/dashboard/page'
+import Dashboard from '../../(features)/(campus)/dashboard2/page'
 import { Inter } from 'next/font/google'
 import Image from 'next/image'
 import { SpinnerGap } from 'phosphor-react'
@@ -118,6 +118,7 @@ async function loginHere(){
             var otp = Math.floor(1000 + Math.random() * 9000);
             setOTP(otp);
             console.log(otp);
+            
 
             // show the loading.
             setuserFound(true);
@@ -133,10 +134,22 @@ async function loginHere(){
             if(resultData.status == 200) {
                 
                 // set the state variables with the user data
-                setUser(resultData.data)
-                setUsername(resultData.data.name)
-                setEmail(resultData.data.email)
-                setPhone(resultData.data.mobile)
+                setUser(resultData.data);
+                setUsername(resultData.data.name);
+                setEmail(resultData.data.email);
+                setPhone(resultData.data.mobile);
+
+                var result1 = await fetch(encodeURI("https://messaging.charteredinfo.com/smsaspx?ID=piltovrindia@gmail.com&Pwd=PiltovrIndia@33&PhNo=91"+resultData.data.mobile+"&Text="+otp+" is OTP for Anjani Tek login. Valid for 5 minutes. Regards, Team Piltovr.&TemplateID=1007619515128741928"), {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Accept: "application/json",
+                    },
+                });
+
+                // var result1 = await fetch(encodeURI("https://messaging.charteredinfo.com/smsaspx?ID=piltovrindia@gmail.com&Pwd=PiltovrIndia@33&PhNo=91"+mobileNumber.trim()+"&Text="+verifyOTP+" is OTP for Anjani Tek login. Valid for 5 minutes. Regards, Team Piltovr.&TemplateID=1007619515128741928"), {headers: {"Accept": "application/json"}});
+        console.log(result1);
+        
 
                 // save the data to local cookie
                 // let jsonString = JSON.stringify(queryResult.data)
@@ -188,6 +201,7 @@ async function loginHere(){
         
         setuserFound(false);
         setotpSent(false);
+console.log(e);
 
         // show and hide message
         setResultType('error');
@@ -279,7 +293,7 @@ function verifyOTP(){
             
             // save the data to local cookie
             let jsonString = JSON.stringify(queryResult.data)
-            biscuits.set('sc_user_detail', encodeURIComponent(jsonString), {path: '/', expires: new Date(Date.now() + 10800000)})
+            biscuits.set('sc_user_detail', encodeURIComponent(jsonString), {path: '/', expires: new Date(Date.now() + 43200000)})
             
             // navigate to dashboard
             // router.push('/dashboard')

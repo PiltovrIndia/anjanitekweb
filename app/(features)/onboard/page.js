@@ -1,6 +1,6 @@
 'use client'
 
-import Dashboard from '../(campus)/dashboard/page'
+import Dashboard from '../(campus)/dashboard2/page'
 import { Inter } from 'next/font/google'
 import Image from 'next/image'
 import { SpinnerGap } from 'phosphor-react'
