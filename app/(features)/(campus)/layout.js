@@ -8,7 +8,7 @@ const biscuits = new Biscuits
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react';
 import Registration from './registration/form/page'
-import SearchStudents from './search/page'
+
 import { Toaster } from "@/app/components/ui/toaster"
 
 const inter = Inter({ subsets: ['latin'] })
