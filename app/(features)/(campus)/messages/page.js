@@ -83,8 +83,8 @@ fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message
     },
 });
 // search dealer by name
-const searchDealerByName = async (pass, dealer, offset) =>   
-fetch("/api/v2/user/"+pass+"/U2/"+dealer+"/"+offset, {
+const searchDealerByName = async (pass, dealer, offset, id, role) =>   
+fetch("/api/v2/user/"+pass+"/U2/"+dealer+"/"+offset+"/"+id+"/"+role, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -93,27 +93,6 @@ fetch("/api/v2/user/"+pass+"/U2/"+dealer+"/"+offset, {
 });
 
 
-
-const getPending = async (pass, role, branch) => 
-  
-fetch("/api/v2/amount/"+pass+"/U5", {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-// get dealer count by location
-const getStats = async (pass, role, branch) => 
-  
-fetch("/api/v2/dealerstats/"+pass+"/0", {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
 
 // const spaceRef = ref(storage, 'images/space.jpg');
 // check for the user
@@ -189,6 +168,7 @@ export default function Messages() {
 
                 // set the user state variable
                 setUser(obj)
+                setRole(obj.role)
 
                 // get if receivers data is present
                 if(receiversList.length == 0){
@@ -274,7 +254,7 @@ export default function Messages() {
         try {    
             const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, receiver)
             const queryResult = await result.json() // get data
-            console.log(queryResult);
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -384,19 +364,19 @@ export default function Messages() {
         }
         else {
             setDealerSearching(true);
-            console.log("offset : ");
-            console.log(offset);
+            // console.log("offset : ");
+            // console.log(offset);
             // setOffset(offset+10); // update the offset for every call
             var searchTerm = document.getElementById('search').value;
 
             try {    
-                console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U2/"+searchTerm+"/0");
+                // console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U2/"+searchTerm+"/0/"+role+"/"+user.id);
                 // console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/1/"+row.getValue('appointmentId')+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).username+"/"+updatedOn+"/"+row.getValue('collegeId'));
-                const result  = await searchDealerByName(process.env.NEXT_PUBLIC_API_PASS,searchTerm,offset);
+                const result  = await searchDealerByName(process.env.NEXT_PUBLIC_API_PASS,searchTerm,offset, role, user.id);
             
                 // const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, receiver)
                 const queryResult = await result.json() // get data
-                console.log(queryResult);
+                // console.log(queryResult);
                 // var sentObj = {
                 //     notificationId: 100000,
                 //     sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,
@@ -440,7 +420,7 @@ export default function Messages() {
         console.log("Selected Search ITEM: "+searchItem.name);
         
         // set the object
-        var obj = {name:searchItem.name, receiver:searchItem.userId};
+        var obj = {name:searchItem.name, receiver:searchItem.id};
         // set the selected receiver
         setSelectedReceiver(obj);
 
@@ -645,20 +625,20 @@ const processData = (e) => {
                                             : 
                                             <div>
                                                 {searchedList.map((searchItem, index) => (
-                                                <>
+                                                // <>
                                                     <li className="flex py-4 first:pt-0 last:pb-0 cursor-pointer" key={index} onClick={()=>{selectTheSearchItem(searchItem)}}>
                                                     {/* <li className="flex py-4 first:pt-0 last:pb-0" key={index} onClick={()=>{setSelectedReceiver(receiver)}}> */}
                                                     {/* <img class="h-10 w-10 rounded-full" src="" alt="" /> */}
-                                                    <Avatar>
-                                                        <AvatarImage src="" alt="dealer_image" />
-                                                        <AvatarFallback>{searchItem.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="ml-3 overflow-hidden w-max">
-                                                        <p className="text-sm font-medium text-slate-900">{searchItem.name}</p>
-                                                        <p className="text-sm text-slate-500 truncate">{searchItem.userId}</p>
-                                                    </div>
+                                                        <Avatar>
+                                                            <AvatarImage src="" alt="dealer_image" />
+                                                            <AvatarFallback>{searchItem.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
+                                                        </Avatar>
+                                                        <div className="ml-3 overflow-hidden w-max">
+                                                            <p className="text-sm font-medium text-slate-900">{searchItem.name}</p>
+                                                            <p className="text-sm text-slate-500 truncate">{searchItem.id}</p>
+                                                        </div>
                                                     </li>
-                                                </>
+                                                // </>
                                                 
                                                 ))}
                                                 

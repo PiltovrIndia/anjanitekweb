@@ -1,9 +1,9 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { ChatText, Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, Plus } from 'phosphor-react'
+import { ChatText, Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, Plus, UserMinus } from 'phosphor-react'
 import React, { useRef, useEffect, useState } from 'react'
-import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart, } from 'recharts';
+import { XAxis, YAxis, Cell, PieChart, Pie, Area, AreaChart, } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
 import Biscuits from 'universal-cookie'
@@ -25,7 +25,12 @@ import { Checkbox } from "@/app/components/ui/checkbox"
 import { Input } from "@/app/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger, } from "../../../../app/components/ui/popover"
 import { Avatar, AvatarFallback, AvatarImage } from "../../../../app/components/ui/avatar"
-  
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+  } from "@/app/components/ui/tooltip"  
 
 import BlockDatesBtn from '../../../components/myui/blockdatesbtn'
 import OutingRequest from '../../../components/myui/outingrequest'
@@ -1010,7 +1015,7 @@ const sendMessageNow = async (e) => {
                 <div className='flex flex-row mx-2 gap-2 items-center'>
                     <Input type="text" id="search" placeholder="Type name to search and map" className="my-2 "/>
                     <Popover open={openSearch} onOpenChange={setOpenSearch}>
-                        <PopoverTrigger asChild><Button variant="outline" onClick={searchForPeopleToMap}>Search</Button></PopoverTrigger>
+                        <PopoverTrigger asChild><Button variant="outline" className='text-white bg-blue-700' onClick={searchForPeopleToMap}>Search</Button></PopoverTrigger>
                         <PopoverContent className="w-fit">
                         {
                             searching3 ? 
@@ -1019,18 +1024,21 @@ const sendMessageNow = async (e) => {
                             <div style={{height:'300px', width: '400px', overflow:'scroll'}}>
                                 {searchedList.map((searchItem, index) => (
                                 <>
-                                    <li className="flex py-4 first:pt-0 last:pb-0 cursor-pointer" key={index} onClick={()=>{selectTheSearchItem(searchItem)}}>
+                                    <li className="flex w-max items-center py-4 first:pt-0 last:pb-0 cursor-pointer" key={index} onClick={()=>{selectTheSearchItem(searchItem)}}>
                                     {/* <li className="flex py-4 first:pt-0 last:pb-0" key={index} onClick={()=>{setSelectedReceiver(receiver)}}> */}
                                     {/* <img class="h-10 w-10 rounded-full" src="" alt="" /> */}
-                                    <Avatar>
-                                        <AvatarImage src="" alt="dealer_image" />
-                                        <AvatarFallback>{searchItem.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="ml-3 overflow-hidden w-max">
-                                        <p className="text-sm font-medium text-slate-900">{searchItem.name}</p>
-                                        <p className="text-sm text-slate-500 truncate">{searchItem.id}</p>
-                                        <p className="text-sm text-slate-500 truncate">{searchItem.role}</p>
-                                        {(searchItem.mapTo.length > 3 && allSalesPeople.length > 0) ? <p className="text-sm text-slate-500 truncate">Mapped to: {allSalesPeople.find(item => item.id === searchItem.mapTo)?.name}</p> : <p></p>}
+                                        <Avatar>
+                                            <AvatarImage src="" alt="dealer_image" />
+                                            <AvatarFallback>{searchItem.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="ml-3 overflow-hidden w-[280px]">
+                                            <p className="text-sm font-medium text-slate-900">{searchItem.name}</p>
+                                            <p className="text-sm text-slate-500 truncate">{searchItem.id}</p>
+                                            <p className="text-sm text-slate-500 truncate">{searchItem.role}</p>
+                                            {(searchItem.mapTo.length > 3 && allSalesPeople.length > 1) ? <p className="text-sm text-slate-500 truncate">Mapped to: {allSalesPeople.find(item => item.id === searchItem.mapTo)?.name}</p> : <p></p>}
+                                        </div>
+                                        <div className='items-end'>
+                                            <Button variant='outline' className='border-blue-700'>Add</Button>
                                         </div>
                                     </li>
                                     <Separator />
@@ -1052,19 +1060,43 @@ const sendMessageNow = async (e) => {
                         {allMappedPeople.map((row) => (
                             <TableRow key={row.id} style={{cursor:'pointer'}}  className={(selectedDealerPerson==row.id) ? 'bg-green-100' : ''} onClick={()=>getSenderMessagesData(selectedSalesPerson, row.id)} >
                                 <TableCell className={(selectedDealerPerson==row.id) ? 'font-semibold text-green-700 py-2 border-l-8 border-green-700' : 'font-semibold text-black-700 py-2'}>{row.name}<br/>
-                                    <p className="font-normal text-muted-foreground">
+                                    <p className="font-normal text-muted-foreground py-2">
                                         {row.id} 
                                     </p>
-                                    <p className="font-normal text-muted-foreground">
+
+                                    {row.email.length > 2 ?
+                                    <p className="font-normal text-muted-foreground pb-2">
                                         {row.email}
                                     </p>
-                                    <p className="text-sm text-slate-500 bg-slate-50 px-1 py-1 w-fit border border-slate-200 rounded">
+                                    : ''}
+                                    <p className="text-sm text-slate-500 bg-slate-50 mb-2 px-1 py-1 w-fit border border-slate-200 rounded">
                                         {row.role}
                                     </p>
                                 </TableCell>
                                 <TableCell>
-                                    <Button variant='outline' className="mx-2 px-2"><ChatText size={24} className="text-green-600"/></Button>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant='outline' className="mx-2 px-2"><ChatText size={24} className="text-green-600"/></Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                        <p>View messages</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                    </TooltipProvider>
                                 </TableCell>
+                                {/* <TableCell>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant='outline' className="mx-2 px-2"><UserMinus size={24} className="text-red-600"/>&nbsp;Remove</Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                        <p>View messages</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                    </TooltipProvider>
+                                </TableCell> */}
                             </TableRow>
                         ))}
                     </TableBody>

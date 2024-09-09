@@ -164,7 +164,7 @@ async function loginHere(){
                 // As OTP is already sent, show the OTP prompt text field
 
                 // for now, only allow if user is admin
-                if(resultData.data.role == 'admin' || resultData.data.role == 'SuperAdmin'){
+                if(resultData.data.role == 'admin' || resultData.data.role == 'SuperAdmin' || resultData.data.role == 'SalesManager' || resultData.data.role == 'SalesExecutive'){
                     // otp sent
                     setotpSent(true)
                 }
@@ -301,13 +301,15 @@ function verifyOTP(){
             //     router.push('/dashboard')
             // }
             // else 
-            if(queryResult.data.role.toLocaleLowerCase() == 'SuperAdmin'.toLocaleLowerCase()){
+            if(queryResult.data.role.toLocaleLowerCase() == 'SuperAdmin'.toLocaleLowerCase() ||
+            queryResult.data.role.toLocaleLowerCase() == 'SalesManager'.toLocaleLowerCase() ||
+            queryResult.data.role.toLocaleLowerCase() == 'SalesExecutive'.toLocaleLowerCase()){
                 
                 router.push('/dashboard')
             }
             else if(queryResult.data.role.toLocaleLowerCase() == 'Admin'.toLocaleLowerCase()){
                 
-                router.push('/dealers')
+                // router.push('/dealers')
             }
         }
         else{

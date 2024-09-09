@@ -1,7 +1,6 @@
 import pool from '../../../db'
 // const OneSignal = require('onesignal-node')
 import { Keyverify } from '../../../secretverify';
-import dayjs from 'dayjs'
 
 // const client = new OneSignal.Client(process.env.ONE_SIGNAL_APPID, process.env.ONE_SIGNAL_APIKEY)
 // if 0, get all campuses list
@@ -17,35 +16,102 @@ export async function GET(request,{params}) {
             // authorize secret key
             if(params.ids[1] == '0'){
 
-              var query =
-                `SELECT 
-                    'All' AS state, 
-                    COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
-                    COUNT(DISTINCT d.dealerId) AS dealers,
-                    COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
-                    COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL, 
-                    COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL 
-                FROM 
-                    dealer d 
-                LEFT JOIN 
-                    invoices i ON i.billTo = d.dealerId
-                
-                UNION ALL
+              var query = '';
+              
+              if(params.ids[2]=='SuperAdmin'){
+                  query =
+                    `SELECT 
+                        'All' AS state, 
+                        COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
+                        COUNT(DISTINCT d.dealerId) AS dealers,
+                        COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
+                        COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL, 
+                        COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL 
+                    FROM 
+                        dealer d 
+                    LEFT JOIN 
+                        invoices i ON i.billTo = d.dealerId
+                    
+                    UNION ALL
 
-                SELECT 
-                    d.state, 
-                    COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
-                    COUNT(DISTINCT d.dealerId) AS dealers,
-                    COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
-                    COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL,
-                    COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL
-                FROM 
-                    dealer d 
-                LEFT JOIN 
-                    invoices i ON i.billTo = d.dealerId 
-                GROUP BY 
-                    d.state;`;
+                    SELECT 
+                        d.state, 
+                        COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
+                        COUNT(DISTINCT d.dealerId) AS dealers,
+                        COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
+                        COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL,
+                        COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL
+                    FROM 
+                        dealer d 
+                    LEFT JOIN 
+                        invoices i ON i.billTo = d.dealerId 
+                    GROUP BY 
+                        d.state;`;
+                }
+                else if(params.ids[2]=='SalesManager'){
+console.log('q1');
 
+                  // get the list of executives mapped to SalesManager
+                  const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+params.ids[3]+'"');
+                  console.log('q2');
+                  // get the list of dealers mapped to each executive
+                  var dealers = [];
+                  const promises = rows.map(async (row) => {
+                    console.log('q3');
+                      const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row.id+'"');
+                      rows1.map((row1) => {
+                          dealers.push(row1.id);
+                      })
+                  });
+
+                  await Promise.all(promises); // wait till above finishes
+
+                  // get the dealers
+                  if(dealers.length > 0){
+                    console.log('q4');
+                      const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
+                      
+                      query =
+                        `SELECT 
+                            'All' AS state, 
+                            COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
+                            COUNT(DISTINCT d.dealerId) AS dealers,
+                            COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
+                            COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL, 
+                            COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL 
+                        FROM 
+                            dealer d 
+                        LEFT JOIN 
+                            invoices i ON i.billTo = d.dealerId
+                        WHERE i.billTo IN (${dealersList}) 
+                        UNION ALL
+
+                        SELECT 
+                            d.state, 
+                            COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
+                            COUNT(DISTINCT d.dealerId) AS dealers,
+                            COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
+                            COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL,
+                            COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL
+                        FROM 
+                            dealer d 
+                        LEFT JOIN 
+                            invoices i ON i.billTo = d.dealerId 
+                        WHERE i.billTo IN (${dealersList}) 
+                        GROUP BY 
+                            d.state;`;
+
+                      const [rows2, fields2] = await connection.execute(query);
+                      connection.release();
+                      return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                  }
+                  else {
+                      connection.release();
+                      return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                  }
+
+                  
+                }
 
               // const [rows, fields] = await connection.execute(
               //   `SELECT d.state, 

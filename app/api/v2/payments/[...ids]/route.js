@@ -55,13 +55,14 @@ export async function GET(request,{params}) {
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           if(params.ids[1] == 'websingle'){
+            const paymentDate1 = new Date(params.ids[6]);
             // apply payment to multiple invoices at a time
             // applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular)
             await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[9], params.ids[5], paymentDate1, params.ids[7], params.ids[8]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           else {
-
+            // bulk upload from the web via excel
             // apply payment to multiple invoices at a time
             // id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
             // Parse the JSON string into an array
@@ -70,7 +71,7 @@ export async function GET(request,{params}) {
             
             items.forEach(async (item, index) => {
               console.log(`Item ${index}:`, item);
-              await applyPayment(item.id, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+              await applyPayment(item.gst, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
             });
 
             // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);

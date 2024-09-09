@@ -89,9 +89,9 @@ const updateUser = async (pass, role, id, updateDataBasic) =>
     });
 
 // get the dealers for SuperAdmin/Admin
-const getAllDealersDataAPI = async (pass, role, offset) => 
+const getAllDealersDataAPI = async (pass, role, id) => 
   
-fetch("/api/v2/user/"+pass+"/U6/"+role+"/"+offset, {
+fetch("/api/v2/user/"+pass+"/U6/"+role+"/"+id, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -140,6 +140,7 @@ export default function Outing() {
     const [role, setRole] = useState('');
     const [selectedState, setSelectedState] = useState('All');
     const [selectedMapToPerson, setSelectedMapToPerson] = useState('');
+    const [selectedManager, setSelectedManager] = useState('');
     const [offset, setOffset] = useState(0);
     const [completed, setCompleted] = useState(false);
     const [creatingPerson, setCreatingPerson] = useState(false);
@@ -234,41 +235,34 @@ export default function Outing() {
 
     // get the user and fire the data fetch
     useEffect(()=>{
-
-
-
         let cookieValue = biscuits.get('sc_user_detail')
             if(cookieValue){
                 const obj = JSON.parse(decodeURIComponent(cookieValue)) // get the cookie data
 
                 // set the user state variable
                 setUser(obj);
-                setRole(obj.role);
+                // setRole(obj.role);
                 
-                if(!completed){
-                    
-                    getAllDealers(initialDatesValues.from,initialDatesValues.to);
-                }
-                else {
-                    console.log("DONE READING");
-                }
-                
+                // if(!completed){
+                //     getAllDealers(initialDatesValues.from,initialDatesValues.to);
+                // }
+                // else {
+                //     console.log("DONE READING");
+                // }
             }
             else{
                 console.log('Not found')
                 router.push('/')
             }
-
-            // if (inView) {
-            //     console.log("YO YO YO!");
-            //   }
-    // });
-    // This code will run whenever capturedStudentImage changes
-    // console.log('capturedStudentImage'); // Updated value
-    // console.log(capturedStudentImage); // Updated value
-
-
     },[]);
+
+
+    useEffect(() => {
+        if (user && user.id && !completed) {
+            getAllDealers(initialDatesValues.from,initialDatesValues.to);
+        }
+    }, [user, completed]);
+
 
 
     // Get requests for a particular role
@@ -279,10 +273,9 @@ export default function Outing() {
         // setOffset(offset+0); // update the offset for every call
 
         try {    
-            const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, offset) 
+            const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, user.id) 
             const queryResult = await result.json() // get data
 
-            console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -421,6 +414,19 @@ export default function Outing() {
         }
     }
 
+
+    function selectSalesPerson(e) {
+        setSelectedMapToPerson(e);
+
+        const mapTo = allSalesPeople.find(row => row.id === e).mapTo;
+        console.log(mapTo);
+        
+        const SM = allSalesPeople.find(row => row.id === mapTo).name;
+        console.log(SM);
+
+        setSelectedManager(SM);
+        
+    }
     
     const getNextId = (list) => {
         // Extract numeric part from each ID and find the highest number
@@ -444,6 +450,7 @@ export default function Outing() {
         // receiver is always the dealer
         try{
             if(document.getElementById('name').value.length > 0 && 
+            document.getElementById('dealerId').value.length > 0 && 
             document.getElementById('email').value.length > 0 && 
             document.getElementById('mobile').value.length > 0 && 
             document.getElementById('address1').value.length > 0 && 
@@ -459,7 +466,8 @@ export default function Outing() {
                 // show and hide message
                 toast({description: "Creating Dealer. Please wait ...",});
 
-                var id = getNextId(allDealers); // get the next salesID
+                // var id = getNextId(allDealers); // get the next salesID
+                var id = document.getElementById('dealerId').value;
                 var name = document.getElementById('name').value;
                 var emailaddress = document.getElementById('email').value;
                 var mobilenumber = document.getElementById('mobile').value;
@@ -788,9 +796,10 @@ const sendMessageNow = async (e) => {
                         <br/>
                         <div className="flex flex-col items-start gap-2 mb-2">
                             <Label htmlFor="name" className="text-right">
-                            Dealer ID: (Auto-generated)
+                            Dealer ID:
                             </Label>
-                            <p className='font-semibold text-black'>{getNextId(allDealers)}</p>
+                            {/* <p className='font-semibold text-black'>{getNextId(allDealers)}</p> */}
+                            <Input id="dealerId" className="col-span-3 text-black" />
                         </div>
                         <div className="flex flex-col items-start gap-2 mb-2">
                             <Label htmlFor="name" className="text-right">
@@ -817,10 +826,36 @@ const sendMessageNow = async (e) => {
                             <Input id="gst" className="col-span-3 text-black" />
                         </div>
                         <div className="flex flex-col items-start gap-2 mb-2">
-                            <Label htmlFor="gst" className="text-right">
-                            Sales Person:
+                            <Label htmlFor="mapTo" className="text-right">
+                            Sales Executive:
                             </Label>
                             {searchingSales ?
+                                <div className="flex flex-row m-12">    
+                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                                    <p className={`${inter.className} ${styles.text3}`}>Loading sales persons...</p> 
+                                </div>
+                                :
+                                <Select onValueChange={(e)=>selectSalesPerson(e)}>
+                                    <SelectTrigger className="text-black">
+                                        <SelectValue placeholder="Select Sales Person" className="text-black" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                        <SelectLabel className="text-black">Select Sales Person</SelectLabel>
+                                            {allSalesPeople.filter(row => row.role === 'SalesExecutive').map((row) => (
+                                                <SelectItem key={row.id} value={row.id} className="text-black">{row.name}<br/>{row.mapTo}</SelectItem>))}
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
+                            }
+                        </div>
+
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="SM" className="text-right">
+                            Sales Manager:
+                            </Label>
+                            <Input disabled id="SM" value={selectedManager} className="col-span-3 text-black" />
+                            {/* {searchingSales ?
                                 <div className="flex flex-row m-12">    
                                     <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
                                     <p className={`${inter.className} ${styles.text3}`}>Loading sales persons...</p> 
@@ -838,7 +873,7 @@ const sendMessageNow = async (e) => {
                                         </SelectGroup>
                                     </SelectContent>
                                 </Select>
-                            }
+                            } */}
                         </div>
                         <Separator />
                         <p className='text-black font-semibold'>Address Details</p>

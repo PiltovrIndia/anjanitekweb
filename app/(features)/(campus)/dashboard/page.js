@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, XCircle, Plus } from 'phosphor-react'
+import { Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, XCircle, Plus, CurrencyInr, Receipt } from 'phosphor-react'
 import React, { useRef, useEffect, useState } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
@@ -76,81 +76,16 @@ import {
 import { UserNav } from "@/app/components/user-nav"
 import { Input } from '@/app/components/ui/input';
 import * as XLSX from 'xlsx';
-// import { taskSchema } from "@/app/data/schema"
-
-// import data from '@/app/data/'
 
 
-const metadata = {
-    title: "Tasks",
-    description: "A task and issue tracker build using Tanstack Table."
-  }
-  // Simulate a database read for tasks.
-   function getTasks() {
-    // const data =  fs.readFile(
-    //   path.join(process.cwd(), "src/app/data/tasks.json")
-    // )
-  
-    // const tasks = JSON.parse(data.toString())
-
-    var tasks = [
-        {
-          "id": "TASK-5207",
-          "title": "The SMS interface is down, copy the bluetooth bus so we can quantify the VGA card!",
-          "status": "Approved",
-          "label": "bug",
-          "priority": "low"
-        }
-      ]
-  
-    return JSON.parse(JSON.stringify(tasks))
-    // return array( taskSchema.validate(tasks))
-    // return array(taskSchema).parse(tasks)
-  
-  // parse and assert validity
-  // const user = await taskSchema.validate(tasks);
-  
-  
-  }
 const xlsx = require('xlsx');
-// import {jsPDF} from 'jsPDF';
-// Default export is a4 paper, portrait, using millimeters for units
-// const doc = new jsPDF();
-
-// Create styles
-// const styles1 = StyleSheet.create({
-//     page: {
-//       flexDirection: 'row',
-//       backgroundColor: '#E4E4E4'
-//     },
-//     section: {
-//       margin: 10,
-//       padding: 10,
-//       flexGrow: 1
-//     }
-//   });
-
-
-
-// Hostels and strengths
-// SELECT h.hostelName, h.hostelId, COUNT(ud.collegeId) AS userCount FROM hostel h LEFT JOIN user_details ud ON h.hostelId = ud.hostelId JOIN user u ON ud.collegeId = u.collegeId and u.type='hostel' and u.role='student' GROUP BY h.hostelName, h.hostelId
-
-// Inouting count from each hostel
-// SELECT h.hostelName, h.hostelId, COUNT(r.collegeId) AS userCount FROM hostel h LEFT JOIN user_details ud ON h.hostelId = ud.hostelId JOIN request r ON ud.collegeId = r.collegeId and r.requestStatus='InOuting' GROUP BY h.hostelName, h.hostelId
-
-// InHostel Count, InOuting count from each hostel
-// SELECT h.hostelName, h.hostelId, COUNT(DISTINCT ud.collegeId) AS userCount, SUM(CASE WHEN r.requestStatus='InOuting' THEN 1 ELSE 0 END) AS outingCount, COUNT(DISTINCT ud.collegeId) - SUM(CASE WHEN r.requestStatus='InOuting' THEN 1 ELSE 0 END) AS inHostel FROM hostel h LEFT JOIN user_details ud ON h.hostelId = ud.hostelId LEFT JOIN user u ON ud.collegeId = u.collegeId AND u.type='hostel' AND u.role='student' LEFT JOIN request r ON ud.collegeId = r.collegeId GROUP BY h.hostelName, h.hostelId
-
-// to download hostelwise student status
-// SELECT u.collegeId, u.username, (CASE WHEN r.requestStatus='InOuting' THEN 'InOuting' ELSE 'InHostel' END) as status FROM user u JOIN user_details ud ON u.collegeId = ud.collegeId JOIN request r ON u.collegeId = r.collegeId WHERE ud.hostelId = 'H09u23jidw' ORDER BY `status` DESC
-
 // Child references can also take paths delimited by '/'
 const spaceRef = ref(storage, '/');
 
 // get dealer count by location
-const getStats = async (pass, role, branch) => 
+const getStats = async (pass, role, id) => 
   
-    fetch("/api/v2/dealerstats/"+pass+"/0", {
+    fetch("/api/v2/dealerstats/"+pass+"/0/"+role+"/"+id, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -159,9 +94,9 @@ const getStats = async (pass, role, branch) =>
     });
 
 // get the dealers for SuperAdmin/Admin
-const getAllDealersDataAPI = async (pass, role, offset, days, state) => 
+const getAllDealersDataAPI = async (pass, role, offset, days, state, id) => 
   
-fetch("/api/v2/user/"+pass+"/U5/"+role+"/"+offset+"/"+days+"/"+state, {
+fetch("/api/v2/user/"+pass+"/U5/"+role+"/"+offset+"/"+days+"/"+state+"/"+id, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -239,6 +174,7 @@ export default function Outing() {
 
     // user state and requests variable
     const [user, setUser] = useState();
+    const [id, setUserId] = useState('');
     const [role, setRole] = useState('');
     const [offset, setOffset] = useState(0);
     const [days, setDays] = useState(45);
@@ -402,9 +338,6 @@ export default function Outing() {
 
     // get the user and fire the data fetch
     useEffect(()=>{
-
-
-
         let cookieValue = biscuits.get('sc_user_detail')
             if(cookieValue){
                 const obj = JSON.parse(decodeURIComponent(cookieValue)) // get the cookie data
@@ -412,33 +345,20 @@ export default function Outing() {
                 // set the user state variable
                 setUser(obj);
                 setRole(obj.role);
-                
-                if(!completed){
-                    
-                    getDealerStats();
-                    getAllRequests(days,currentState);
-                }
-                else {
-                    console.log("DONE READING");
-                }
-                
+                setUserId(obj.id);
             }
             else{
                 console.log('Not found')
                 router.push('/')
             }
-
-            // if (inView) {
-            //     console.log("YO YO YO!");
-            //   }
-    // });
-    // This code will run whenever capturedStudentImage changes
-    // console.log('capturedStudentImage'); // Updated value
-    // console.log(capturedStudentImage); // Updated value
-
-
     },[]);
 
+    useEffect(() => {
+        if (user && user.id && !completed) {
+            getDealerStats();
+            getAllRequests(days, currentState);
+        }
+    }, [user, completed]);
 
 
     // get dealer stats
@@ -448,9 +368,10 @@ export default function Outing() {
         setOffset(offset+10); // update the offset for every call
 
         try {    
-            const result  = await getStats(process.env.NEXT_PUBLIC_API_PASS)
+            
+            const result  = await getStats(process.env.NEXT_PUBLIC_API_PASS, role, id)
             const queryResult = await result.json() // get data
-            console.log(queryResult);
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -538,11 +459,10 @@ export default function Outing() {
         // setOffset(offset+0); // update the offset for every call
 
         try {    
-            
-            const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, offset, days, state) 
+            const result  = await getAllDealersDataAPI(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, offset, days, state, id ) 
             const queryResult = await result.json() // get data
 
-            console.log(queryResult);
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -842,7 +762,6 @@ const sendMessageNow = async (e) => {
     };
     
     const processData = (e) => {
-        console.log("Uploading...");
         
         if (file) {
             const reader = new FileReader();
@@ -890,22 +809,16 @@ const sendMessageNow = async (e) => {
         setUploadProgress(true);
         
         try {    
-            const result  = await updateUploadData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId)
+            const result  = await updateUploadData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id)
             const queryResult = await result.json() // get data
-            console.log("Call2 for Upload...");
+            
             // check for the status
             if(queryResult.status == 200){
 
 
                 setUploadProgress(false);
 
-                toast("Data is uploaded", {
-                    description: "Refresh to view updated data",
-                    action: {
-                      label: "Okay",
-                      onClick: () => console.log("Okay"),
-                    },
-                  })
+                toast({description: "Upload success. Refresh to view updated data"});
 
                 // toast("Event has been created.")
 
@@ -997,7 +910,45 @@ const sendMessageNow = async (e) => {
 
             <Sheet>
                 <SheetTrigger asChild>
-                    <Button>Upload data</Button>
+                    <Button className="text-white bg-green-600"><Receipt className='font-bold text-lg'/>&nbsp; Upload Invoices Data</Button>
+                </SheetTrigger>
+                <SheetContent>
+                    <SheetHeader>
+                    <SheetTitle>File upload</SheetTitle>
+                    <SheetDescription>
+                        Make sure you use the correct format. Click Upload now when file is selected.
+                    </SheetDescription>
+                    </SheetHeader>
+                    <div className="grid gap-4 py-4">
+                        <br/>
+                        {/* <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="name" className="text-right">
+                            Name
+                            </Label>
+                            <Input id="name" value="Pedro Duarte" className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="username" className="text-right">
+                            Username
+                            </Label>
+                            <Input id="username" value="@peduarte" className="col-span-3" />
+                        </div> */}
+                        <div className="grid w-full max-w-sm items-center gap-1.5">
+                            <Label htmlFor="picture">Data file</Label>
+                            <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
+                        </div>
+                    </div>
+                    <SheetFooter>
+                    <SheetClose asChild>
+                        <Button type="submit" onClick={processData}>Upload now</Button>
+                    </SheetClose>
+                    </SheetFooter>
+                </SheetContent>
+            </Sheet>
+            
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button className="text-white bg-blue-700"><CurrencyInr className='font-bold text-lg'/>&nbsp; Upload Payments Data</Button>
                 </SheetTrigger>
                 <SheetContent>
                     <SheetHeader>
@@ -1294,12 +1245,17 @@ const sendMessageNow = async (e) => {
             <div className="flex flex-col flex-1 rounded-md border p-4 gap-4 min-w-96" style={{height: '90vh',position: 'sticky'}}>
                 <div className="flex flex-1 flex-col gap-2">
                     {searchingMessages ? <Skeleton className="h-4 w-[100px] h-[20px]" /> : 
-                    <div className='flex flex-row justify-between'>
-                        <p className="text-base font-semibold text-black">{allRequests.find(item => item.dealerId === selectedDealer).accountName}</p>
+                    <div className='flex flex-row justify-between items-center'>
+                        {/* <div className='flex flex-col gap-4'> */}
+                            <p className="text-xl font-semibold text-black">Send Message</p>
+                        {/* </div> */}
                         <Button variant='outline' size="icon" onClick={()=>setShowMessageView(false)} className="text-blue-600"><X size={24} className="text-slate-600"/></Button>
                     </div>
                     }
-                    <p className='text-sm text-slate-600'>Dealer ID: {selectedDealer}</p>
+                    <br/>
+                    <p className="text-sm font-semibold text-black">{allRequests.find(item => item.dealerId === selectedDealer).accountName}</p>
+                    <p className='text-sm text-slate-600'>GST: {selectedDealer}</p>
+                    
                 </div>
                 
                     
@@ -1357,7 +1313,7 @@ const sendMessageNow = async (e) => {
                     }
                     <br/>
                     <p className="text-sm font-semibold text-black">{allRequests.find(item => item.dealerId === selectedDealer).accountName}</p>
-                    <p className='text-sm text-slate-600'>Dealer ID: {selectedDealer}</p>
+                    <p className='text-sm text-slate-600'>GST: {selectedDealer}</p>
                     <br/>
                     <div className="flex flex-col items-start gap-2">
                         <Label htmlFor="name" className="text-right">

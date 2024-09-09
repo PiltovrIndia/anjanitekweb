@@ -1,7 +1,7 @@
 'use client'
 import { Inter } from 'next/font/google'
 import styles from '../../../app/page.module.css'
-import { Monitor, UserFocus, Chats, ArrowSquareOut, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files, Rows } from 'phosphor-react'
+import { Monitor, UserFocus, Chats, ArrowSquareOut, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files, Rows, Power } from 'phosphor-react'
 import Image from 'next/image'
 import Biscuits from 'universal-cookie'
 const biscuits = new Biscuits
@@ -24,6 +24,8 @@ const inter = Inter({ subsets: ['latin'] })
     // // variable to store the active tab
     const [selectedTab, setSelectedTab] = useState('Dashboard');
     const [userData, setUserData] = useState();
+    const [name, setName] = useState();
+    var userName = '';
     const [role, setRole] = useState();
     const [id, setId] = useState();
     // function handleTabChange(tabName){
@@ -50,9 +52,10 @@ const inter = Inter({ subsets: ['latin'] })
     let cookieValue = biscuits.get('sc_user_detail')
     if(cookieValue){
         const obj = JSON.parse(decodeURIComponent(cookieValue)) // get the cookie data
-
+        userName = JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).name;
         // configure some variables
         setUserData(obj);
+        setName(JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).name);
         setRole(obj.role);
         setId(obj.collegeId);
 
@@ -160,7 +163,9 @@ const inter = Inter({ subsets: ['latin'] })
               {/* <h3>Smart Campus</h3> */}
             </div>
             <div>
-              <p onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >Logout</p>
+              {/* <p onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >Log out</p> */}
+              {/* <p className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >{userName}</p> */}
+              <p className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >{JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).name}</p>
               {/* <ProfileBtn show={false} /> */}
             </div>
           </div>
@@ -177,9 +182,9 @@ const inter = Inter({ subsets: ['latin'] })
             <div style={{padding:'24px 0px 24px 0px',height: '100%',borderRight: '1px solid #efefef',width:'15%', display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
               
               <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-              {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dashboard' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDashboard.bind(this)} style={{cursor:'pointer'}}><Monitor className={styles.menuicon}/> Dashboard</div> : <div></div>}
+              {(role == 'SuperAdmin' || role == 'SalesManager' ) ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dashboard' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDashboard.bind(this)} style={{cursor:'pointer'}}><Monitor className={styles.menuicon}/> Dashboard</div> : <div></div>}
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealers.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers</div>
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Sales' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSales.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Sales</div>
+                {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Sales' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSales.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Sales</div> : <div></div>}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers Pending' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealersPending.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers Pending</div> */}
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Messages' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateMessages.bind(this)} style={{cursor:'pointer'}}><Chats className={styles.menuicon}/> Messages</div>
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Feed' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateFeed.bind(this)} style={{cursor:'pointer'}}><Rows className={styles.menuicon}/> Feed</div>
@@ -198,7 +203,7 @@ const inter = Inter({ subsets: ['latin'] })
               <div className={styles.verticalsection} style={{gap:'8px',padding: '8px',backgroundColor: '#f0f0f0',border: '1px solid #e5e5e5',borderRadius: '8px',margin: '0px 12px'}}>
                   {/* <p className={`${inter.className} ${styles.text3}  ${styles.tag}`} style={{cursor:'pointer'}} >{userData.role}</p>
                   <p className={`${inter.className} ${styles.text1}`} style={{cursor:'pointer'}} >{userData.username}</p> */}
-                  <p onClick={clearCookies.bind(this)} className='text-slate-600 cursor-pointer' >Log out</p>
+                  <p onClick={clearCookies.bind(this)} className='flex flex-row gap-2 items-center text-slate-600 cursor-pointer' ><Power className={styles.menuicon}/> Log out</p>
               </div>
               : ''}
             </div>

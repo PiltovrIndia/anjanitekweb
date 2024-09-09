@@ -233,6 +233,7 @@ const columns = [
                     <div className="text-left py-1">
                       <p className="text-blue-700 font-semibold tracking-wide underline-offset-4 py-1">{row.getValue("accountName")}</p>
                       <p className='text-xs font-normal text-slate-500'>{ row.getValue("dealerId")}</p>
+                      {/* <p className='text-xs font-normal text-slate-500'>{ row.getValue("gst")}</p> */}
                       
                     </div>
                   </SheetTrigger>
@@ -242,7 +243,8 @@ const columns = [
                       <div>
                       <SheetDescription>
                         
-                          <p>{row.getValue("dealerId")}</p>
+                          <p>{row.getValue("gst")}</p>
+                          {/* <p>{row.getValue("dealerId")}</p> */}
                           {/* <p className="text-black-700 text-xl text-foreground">{ row.getValue("dealerId")}</p> */}
                           
                           {/* <br/> */}
@@ -290,6 +292,10 @@ const columns = [
     {
       accessorKey: "accountName",
       header: "accountName"
+    },
+    {
+      accessorKey: "gst",
+      header: "gst"
     },
     {
       accessorKey: "invoiceType",
@@ -543,12 +549,14 @@ const columns = [
                       // </SheetContent>
                       // </Sheet>
 
-                      <Button onClick={() => changeSelectedDealer(row.getValue('dealerId'))} variant='outline' ><ChatText size={24} className="text-blue-600"/></Button>
+                      <Button onClick={() => changeSelectedDealer(row.getValue('gst'))} variant='outline' ><ChatText size={24} className="text-blue-600"/></Button>
+                      // <Button onClick={() => changeSelectedDealer(row.getValue('dealerId'))} variant='outline' ><ChatText size={24} className="text-blue-600"/></Button>
                   )
                   
                   }
 
-                  <Button onClick={() => showPaymentView(row.getValue('dealerId'))} variant='outline' className="mx-2 px-2"><CurrencyInr size={24} className="text-blue-600"/> <PlusMinus size={24} className="text-blue-600"/></Button>
+                  <Button onClick={() => showPaymentView(row.getValue('gst'))} variant='outline' className="mx-2 px-2"><CurrencyInr size={24} className="text-blue-600"/> <PlusMinus size={24} className="text-blue-600"/></Button>
+                  {/* <Button onClick={() => showPaymentView(row.getValue('dealerId'))} variant='outline' className="mx-2 px-2"><CurrencyInr size={24} className="text-blue-600"/> <PlusMinus size={24} className="text-blue-600"/></Button> */}
               
         </div>
         
@@ -697,7 +705,7 @@ const columns = [
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map(header => {
 
-                  if(header.id == 'invoiceType' || header.id == 'accountName' || header.id == 'status' || header.id == 'state' || header.id == 'city' || header.id == 'district'){
+                  if(header.id == 'gst' || header.id == 'invoiceType' || header.id == 'accountName' || header.id == 'status' || header.id == 'state' || header.id == 'city' || header.id == 'district'){
                     return null
                   }
                   else {
@@ -738,7 +746,7 @@ const columns = [
                   {row.getVisibleCells().map(cell => (
                     // console.log(cell.column.id),
                     // (cell.column.id == 'actions') ? cell.column.onClick=()=>acceptAppointment('Submitted') : 'ok',
-                    (cell.column.id == 'invoiceType' || cell.column.id == 'accountName' || cell.column.id == 'status' || cell.column.id == 'state' || cell.column.id == 'city' || cell.column.id == 'district') ? null :
+                    (cell.column.id == 'gst' || cell.column.id == 'invoiceType' || cell.column.id == 'accountName' || cell.column.id == 'status' || cell.column.id == 'state' || cell.column.id == 'city' || cell.column.id == 'district') ? null :
                     
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
