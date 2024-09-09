@@ -52,10 +52,10 @@ const inter = Inter({ subsets: ['latin'] })
     let cookieValue = biscuits.get('sc_user_detail')
     if(cookieValue){
         const obj = JSON.parse(decodeURIComponent(cookieValue)) // get the cookie data
-        userName = JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).name;
+        userName = obj.name;
         // configure some variables
         setUserData(obj);
-        setName(JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).name);
+        setName(obj.name);
         setRole(obj.role);
         setId(obj.collegeId);
 
@@ -163,9 +163,9 @@ const inter = Inter({ subsets: ['latin'] })
               {/* <h3>Smart Campus</h3> */}
             </div>
             <div>
-              {/* <p onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >Log out</p> */}
+              <p onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >Log out</p>
               {/* <p className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >{userName}</p> */}
-              <p className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >{JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).name}</p>
+              {/* <p className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >{JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).name}</p> */}
               {/* <ProfileBtn show={false} /> */}
             </div>
           </div>
