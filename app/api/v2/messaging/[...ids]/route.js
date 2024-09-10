@@ -102,7 +102,7 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 2){ // fetch data for specific dealer
                 
-                var q = 'SELECT * from notifications WHERE sentAt < "'+params.ids[3]+'" AND (receiver="'+params.ids[2]+'" OR receiver="All" OR sender="'+params.ids[2]+'") ORDER BY sentAt DESC LIMIT 50 OFFSET '+params.ids[4];
+                var q = 'SELECT * from notifications WHERE sentAt < "'+params.ids[3]+'" AND (receiver="'+params.ids[2]+'" OR receiver="All" OR sender="'+params.ids[2]+'") ORDER BY sentAt ASC LIMIT 50 OFFSET '+params.ids[4];
                 
                 const [rows, fields] = await connection.execute(q);
                 // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" AND branch = "All" or FIND_IN_SET("'+params.ids[4]+'", branch)>0 ORDER BY createdOn DESC');
@@ -179,12 +179,11 @@ export async function GET(request,{params}) {
                 return Response.json({status: 404, message:'No data!'}, {status: 200})
             }
           }
-          else if(params.ids[1] == 6){ // update the notification as SEEN by the dealer
-                
-            var q = 'UPDATE notifications set seen=1 WHERE notificationId = '+params.ids[2];
+          else if(params.ids[1] == 6){ // update the notifications as SEEN by the dealer which are sent to them
+            
+            var q = 'UPDATE notifications set seen=1 WHERE notificationId IN ('+params.ids[2].split(',')+')';
             
             const [rows, fields] = await connection.execute(q);
-            // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" AND branch = "All" or FIND_IN_SET("'+params.ids[4]+'", branch)>0 ORDER BY createdOn DESC');
             connection.release();
         
             // check if user is found

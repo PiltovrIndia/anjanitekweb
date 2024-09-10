@@ -211,9 +211,7 @@ export async function GET(request,{params}) {
                                 const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
                                 const dList = ` AND d.dealerId IN (${dealersList}) `;
                                 
-                                query = `SELECT DISTINCT 
-                                    d.*,
-                                    u_sales.name AS sales,i.*
+                                query = `SELECT DISTINCT d.*, u_sales.name AS sales,i.*
                                 FROM dealer d
                                 JOIN invoices i ON d.dealerId = i.billTo
                                 LEFT JOIN user u_dealer ON d.dealerId = u_dealer.id  -- Join to match dealer with user table
@@ -224,13 +222,13 @@ export async function GET(request,{params}) {
                                 `+dList+`
                                 ORDER BY i.expiryDate ASC`;
 
-                                const [rows1, fields1] = await connection.execute(query);
+                                const [rows2, fields2] = await connection.execute(query);
                                 connection.release();
 
                                 // check if user is found
-                                if(rows1.length > 0){
+                                if(rows2.length > 0){
                                     // return the requests data
-                                    return Response.json({status: 200, data: rows1, message:'Data found!'}, {status: 200})
+                                    return Response.json({status: 200, data: rows2, message:'Data found!'}, {status: 200})
                                 }
                                 else {
                                     // user doesn't exist in the system
@@ -259,7 +257,7 @@ export async function GET(request,{params}) {
                             if(dealers.length > 0){
                                 
                                 const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                                dList = ` AND d.dealerId IN (${dealersList}) `;
+                                const dList = ` AND d.dealerId IN (${dealersList}) `;
 
                                 query = `SELECT DISTINCT 
                                     d.*,

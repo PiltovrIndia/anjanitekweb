@@ -71,9 +71,9 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No users found!'+error.message}, {status: 200})
                 }
             }
-            else if(params.ids[1] == 'U4'){ // get all invoices for admin
+            else if(params.ids[1] == 'U4'){ // get all invoices for admin based on the role
                 
-                const [rows, fields] = await connection.execute('SELECT * FROM invoices ORDER BY invoiceDate DESC LIMIT 5 OFFSET '+params.ids[2]);
+                const [rows, fields] = await connection.execute('SELECT * FROM invoices ORDER BY invoiceDate DESC LIMIT 20 OFFSET '+params.ids[2]);
                 connection.release();
     
                 
