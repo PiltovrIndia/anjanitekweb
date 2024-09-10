@@ -90,7 +90,12 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U6'){ // get all invoices of dealers assigned to a list of executives
             
-                if(params.ids[2] == 'SalesManager'){
+                if(params.ids[2] == 'SuperAdmin'){
+                    const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where status!="Paid"`);
+                    connection.release();
+                    return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                }
+                else if(params.ids[2] == 'SalesManager'){
                     // get the list of executives mapped to SalesManager
                     const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+params.ids[3]+'"');
                     
