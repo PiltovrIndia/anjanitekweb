@@ -139,10 +139,10 @@ async function loginHere(){
                 setEmail(resultData.data.email);
                 setPhone(resultData.data.mobile);
 
-                // await fetch(encodeURI("https://messaging.charteredinfo.com/smsaspx?ID=piltovrindia@gmail.com&Pwd=PiltovrIndia@33&PhNo=91"+resultData.data.mobile+"&Text="+otp+" is OTP for Anjani Tek login. Valid for 5 minutes. Regards, Team Piltovr.&TemplateID=1007619515128741928"), {
-                //     method: "GET",
-                //     mode: 'no-cors',
-                // });
+                await fetch(encodeURI("https://messaging.charteredinfo.com/smsaspx?ID=piltovrindia@gmail.com&Pwd=PiltovrIndia@33&PhNo=91"+resultData.data.mobile+"&Text="+otp+" is OTP for Anjani Tek login. Valid for 5 minutes. Regards, Team Piltovr.&TemplateID=1007619515128741928"), {
+                    method: "GET",
+                    mode: 'no-cors',
+                });
         
 
                 // save the data to local cookie
