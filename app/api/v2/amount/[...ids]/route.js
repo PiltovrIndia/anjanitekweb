@@ -95,6 +95,45 @@ export async function GET(request,{params}) {
                     connection.release();
                     return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
                 }
+                else if(params.ids[2] == 'StateHead'){
+                    // get the list of managers mapped to StateHead
+                    const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesManager" AND mapTo="'+params.ids[3]+'"');
+                    
+                    // get the list of executives mapped to each managers
+                    var executives = [];
+                    const promises1 = rows.map(async (row) => {
+                        
+                        const [rows11, fields1] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+row.id+'"');
+                        rows11.map((row11) => {
+                            executives.push(row11.id);
+                        })
+                    });
+                    await Promise.all(promises1); // wait till above finishes
+                    
+                    // get the list of dealers mapped to each executive
+                    var dealers = [];
+                    const promises = executives.map(async (row) => {
+                        
+                        const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row+'"');
+                        rows1.map((row1) => {
+                            dealers.push(row1.id);
+                        })
+                    });
+                    await Promise.all(promises); // wait till above finishes
+
+                    // get the dealers
+                    if(dealers.length > 0){
+                        const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
+                        const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where billTo IN (${dealersList}) and status!="Paid"`);
+                        connection.release();
+                        return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                    }
+                    else {
+                        connection.release();
+                        return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                    }
+                    
+                }
                 else if(params.ids[2] == 'SalesManager'){
                     // get the list of executives mapped to SalesManager
                     const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+params.ids[3]+'"');
@@ -151,6 +190,24 @@ export async function GET(request,{params}) {
                 
             
             }
+            else if(params.ids[1] == 'U7'){ // Upload invoices in bulk
+            
+                // bulk upload from the web via excel
+                // apply payment to multiple invoices at a time
+                // invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
+                // Parse the JSON string into an array
+                const decodedItems = decodeURIComponent(params.ids[2]);
+                const items = JSON.parse(decodedItems);
+                
+                items.forEach(async (item, index) => {
+                    console.log(`Item ${index}:`, item);
+                    await applyInvoicesUpload(item.invoiceNo, item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
+                // await applyPayment(item.gst, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+                });
+
+                // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
+                return Response.json({status: 200, message:'Success!'}, {status: 200})
+            }
             else {
                 return Response.json({status: 404, message:'No Student found!'}, {status: 200})
             }
@@ -165,4 +222,40 @@ export async function GET(request,{params}) {
         return Response.json({status: 500, message:'Facing issues. Please try again!'}, {status: 200})
     }
   }
+
+
+
+
+  // apply invoices upload one by one
+  // provided: invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, expiryDate
+  // Needed for insertion: invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
+  async function applyInvoicesUpload(invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, expiryDate) {
+    
+    // get the pool connection to db
+    const connection = await pool.getConnection(); 
+    
+    try {
+        await connection.beginTransaction();
+        
+        // 1. verify the totalAmount & amountPaid to estimate pending & status for the given invoice
+        // 2. update the invoices table with the transaction of selected invoices
+
+        // 1
+        // check if amount being paid is more, accordingly we need to update the status
+        var status = (totalAmount == amountPaid) ? 'Pending' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
+        const pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
+        console.log(pending);
+        
+
+        const q = 'INSERT INTO invoices (invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)), ?, ?, ? )';
+        const [payments] = await connection.query(q,[invoiceNo, invoiceType, invoiceDate, '-','-','-','-',dealerId, dealerId, totalAmount, amountPaid, pending, status, expiryDate, '-']);
+
+        await connection.commit();
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        await connection.release();
+    }
+}
   

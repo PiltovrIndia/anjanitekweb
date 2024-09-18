@@ -151,11 +151,22 @@ const sendPaymentUpdate = async (pass, dealer, amount, invoiceNo, transaction, d
 
 
 // const spaceRef = ref(storage, 'images/space.jpg');
-// check for the user
+// upload payments data
 const updateUploadData = async (pass, items1, adminId) => 
     // userId, paymentAmount, type, transactionId, paymentDate,
     // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
     fetch("/api/v2/payments/"+pass+"/web/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+    });
+// upload invoices data
+const updateUploadInvoicesData = async (pass, items1, adminId) => 
+    // userId, paymentAmount, type, transactionId, paymentDate,
+    // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
+    fetch("/api/v2/amount/"+pass+"/U7/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -761,6 +772,7 @@ const sendMessageNow = async (e) => {
         }
     };
     
+    // for payments upload
     const processData = (e) => {
         
         if (file) {
@@ -796,10 +808,7 @@ const sendMessageNow = async (e) => {
         } else {
             console.log("Please select a file first.");
         }
-        
     }
-
-
 
     // get the requests data
     // for the user based on their role.
@@ -832,7 +841,74 @@ const sendMessageNow = async (e) => {
             console.log(e);
             toast({description: "Issue loading. Please refresh or try again later!"});
         }
-}
+    }
+    
+    // for invocies upload
+    const processInvoicesData = (e) => {
+        console.log('Check1');
+        
+        if (file) {
+            const reader = new FileReader();
+    
+            reader.onload = (event) => {
+                const binaryString = event.target.result;
+                const workbook = XLSX.read(binaryString, {type: 'binary'});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Specify date format directly in the read operation
+                const data = XLSX.utils.sheet_to_json(worksheet, {
+                    dateNF: 'yyyy-mm-dd hh:mm:ss', // Format date columns
+                    raw: false, // Do not use raw values (this ensures that dates are processed)
+                });
+                
+                // Optionally process amounts to ensure they are decimals with two decimal places
+                const processedData = data.map(item => ({
+                    ...item,
+                    amount: typeof item.amount === 'number' ? parseFloat(item.amount.toFixed(2)) : item.amount,
+                }));
+    
+    
+                // setItems(data);
+                getInvoiceDataDetails(data);
+                // const data = XLSX.utils.sheet_to_json(worksheet);
+                // setItems(data);
+                // getDataDetails(data);
+            };
+    
+            reader.readAsBinaryString(file);
+        } else {
+            console.log("Please select a file first.");
+        }
+    }
+    async function getInvoiceDataDetails(items1){
+        
+        setUploadProgress(true);
+        
+        try {    
+            const result  = await updateUploadInvoicesData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id)
+            const queryResult = await result.json() // get data
+            
+            // check for the status
+            if(queryResult.status == 200){
+
+
+                setUploadProgress(false);
+                toast({description: "Upload success. Refresh to view updated data"});
+
+                // toast("Event has been created.")
+
+            }
+            else {
+                
+                setUploadProgress(false);
+            }
+        }
+        catch (e){
+            console.log(e);
+            toast({description: "Issue loading. Please refresh or try again later!"});
+        }
+    }
   
     
   return (
@@ -908,7 +984,7 @@ const sendMessageNow = async (e) => {
     <div className='flex flex-row gap-2 items-center py-4' >
         <h2 className="text-lg font-semibold mr-4">Dashboard</h2>
 
-            <Sheet>
+            {/* <Sheet>
                 <SheetTrigger asChild>
                     <Button className="text-white bg-green-600"><Receipt className='font-bold text-lg'/>&nbsp; Upload Invoices Data</Button>
                 </SheetTrigger>
@@ -921,18 +997,6 @@ const sendMessageNow = async (e) => {
                     </SheetHeader>
                     <div className="grid gap-4 py-4">
                         <br/>
-                        {/* <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="name" className="text-right">
-                            Name
-                            </Label>
-                            <Input id="name" value="Pedro Duarte" className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="username" className="text-right">
-                            Username
-                            </Label>
-                            <Input id="username" value="@peduarte" className="col-span-3" />
-                        </div> */}
                         <div className="grid w-full max-w-sm items-center gap-1.5">
                             <Label htmlFor="picture">Data file</Label>
                             <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
@@ -940,11 +1004,11 @@ const sendMessageNow = async (e) => {
                     </div>
                     <SheetFooter>
                     <SheetClose asChild>
-                        <Button type="submit" onClick={processData}>Upload now</Button>
+                        <Button type="submit" onClick={processInvoicesData}>Upload now</Button>
                     </SheetClose>
                     </SheetFooter>
                 </SheetContent>
-            </Sheet>
+            </Sheet> */}
             
             <Sheet>
                 <SheetTrigger asChild>
@@ -959,18 +1023,6 @@ const sendMessageNow = async (e) => {
                     </SheetHeader>
                     <div className="grid gap-4 py-4">
                         <br/>
-                        {/* <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="name" className="text-right">
-                            Name
-                            </Label>
-                            <Input id="name" value="Pedro Duarte" className="col-span-3" />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="username" className="text-right">
-                            Username
-                            </Label>
-                            <Input id="username" value="@peduarte" className="col-span-3" />
-                        </div> */}
                         <div className="grid w-full max-w-sm items-center gap-1.5">
                             <Label htmlFor="picture">Data file</Label>
                             <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
