@@ -48,6 +48,77 @@ export async function GET(request,{params}) {
                     GROUP BY 
                         d.state;`;
                 }
+                else if(params.ids[2]=='StateHead'){
+
+                  // get the list of managers mapped to StateHead
+                  const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesManager" AND mapTo="'+params.ids[3]+'"');
+                  
+                  // get the list of dealers mapped to each executive
+                  var executives = [];
+                  const promises1 = rows.map(async (row) => {
+                      const [rows11, fields1] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+row.id+'"');
+                      rows11.map((row11) => {
+                          executives.push(row11.id);
+                      })
+                  });
+                  await Promise.all(promises1); // wait till above finishes
+                  
+                  // get the list of dealers mapped to each executive
+                  var dealers = [];
+                  const promises = executives.map(async (row) => {
+                      const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row+'"');
+                      rows1.map((row1) => {
+                          dealers.push(row1.id);
+                      })
+                  });
+                  await Promise.all(promises); // wait till above finishes
+
+                  // get the dealers
+                  if(dealers.length > 0){
+                    console.log('q4');
+                      const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
+                      
+                      query =
+                        `SELECT 
+                            'All' AS state, 
+                            COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
+                            COUNT(DISTINCT d.dealerId) AS dealers,
+                            COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
+                            COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL, 
+                            COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL 
+                        FROM 
+                            dealer d 
+                        LEFT JOIN 
+                            invoices i ON i.billTo = d.dealerId
+                        WHERE i.billTo IN (${dealersList}) 
+                        UNION ALL
+
+                        SELECT 
+                            d.state, 
+                            COUNT(CASE WHEN i.status NOT IN ('Paid') THEN i.invoiceId END) AS invoices,
+                            COUNT(DISTINCT d.dealerId) AS dealers,
+                            COUNT(DISTINCT CASE WHEN i.status NOT IN ('Paid') THEN d.dealerId END) AS dealersDue,
+                            COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'ATL' THEN i.pending END), 0) AS pendingATL,
+                            COALESCE(SUM(CASE WHEN i.status NOT IN ('Paid') AND i.invoiceType = 'VCL' THEN i.pending END), 0) AS pendingVCL
+                        FROM 
+                            dealer d 
+                        LEFT JOIN 
+                            invoices i ON i.billTo = d.dealerId 
+                        WHERE i.billTo IN (${dealersList}) 
+                        GROUP BY 
+                            d.state;`;
+
+                      const [rows2, fields2] = await connection.execute(query);
+                      connection.release();
+                      return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                  }
+                  else {
+                      connection.release();
+                      return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                  }
+
+                  
+                }
                 else if(params.ids[2]=='SalesManager'){
 
                   // get the list of executives mapped to SalesManager

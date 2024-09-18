@@ -44,6 +44,38 @@ export async function GET(request,{params}) {
                     if(params.ids[4] == 'SuperAdmin'){
                         query = 'SELECT * from user WHERE role="dealer" AND name LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3];
                     }
+                    else if(params.ids[4] == 'StateHead'){
+                        // find the assigned managers, executives and get dealers under them
+                        // get the list of managers mapped to StateHead
+                        const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesManager" AND mapTo="'+params.ids[5]+'"');
+                        
+                        // get the list of executives mapped to each manager
+                        var executives = [];
+                        const promises1 = rows.map(async (row) => {
+                            const [rows11, fields1] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+row.id+'"');
+                            rows11.map((row11) => {
+                                executives.push(row11.id);
+                                
+                            })
+                        });
+                        await Promise.all(promises1);
+                        
+                        // get the list of dealers mapped to each executive
+                        var dealers = [];
+                        const promises = executives.map(async (row) => {
+                            const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row+'"');
+                            rows1.map((row1) => {
+                                dealers.push(row1.id);
+                                
+                            })
+                        });
+                        await Promise.all(promises);
+
+                        if(dealers.length > 0){
+                            const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
+                            query = `SELECT * from user WHERE role="dealer" AND id IN (${dealersList}) AND name LIKE "%`+params.ids[2]+`%" LIMIT 20 OFFSET `+params.ids[3];
+                        }
+                    }
                     else if(params.ids[4] == 'SalesManager'){
                         // find the assigned executives and get dealers under them
                         // get the list of executives mapped to SalesManager
@@ -124,7 +156,7 @@ export async function GET(request,{params}) {
             // get dealer details of the dealer by id
             else if(params.ids[1] == 'U4'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * from dealer d LEFT JOIN user u ON d.salesId = u.id WHERE d.dealerId = "'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('SELECT * from dealer d LEFT JOIN user u ON d.dealerId = u.id WHERE d.dealerId = "'+params.ids[2]+'"');
                     connection.release();
                     // return successful update
 
@@ -187,6 +219,68 @@ export async function GET(request,{params}) {
                             // user doesn't exist in the system
                             return Response.json({status: 201, message:'No data found!'}, {status: 200})
                         }
+                    }
+                    else if(params.ids[2] == 'StateHead'){
+                        
+                        // find the assigned managers, executives and get dealers under them
+                        // get the list of managers mapped to StateHead
+                        const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesManager" AND mapTo="'+params.ids[6]+'"');
+                        
+                        // get the list of dealers mapped to each executive
+                        var executives = [];
+                        const promises1 = rows.map(async (row) => {
+                            const [rows11, fields11] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+row.id+'"');
+                            rows11.map((row11) => {
+                                executives.push(row11.id);
+                                
+                            })
+                        });
+                        await Promise.all(promises1); // wait till above finishes
+                        
+                        // get the list of dealers mapped to each executive
+                        var dealers = [];
+                        const promises = executives.map(async (row) => {
+                            const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row+'"');
+                            rows1.map((row1) => {
+                                dealers.push(row1.id);
+                                
+                            })
+                        });
+                        await Promise.all(promises); // wait till above finishes
+
+                            if(dealers.length > 0){
+                                
+                                const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
+                                const dList = ` AND d.dealerId IN (${dealersList}) `;
+                                
+                                query = `SELECT DISTINCT d.*, u_sales.name AS sales,i.*
+                                FROM dealer d
+                                JOIN invoices i ON d.dealerId = i.billTo
+                                LEFT JOIN user u_dealer ON d.dealerId = u_dealer.id  -- Join to match dealer with user table
+                                LEFT JOIN user u_sales ON u_dealer.mapTo = u_sales.id  -- Get the sales person from mapTo
+                                WHERE i.status IN ('NotPaid', 'PartialPaid')
+                                -- AND DATE(i.expiryDate) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL `+params.ids[4]+` DAY)  -- Invoices expiring within the next 5 days
+                                AND DATE(i.expiryDate) <= DATE_ADD(CURDATE(), INTERVAL `+params.ids[4]+` DAY)  -- Invoices expiring within the next 5 days
+                                `+dList+`
+                                ORDER BY i.expiryDate ASC`;
+
+                                const [rows2, fields2] = await connection.execute(query);
+                                connection.release();
+
+                                // check if user is found
+                                if(rows2.length > 0){
+                                    // return the requests data
+                                    return Response.json({status: 200, data: rows2, message:'Data found!'}, {status: 200})
+                                }
+                                else {
+                                    // user doesn't exist in the system
+                                    return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                                }
+                            }
+                            else {
+                                // user doesn't exist in the system
+                                return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                            }
                     }
                     else if(params.ids[2] == 'SalesManager'){
                         
@@ -318,6 +412,47 @@ export async function GET(request,{params}) {
                         }
                     }
 
+                    else if(params.ids[2] == 'StateHead'){
+                        // find the assigned managers, get executives and get dealers under them
+                        // get the list of managers mapped to StateHead
+                        const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesManager" AND mapTo="'+params.ids[3]+'"');
+                        
+                        // get the list of executives mapped to each manager
+                        var executives = [];
+                        const promises1 = rows.map(async (row) => {
+                            
+                            const [rows11, fields11] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+row.id+'"');
+                            rows11.map((row11) => {
+                                executives.push(row11.id);
+                            })
+                        });
+                        await Promise.all(promises1); // wait till above finishes
+                        
+                        // get the list of dealers mapped to each executive
+                        var dealers = [];
+                        const promises2 = executives.map(async (row) => {
+                            
+                            const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row+'"');
+                            rows1.map((row1) => {
+                                dealers.push(row1.id);
+                            })
+                        });
+                        await Promise.all(promises2); // wait till above finishes
+
+                        // get the dealers
+                        if(dealers.length > 0){
+                            const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
+                            const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
+                            connection.release();
+                            
+                            return Response.json({status: 200, length: rows2.length, data: rows2, message:'Details found!'}, {status: 200})
+                        }
+                        else {
+                            connection.release();
+                            return Response.json({status: 201, message:'No Data found!'}, {status: 200})
+                        }
+                    }
+
                     else if(params.ids[2] == 'SalesManager'){
                         // find the assigned executives and get dealers under them
                         // get the list of executives mapped to SalesManager
@@ -385,7 +520,7 @@ export async function GET(request,{params}) {
             // proper loading to be taken care
             else if(params.ids[1] == 'U7'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * from user where role IN ("SalesManager","SalesExecutive") ORDER BY role DESC');
+                    const [rows, fields] = await connection.execute('SELECT * from user where role IN ("StateHead","SalesManager","SalesExecutive") ORDER BY role DESC');
                     
                     connection.release();
                     // return successful update
@@ -437,7 +572,7 @@ export async function GET(request,{params}) {
             // proper loading to be taken care
             else if(params.ids[1] == 'U9'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * from user where role IN ("SalesManager","SalesExecutive","Dealer") AND name LIKE "%'+params.ids[3]+'%" ORDER BY role DESC');
+                    const [rows, fields] = await connection.execute('SELECT * from user where role IN ("StateHead","SalesManager","SalesExecutive","Dealer") AND name LIKE "%'+params.ids[3]+'%" ORDER BY role DESC');
                     
                     connection.release();
                     // return successful update
