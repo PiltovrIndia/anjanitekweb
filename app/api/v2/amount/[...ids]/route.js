@@ -30,7 +30,7 @@ export async function GET(request,{params}) {
                 try {
                     // let q = 'SELECT * FROM users WHERE collegeId LIKE "%'+params.ids[2]+'%"';
                     // console.log(q);
-                    let q = 'SELECT * FROM `invoices` WHERE billTo="'+params.ids[2]+'" ORDER BY invoiceDate DESC LIMIT 5 OFFSET '+params.ids[3];
+                    let q = 'SELECT * FROM `invoices` WHERE billTo="'+params.ids[2]+'" ORDER BY invoiceDate ASC LIMIT 5 OFFSET '+params.ids[3];
                     const [rows, fields] = await connection.execute(q);
                     connection.release();
                     // return successful update
@@ -71,9 +71,114 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No users found!'+error.message}, {status: 200})
                 }
             }
+            // Get the payments done by related dealers in the hirearchy of the selected admin
+          else if(params.ids[1] == 'U3.1'){
+                
+                    // let q = 'SELECT * FROM payments WHERE type="credit" AND id="'+params.ids[2]+'" LIMIT 20 OFFSET '+params.ids[3];
+                    // const [rows, fields] = await connection.execute(q);
+                    // connection.release();
+                    
+                    if(params.ids[2] == 'SuperAdmin'){
+                        const [rows2, fields2] = await connection.execute(`SELECT * FROM payments WHERE type="credit" ORDER BY paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
+                        connection.release();
+                        return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                    }
+                    else if(params.ids[2] == 'StateHead'){
+                        // get the list of managers mapped to StateHead
+                        const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesManager" AND mapTo="'+params.ids[3]+'"');
+                        
+                        // get the list of executives mapped to each managers
+                        var executives = [];
+                        const promises1 = rows.map(async (row) => {
+                            
+                            const [rows11, fields1] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+row.id+'"');
+                            rows11.map((row11) => {
+                                executives.push(row11.id);
+                            })
+                        });
+                        await Promise.all(promises1); // wait till above finishes
+                        
+                        // get the list of dealers mapped to each executive
+                        var dealers = [];
+                        const promises = executives.map(async (row) => {
+                            
+                            const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row+'"');
+                            rows1.map((row1) => {
+                                dealers.push(row1.id);
+                            })
+                        });
+                        await Promise.all(promises); // wait till above finishes
+    
+                        // get the dealers
+                        if(dealers.length > 0){
+                            const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
+                            const [rows2, fields2] = await connection.execute(`SELECT * FROM payments WHERE type="credit" AND id IN (${dealersList}) ORDER BY paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
+                            connection.release();
+                            return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                        }
+                        else {
+                            connection.release();
+                            return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                        }
+                        
+                    }
+                    else if(params.ids[2] == 'SalesManager'){
+                        // get the list of executives mapped to SalesManager
+                        const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+params.ids[3]+'"');
+                        
+                        // get the list of dealers mapped to each executive
+                        var dealers = [];
+                        const promises = rows.map(async (row) => {
+                            
+                            const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row.id+'"');
+                            rows1.map((row1) => {
+                                dealers.push(row1.id);
+                            })
+                        });
+    
+                        await Promise.all(promises); // wait till above finishes
+    
+                        // get the dealers
+                        if(dealers.length > 0){
+                            const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
+                            const [rows2, fields2] = await connection.execute(`SELECT * FROM payments WHERE type="credit" AND id IN (${dealersList}) ORDER BY paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
+                            connection.release();
+                            return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                        }
+                        else {
+                            connection.release();
+                            return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                        }
+                        
+                    }
+                    else if(params.ids[2] == 'SalesExecutive'){
+                        
+                        // get the list of dealers mapped to each executive
+                        var dealers = [];
+                        const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+params.ids[3]+'"');
+                        const promises = rows1.map((row1) => {
+                            dealers.push(row1.id);
+                        });
+    
+                        await Promise.all(promises); // wait till above finishes
+    
+                        // get the dealers
+                        if(dealers.length > 0){
+                            const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
+                            const [rows2, fields2] = await connection.execute(`SELECT * FROM payments WHERE type="credit" AND id IN (${dealersList}) ORDER BY paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
+                            connection.release();
+                            return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                        }
+                        else {
+    
+                            connection.release();
+                            return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                        }
+                    }
+            }
             else if(params.ids[1] == 'U4'){ // get all invoices for admin based on the role
                 
-                const [rows, fields] = await connection.execute('SELECT * FROM invoices ORDER BY invoiceDate DESC LIMIT 20 OFFSET '+params.ids[2]);
+                const [rows, fields] = await connection.execute('SELECT * FROM invoices ORDER BY invoiceDate ASC LIMIT 20 OFFSET '+params.ids[2]);
                 connection.release();
     
                 
@@ -124,7 +229,7 @@ export async function GET(request,{params}) {
                     // get the dealers
                     if(dealers.length > 0){
                         const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                        const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where billTo IN (${dealersList}) and status!="Paid"`);
+                        const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where billTo IN (${dealersList}) and status!="Paid" ORDER BY expiryDate ASC`);
                         connection.release();
                         return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
                     }
@@ -153,7 +258,7 @@ export async function GET(request,{params}) {
                     // get the dealers
                     if(dealers.length > 0){
                         const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                        const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where billTo IN (${dealersList}) and status!="Paid"`);
+                        const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where billTo IN (${dealersList}) and status!="Paid" ORDER BY expiryDate ASC`);
                         connection.release();
                         return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
                     }
@@ -177,7 +282,7 @@ export async function GET(request,{params}) {
                     // get the dealers
                     if(dealers.length > 0){
                         const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                        const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where billTo IN (${dealersList}) and status!="Paid"`);
+                        const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where billTo IN (${dealersList}) and status!="Paid" ORDER BY expiryDate ASC`);
                         connection.release();
                         return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
                     }
