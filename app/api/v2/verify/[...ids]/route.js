@@ -150,8 +150,8 @@ export async function GET(request,{params}) {
 
                     // return the user data
                     // if user is a dealer, get dealer details
-                    if(rows[0].role == 'dealer'){
-                        let p = 'SELECT * from dealer WHERE userId ="'+rows[0].id+'"';
+                    if(rows[0].role == 'Dealer'){
+                        let p = 'SELECT * from dealer WHERE dealerId ="'+rows[0].id+'"';
                         const [drows, dfields] = await connection.execute(p);
                         return Response.json({status: 200, message:'User found!', data: rows[0], data1: drows[0]}, {status: 200})
                     }

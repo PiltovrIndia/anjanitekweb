@@ -79,7 +79,7 @@ export async function GET(request,{params}) {
                     // connection.release();
                     
                     if(params.ids[2] == 'SuperAdmin'){
-                        const [rows2, fields2] = await connection.execute(`SELECT * FROM payments WHERE type="credit" ORDER BY paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
+                        const [rows2, fields2] = await connection.execute(`SELECT * FROM payments p JOIN dealer d ON p.id=d.dealerId WHERE p.type="credit" ORDER BY p.paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
                         connection.release();
                         return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
                     }
@@ -112,7 +112,7 @@ export async function GET(request,{params}) {
                         // get the dealers
                         if(dealers.length > 0){
                             const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                            const [rows2, fields2] = await connection.execute(`SELECT * FROM payments WHERE type="credit" AND id IN (${dealersList}) ORDER BY paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
+                            const [rows2, fields2] = await connection.execute(`SELECT * FROM payments p JOIN dealer d ON p.id=d.dealerId WHERE p.type="credit" AND p.id IN (${dealersList}) ORDER BY p.paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
                             connection.release();
                             return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
                         }
@@ -141,7 +141,7 @@ export async function GET(request,{params}) {
                         // get the dealers
                         if(dealers.length > 0){
                             const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                            const [rows2, fields2] = await connection.execute(`SELECT * FROM payments WHERE type="credit" AND id IN (${dealersList}) ORDER BY paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
+                            const [rows2, fields2] = await connection.execute(`SELECT * FROM payments p JOIN dealer d ON p.id=d.dealerId WHERE p.type="credit" AND p.id IN (${dealersList}) ORDER BY p.paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
                             connection.release();
                             return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
                         }
@@ -165,7 +165,7 @@ export async function GET(request,{params}) {
                         // get the dealers
                         if(dealers.length > 0){
                             const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                            const [rows2, fields2] = await connection.execute(`SELECT * FROM payments WHERE type="credit" AND id IN (${dealersList}) ORDER BY paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
+                            const [rows2, fields2] = await connection.execute(`SELECT * FROM payments p JOIN dealer d ON p.id=d.dealerId WHERE p.type="credit" AND p.id IN (${dealersList}) ORDER BY p.paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
                             connection.release();
                             return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
                         }
