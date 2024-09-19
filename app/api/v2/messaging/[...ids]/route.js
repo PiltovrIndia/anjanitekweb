@@ -51,6 +51,7 @@ export async function GET(request,{params}) {
                             // conditionsString = conditionsString + ' role="dealer" ';
                             query = 'SELECT u.gcm_regId from user u JOIN dealer d where d.dealerId=u.id AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
                         }
+                        // console.log(query);
                         
                         // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
                         const [nrows, nfields] = await connection.execute(query);
