@@ -165,7 +165,7 @@ export async function GET(request,{params}) {
             // Split the branches string into an array
             var query = 'SELECT gcm_regId FROM user where id="'+id+'" AND CHAR_LENGTH(gcm_regId) > 3';
            
-            console.log(query);
+            // console.log(query);
             
             const [nrows, nfields] = await connection.execute(query);
             connection.release();
@@ -180,10 +180,10 @@ export async function GET(request,{params}) {
             }
 
             // var gcmIds = 
-            console.log(gcmIds);
+            // console.log(gcmIds);
 
             // send the notification
-            const notificationResult = gcmIds.length > 0 ? await send_notification('Your payment is updated!', gcmIds, 'Single') : null;
+            const notificationResult = gcmIds.length > 0 ? await send_notification('Your payment is updated!', gcmIds[0], 'Single') : null;
                 
             // return successful update
             // return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
@@ -245,14 +245,14 @@ export async function GET(request,{params}) {
             },
             // include_player_ids: ['playerId'],
             // include_player_ids: ['90323-043'],
-            include_player_ids: [playerId],
+            include_external_user_ids: [playerId],
           };
         } else {
           notification = {
             contents: {
               'en': message,
             },
-            include_player_ids: playerIds,
+            include_external_user_ids: playerIds,
           };
         }
   

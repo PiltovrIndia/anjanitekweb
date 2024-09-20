@@ -68,10 +68,22 @@ export async function GET(request,{params}) {
                         }
 
                         // var gcmIds = 
-                        console.log(gcmIds);
+                        // console.log(gcmIds);
 
                         // send the notification
-                        const notificationResult = gcmIds.length > 0 ? await send_notification(params.ids[5], gcmIds, 'Multiple') : null;
+                        var notificationResult;
+                          if(gcmIds.length > 1){ 
+                            notificationResult = await send_notification(params.ids[5], gcmIds, 'Multiple');
+                          }
+                          else if(gcmIds.length == 1){ 
+                            notificationResult = await send_notification(params.ids[5], gcmIds[0], 'Single');
+                          }
+                          else {
+                            notificationResult = null;
+                          }
+                        
+                        // await send_notification(params.ids[5], gcmIds[0], 'Single') : null;
+                        // const notificationResult = gcmIds.length > 0 ? await send_notification(params.ids[5], gcmIds[0], 'Single') : null;
                             
                         // return successful update
                         return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
@@ -218,50 +230,48 @@ export async function GET(request,{params}) {
   // use the playerIds of the user.
   // check if playerId length > 2
   async function send_notification(message, playerId, type) {
-    // console.log(playerId);
-        return new Promise(async (resolve, reject) => {
-          // send notification only if there is playerId for the user
-          if (playerId.length > 0) {
-            // var playerIds = [];
-            // playerIds.push(playerId);
-      
-            var notification;
-            // notification object
-            if (type == 'Single') {
-              notification = {
-                contents: {
-                  'en': message,
-                },
-                // include_player_ids: ['playerId'],
-                // include_player_ids: ['90323-043'],
-                include_player_ids: [playerId],
-              };
-            } else {
-              notification = {
-                contents: {
-                  'en': message,
-                },
-                include_player_ids: playerId,
-              };
-            }
-      
-            try {
-              // create notification
-              const notificationResult = await client.createNotification(notification);
-              
-              resolve(notificationResult);
-    
-            } catch (error) {
-            //     console.log('ok');
-            //   console.log(error);
-              resolve(null);
-            }
-          } else {
-            // console.log('ok1');console.log(error);
-            resolve(null);
-          }
-        });
+    return new Promise(async (resolve, reject) => {
+      // send notification only if there is playerId for the user
+      if (playerId.length > 0) {
+        var playerIds = [];
+        playerIds.push(playerId);
+  
+        var notification;
+        // notification object
+        if (type == 'Single') {
+          notification = {
+            contents: {
+              'en': message,
+            },
+            // include_player_ids: ['playerId'],
+            // include_player_ids: ['90323-043'],
+            include_external_user_ids: [playerId],
+          };
+        } else {
+          notification = {
+            contents: {
+              'en': message,
+            },
+            include_external_user_ids: playerIds,
+          };
+        }
+  
+        try {
+          
+          // create notification
+          const notificationResult = await client.createNotification(notification);
+          
+          resolve(notificationResult);
+
+        } catch (error) {
+          
+          resolve(null);
+        }
+      } else {
+        resolve(null);
       }
+    });
+  }
     
     
     
