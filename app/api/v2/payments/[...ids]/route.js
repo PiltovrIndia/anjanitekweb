@@ -109,6 +109,7 @@ export async function GET(request,{params}) {
         // 1. get the pending invoices from table for the given dealer
         // 2. update the invoices table with pending amount for the selected invoices
         // 3. update the payments table with the transaction of selected invoices
+        // 4. Send notification to Dealer(s)
 
         // 1
         const [invoices] = await connection.query('SELECT invoiceNo, pending FROM invoices WHERE billTo = "'+id+'" AND pending > 0 ORDER BY invoiceDate ASC',[]);
@@ -147,7 +148,6 @@ export async function GET(request,{params}) {
         // console.log("plpl"+balance[0].balance);
         // console.log(paymentDate);
 
-        // 4
         var bal = 0;
         if(type == 'credit'){
             bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) - parseFloat(amount);
@@ -157,6 +157,36 @@ export async function GET(request,{params}) {
         }
         const q = 'INSERT INTO payments (amount, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
         const [payments] = await connection.query(q,[amount, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
+
+        // 4
+        // send notification to Dealer(s)
+
+        // get the gcm_regIds of Students to notify
+            // Split the branches string into an array
+            var query = 'SELECT gcm_regId FROM user where id="'+id+'" AND CHAR_LENGTH(gcm_regId) > 3';
+           
+            console.log(query);
+            
+            const [nrows, nfields] = await connection.execute(query);
+            connection.release();
+            
+            // get the gcm_regIds list from the query result
+            var gcmIds = [];
+            for (let index = 0; index < nrows.length; index++) {
+              const element = nrows[index].gcm_regId;
+            //   console.log(element)
+              if(element.length > 3)
+                gcmIds.push(element); 
+            }
+
+            // var gcmIds = 
+            console.log(gcmIds);
+
+            // send the notification
+            const notificationResult = gcmIds.length > 0 ? await send_notification('Your payment is updated!', gcmIds, 'Single') : null;
+                
+            // return successful update
+            // return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
 
         
 
