@@ -110,6 +110,7 @@ export async function GET(request,{params}) {
         // 2. update the invoices table with pending amount for the selected invoices
         // 3. update the payments table with the transaction of selected invoices
         // 4. Send notification to Dealer(s)
+        // 5. Include the notification in the chat history and SENT BY will be the respective executive.
 
         // 1
         const [invoices] = await connection.query('SELECT invoiceNo, pending FROM invoices WHERE billTo = "'+id+'" AND pending > 0 ORDER BY invoiceDate ASC',[]);
@@ -163,32 +164,32 @@ export async function GET(request,{params}) {
 
         // get the gcm_regIds of Students to notify
             // Split the branches string into an array
-            var query = 'SELECT gcm_regId FROM user where id="'+id+'" AND CHAR_LENGTH(gcm_regId) > 3';
-           
-            // console.log(query);
-            
+            var query = 'SELECT u.mapTo, u.gcm_regId, (SELECT gcm_regId as mappedTo from user where id=u.mapTo) FROM user u where u.id="'+id+'" AND CHAR_LENGTH(u.gcm_regId) > 3';
             const [nrows, nfields] = await connection.execute(query);
-            connection.release();
+            
             
             // get the gcm_regIds list from the query result
             var gcmIds = [];
             for (let index = 0; index < nrows.length; index++) {
               const element = nrows[index].gcm_regId;
+              const element1 = nrows[index].mappedTo;
             //   console.log(element)
-              if(element.length > 3)
+              if(element.length > 3){
                 gcmIds.push(element); 
+              }
+              if(element1.length > 3){
+                gcmIds.push(element1); 
+              }
             }
-
-            // var gcmIds = 
-            // console.log(gcmIds);
-
             // send the notification
-            const notificationResult = gcmIds.length > 0 ? await send_notification('Your payment is updated!', gcmIds[0], 'Single') : null;
+            const notificationResult = gcmIds.length > 0 ? await send_notification('Payment of ₹'+amount+' is updated for '+id, gcmIds, 'Multiple') : null;
                 
-            // return successful update
-            // return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
-
-        
+        // 5
+        // Include in the chat history
+        // create query for insert
+        const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
+        const [rows, fields] = await connection.execute(q1, [ nrows[0].mapTo, id, paymentDate, decodeURIComponent('Payment of ₹'+amount+' is updated for '+id), 0, '-' ]);
+        connection.release();
 
         await connection.commit();
     } catch (error) {
