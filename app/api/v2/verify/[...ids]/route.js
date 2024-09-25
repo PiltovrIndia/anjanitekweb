@@ -36,7 +36,7 @@ export async function GET(request,{params}) {
         // authorize secret key
         if(await Keyverify(params.ids[0])){
 
-            let q = 'SELECT * from `user` WHERE mobile = "'+params.ids[1]+'"';
+            let q = 'SELECT u.*, (SELECT name from user where id=u.mapTo ) as mapName from `user` u WHERE u.mobile = "'+params.ids[1]+'"';
             // let q = 'SELECT u.*, IFNULL(d.fatherName, "") AS fatherName, IFNULL(d.fatherPhoneNumber, "") AS fatherPhoneNumber, IFNULL(d.motherName, "") AS motherName, IFNULL(d.motherPhoneNumber, "") AS motherPhoneNumber, IFNULL(d.address, "") AS address, IFNULL(d.guardianName, "") AS guardianName, IFNULL(d.guardianPhoneNumber, "") AS guardianPhoneNumber, IFNULL(d.guardian2Name, "") AS guardian2Name, IFNULL(d.guardian2PhoneNumber, "") AS guardian2PhoneNumber, IFNULL(d.hostelId, "") AS hostelId, IFNULL(d.roomNumber, "") AS roomNumber, IFNULL(h.hostelName, "") AS hostelName FROM user u LEFT JOIN user_details d ON u.userId = d.userId LEFT JOIN `hostel` h ON d.hostelId = h.hostelId WHERE u.userId = "'+params.ids[1]+'"';
             // 'SELECT u.*,d.* FROM user u LEFT JOIN user_details d ON u.userId = d.userId WHERE u.userId = "'+params.ids[1]+'"'
      
@@ -152,6 +152,7 @@ export async function GET(request,{params}) {
                     // if user is a dealer, get dealer details
                     if(rows[0].role == 'Dealer' || rows[0].role == 'dealer'){
                         let p = 'SELECT * from dealer WHERE dealerId ="'+rows[0].id+'"';
+                        // let p = 'SELECT d.*, (SELECT name from user where id="'+rows[0].mapTo+'" ) as mapName  from dealer WHERE dealerId ="'+rows[0].id+'"';
                         const [drows, dfields] = await connection.execute(p);
                         return Response.json({status: 200, message:'User found!', data: rows[0], data1: drows[0]}, {status: 200})
                     }

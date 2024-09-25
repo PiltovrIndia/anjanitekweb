@@ -184,7 +184,8 @@ export async function GET(request,{params}) {
               }
             }
             // send the notification
-            const notificationResult = gcmIds.length > 0 ? await send_notification('Payment of ₹'+amount+' is updated for '+id, gcmIds, 'Multiple') : null;
+            const notificationResult = gcmIds.length > 0 ? await send_notification('Payment of ₹'+amount+' is updated', gcmIds, 'Multiple') : null;
+            // const notificationResult = gcmIds.length > 0 ? await send_notification('Payment of ₹'+amount+' is updated for '+id, gcmIds, 'Multiple') : null;
                 
         // 5
         // Include in the chat history
