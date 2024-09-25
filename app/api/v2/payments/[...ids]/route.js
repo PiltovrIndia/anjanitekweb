@@ -164,9 +164,11 @@ export async function GET(request,{params}) {
 
         // get the gcm_regIds of Students to notify
             // Split the branches string into an array
-            var query = 'SELECT u.mapTo, u.gcm_regId, (SELECT gcm_regId as mappedTo from user where id=u.mapTo) FROM user u where u.id="'+id+'" AND CHAR_LENGTH(u.gcm_regId) > 3';
+            var query = 'SELECT u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo)  as mappedTo FROM user u where u.id="'+id+'" AND CHAR_LENGTH(u.gcm_regId) > 3';
             const [nrows, nfields] = await connection.execute(query);
             
+            console.log(query);
+            console.log(nrows);
             
             // get the gcm_regIds list from the query result
             var gcmIds = [];
