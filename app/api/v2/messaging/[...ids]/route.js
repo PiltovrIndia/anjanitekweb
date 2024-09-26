@@ -153,12 +153,19 @@ export async function GET(request,{params}) {
               // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
               // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
               var query = '';
-              if(params.ids[3] == "All"){
+              if(params.ids[3] == "All"){ // this gets only broadcasted messages
                 query = 'SELECT * FROM notifications WHERE sender ="'+params.ids[2]+'" AND receiver = "'+params.ids[3]+'" ORDER BY sentAt ASC';
               }
-              else {
-                query = 'SELECT n.*,u.name as receiverName FROM notifications n JOIN user u ON n.receiver=u.id WHERE (n.sender IN ("'+params.ids[2]+'", "'+params.ids[3]+'") AND n.receiver = "'+params.ids[3]+'") OR (n.receiver IN ("'+params.ids[2]+'", "'+params.ids[3]+'") AND n.sender = "'+params.ids[3]+'") ORDER BY n.sentAt ASC';
+              else { // this fetches all the messages along with broadcasted ones in sequential order
+                query = `(SELECT n.*,u.name as receiverName FROM notifications n JOIN user u ON n.receiver=u.id 
+                          WHERE (n.sender IN ("`+params.ids[2]+`", "`+params.ids[3]+`") AND n.receiver = "`+params.ids[3]+`" ) 
+                          OR (n.receiver IN ("`+params.ids[2]+`", "`+params.ids[3]+`") AND n.sender = "`+params.ids[3]+`") 
+                          ORDER BY n.sentAt ASC)
+                          UNION ALL 
+                          (SELECT *,'All' as receiverName FROM notifications where receiver = "All" ORDER BY sentAt ASC) 
+                          ORDER BY sentAt ASC;`;
               }
+              
               const [rows, fields] = await connection.execute(query);
               connection.release();
           
