@@ -164,7 +164,7 @@ export async function GET(request,{params}) {
 
         // get the gcm_regIds of Students to notify
             // Split the branches string into an array
-            var query = 'SELECT u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo)  as mappedTo FROM user u where u.id="'+id+'" AND CHAR_LENGTH(u.gcm_regId) > 3';
+            var query = 'SELECT u.name, u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo)  as mappedTo FROM user u where u.id="'+id+'" AND CHAR_LENGTH(u.gcm_regId) > 3';
             const [nrows, nfields] = await connection.execute(query);
             
             console.log(query);
@@ -175,23 +175,27 @@ export async function GET(request,{params}) {
             for (let index = 0; index < nrows.length; index++) {
               const element = nrows[index].gcm_regId;
               const element1 = nrows[index].mappedTo;
+              const dealer_name = nrows[index].name;
             //   console.log(element)
               if(element.length > 3){
                 gcmIds.push(element); 
+                // send notification to the dealer
+                const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+id, element, 'Single');
               }
               if(element1.length > 3){
                 gcmIds.push(element1); 
+                // send notification to the executive
+                const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+dealer_name, element1, 'Single');
               }
             }
             // send the notification
-            const notificationResult = gcmIds.length > 0 ? await send_notification('Payment of ₹'+amount+' is updated', gcmIds, 'Multiple') : null;
             // const notificationResult = gcmIds.length > 0 ? await send_notification('Payment of ₹'+amount+' is updated for '+id, gcmIds, 'Multiple') : null;
                 
         // 5
         // Include in the chat history
         // create query for insert
         const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
-        const [rows, fields] = await connection.execute(q1, [ nrows[0].mapTo, id, paymentDate, decodeURIComponent('Payment of ₹'+amount+' is updated for '+id), 0, '-' ]);
+        const [rows, fields] = await connection.execute(q1, [ nrows[0].mapTo, id, paymentDate, decodeURIComponent('Payment of ₹'+amount+' is updated'), 0, '-' ]);
         connection.release();
 
         await connection.commit();
@@ -199,7 +203,7 @@ export async function GET(request,{params}) {
         await connection.rollback();
         throw error;
     } finally {
-        await connection.release();
+        connection.release();
     }
 }
 
