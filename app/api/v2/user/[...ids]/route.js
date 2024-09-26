@@ -788,6 +788,27 @@ export async function GET(request,{params}) {
             }
             
             
+            else if(params.ids[1] == 'U14'){
+                try {
+                    const [rows, fields] = await connection.execute('SELECT u.*, (SELECT name from user where id=u.mapTo ) as mapName from `user` u WHERE u.mobile = "'+params.ids[2]+'"');
+                    connection.release();
+                    // return successful update
+
+                    if(rows[0].role == 'Dealer' || rows[0].role == 'dealer'){
+                        let p = 'SELECT * from dealer WHERE dealerId ="'+rows[0].id+'"';
+                        // let p = 'SELECT d.*, (SELECT name from user where id="'+rows[0].mapTo+'" ) as mapName  from dealer WHERE dealerId ="'+rows[0].id+'"';
+                        const [drows, dfields] = await connection.execute(p);
+                        return Response.json({status: 200, message:'User found!', data: rows[0], data1: drows[0]}, {status: 200})
+                    }
+                    else {
+                        return Response.json({status: 200, message:'User found!', data: rows[0]}, {status: 200})
+                    }
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No user found!'}, {status: 200})
+                }
+            }
+            
+            
             //////////////////////
             // Student 360 feature
             //////////////////////
