@@ -51,7 +51,7 @@ export async function GET(request,{params}) {
           // is it a single operation of bulk from web
           if(params.ids[1] == 'mobile'){
             // apply payment to multiple invoices at a time
-            await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
+            await applyPayment(params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], paymentDate, params.ids[8], params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           if(params.ids[1] == 'websingle'){
@@ -113,7 +113,15 @@ export async function GET(request,{params}) {
         // 5. Include the notification in the chat history and SENT BY will be the respective executive.
 
         // 1
-        const [invoices] = await connection.query('SELECT invoiceNo, pending FROM invoices WHERE billTo = "'+id+'" AND pending > 0 ORDER BY invoiceDate ASC',[]);
+        var query1;
+        if(invoiceNo.length > 3){
+          query1 = 'SELECT invoiceNo, pending FROM invoices WHERE invoiceNo = "'+invoiceNo+'" AND pending > 0 ORDER BY invoiceDate ASC';
+          }
+        else{
+          query1 = 'SELECT invoiceNo, pending FROM invoices WHERE billTo = "'+id+'" AND pending > 0 ORDER BY invoiceDate ASC';
+        }
+
+        const [invoices] = await connection.query(query1,[]);
 
         // 2
         // collect the invoices list for updating in payments table
@@ -209,29 +217,29 @@ export async function GET(request,{params}) {
 
 
     // function to call the SMS API
-    async function sendSMS(type, name, number, date){
+    // async function sendSMS(type, name, number, date){
 
-        var query = '';
+    //     var query = '';
 
-        if(type == 'S3'){
-            query = "http://webprossms.webprosindia.com/submitsms.jsp?user=SVCEWB&key=c280f55d6bXX&mobile="+number+"&message=Dear Parent, your ward "+name+", has left the campus for outing at "+date+". SVECWB Hostels&senderid=SVECWB&accusage=1&entityid=1001168809218467265&tempid=1007626043853520503";
-        }
-        else if(type == 'S4'){
-            query = "http://webprossms.webprosindia.com/submitsms.jsp?user=SVCEWB&key=c280f55d6bXX&mobile="+number+"&message=Dear Parent, your ward "+name+" has returned to the campus from outing at "+date+". SVECWB Hostels&senderid=SVECWB&accusage=1&entityid=1001168809218467265&tempid=1007892539567152714";
-        }
-        else if(type == 'S4.5'){
-            query = "http://webprossms.webprosindia.com/submitsms.jsp?user=SVCEWB&key=c280f55d6bXX&mobile="+number+"&message=Dear Parent, your ward "+name+" has not returned to the campus after her outing from "+date+". SVECWB Hostels&senderid=SVECWB&accusage=1&entityid=1001168809218467265&tempid=1007149047352803219";
-        }
-        const result  = await fetch(query, {
-              method: "POST",
-              headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json",
-              },
-            });
-              const queryResult = await result.text() // get data
-            //   console.log(queryResult);
-      }
+    //     if(type == 'S3'){
+    //         query = "http://webprossms.webprosindia.com/submitsms.jsp?user=SVCEWB&key=c280f55d6bXX&mobile="+number+"&message=Dear Parent, your ward "+name+", has left the campus for outing at "+date+". SVECWB Hostels&senderid=SVECWB&accusage=1&entityid=1001168809218467265&tempid=1007626043853520503";
+    //     }
+    //     else if(type == 'S4'){
+    //         query = "http://webprossms.webprosindia.com/submitsms.jsp?user=SVCEWB&key=c280f55d6bXX&mobile="+number+"&message=Dear Parent, your ward "+name+" has returned to the campus from outing at "+date+". SVECWB Hostels&senderid=SVECWB&accusage=1&entityid=1001168809218467265&tempid=1007892539567152714";
+    //     }
+    //     else if(type == 'S4.5'){
+    //         query = "http://webprossms.webprosindia.com/submitsms.jsp?user=SVCEWB&key=c280f55d6bXX&mobile="+number+"&message=Dear Parent, your ward "+name+" has not returned to the campus after her outing from "+date+". SVECWB Hostels&senderid=SVECWB&accusage=1&entityid=1001168809218467265&tempid=1007149047352803219";
+    //     }
+    //     const result  = await fetch(query, {
+    //           method: "POST",
+    //           headers: {
+    //               "Content-Type": "application/json",
+    //               Accept: "application/json",
+    //           },
+    //         });
+    //           const queryResult = await result.text() // get data
+    //         //   console.log(queryResult);
+    //   }
   
   // send the notification using onesignal.
   // use the playerIds of the users.
