@@ -160,9 +160,8 @@ export async function GET(request,{params}) {
             // get dealer details of the dealer by id
             else if(params.ids[1] == 'U4'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * from dealer d LEFT JOIN user u ON d.dealerId = u.id WHERE d.dealerId = "'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('SELECT u.*,d.*, (SELECT name from user where id=u.mapTo ) as mapName from `user` u JOIN dealer d ON u.id=d.dealerId WHERE u.id = "'+params.ids[2]+'"');
                     connection.release();
-                    // return successful update
 
                     // check if user is found
                     if(rows.length > 0){
@@ -174,9 +173,32 @@ export async function GET(request,{params}) {
                         // user doesn't exist in the system
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
                     }
+                        
                 } catch (error) { // error updating
-                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                    return Response.json({status: 404, message:'No user found!'}, {status: 200})
                 }
+
+
+
+
+                // try {
+                //     const [rows, fields] = await connection.execute('SELECT * from dealer d LEFT JOIN user u ON d.dealerId = u.id WHERE d.dealerId = "'+params.ids[2]+'"');
+                //     connection.release();
+                //     // return successful update
+
+                //     // check if user is found
+                //     if(rows.length > 0){
+                //         // return the requests data
+                //         return Response.json({status: 200, data: rows[0], message:'Data found!'}, {status: 200})
+
+                //     }
+                //     else {
+                //         // user doesn't exist in the system
+                //         return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                //     }
+                // } catch (error) { // error updating
+                //     return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                // }
             }
             // get the dealers with pending amount for listing in web
             // getting all instead of limiting
