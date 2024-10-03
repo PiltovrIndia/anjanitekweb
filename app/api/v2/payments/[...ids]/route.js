@@ -55,10 +55,14 @@ export async function GET(request,{params}) {
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           if(params.ids[1] == 'websingle'){
-            const paymentDate1 = new Date(params.ids[6]);
+            const paymentDate1 = new Date(params.ids[7]);
+            console.log(params.ids[7]);
+            console.log(paymentDate1);
+            
             // apply payment to multiple invoices at a time
             // applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular)
-            await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[9], params.ids[5], paymentDate1, params.ids[7], params.ids[8]);
+            await applyPayment(params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], paymentDate, params.ids[8],params.ids[9]);
+            // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[9], decodeURIComponent(params.ids[5]), paymentDate1, params.ids[7], params.ids[8]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           else {
@@ -71,7 +75,7 @@ export async function GET(request,{params}) {
             
             items.forEach(async (item, index) => {
               console.log(`Item ${index}:`, item);
-              await applyPayment(item.gst, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+              await applyPayment(item.gst, item.amount, item.type, item.invoiceNo, item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
             });
 
             // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
@@ -165,6 +169,8 @@ export async function GET(request,{params}) {
             bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
         }
         const q = 'INSERT INTO payments (amount, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+        console.log(q);
+        
         const [payments] = await connection.query(q,[amount, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
 
         // 4

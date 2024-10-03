@@ -141,7 +141,8 @@ const sendDealerMessage = async (pass, sender, receiver, sentAt, message, seen, 
 // update the amount for a dealer
 const sendPaymentUpdate = async (pass, dealer, amount, invoiceNo, transaction, date, adminId, message) => 
   
-    fetch("/api/v2/payments/"+pass+"/websingle/"+dealer+"/"+amount+"/credit/"+transaction+"/"+date+"/"+adminId+"/"+message+"/"+JSON.stringify(invoiceNo), {
+    fetch("/api/v2/payments/"+pass+"/websingle/"+dealer+"/"+amount+"/credit/"+encodeURIComponent(invoiceNo)+"/"+transaction+"/"+date+"/"+adminId+"/"+message, {
+    // fetch("/api/v2/payments/"+pass+"/websingle/"+dealer+"/"+amount+"/credit/"+transaction+"/"+date+"/"+adminId+"/"+message+"/"+JSON.stringify(invoiceNo), {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -706,7 +707,7 @@ const sendMessageNow = async (e) => {
         // receiver is always the dealer
         
         try {    
-            console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/mobile/"+selectedDealer+"/"+amountToUpdate+"/credit/"+invoiceNo+"/"+transactionId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
+            console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/websingle/"+selectedDealer+"/"+amountToUpdate+"/credit/"+encodeURIComponent(invoiceNo)+"/"+transactionId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
             const result  = await sendPaymentUpdate(process.env.NEXT_PUBLIC_API_PASS, selectedDealer, amountToUpdate, invoiceNo, transactionId, dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-');
         
             const queryResult = await result.json() // get data
@@ -1311,12 +1312,13 @@ const sendMessageNow = async (e) => {
                 </div>
                 
                     
-                    {/* <div className="grid w-full items-center gap-4"> */}
+                    
                         {searchingMessages ? <Skeleton className="h-4 w-[300px] h-[100px]" /> :
                             <div className="flex flex-col flex-auto overflow-scroll justify-stretch gap-2">
                             {senderMessagesList.length > 0 ?
                             senderMessagesList.map((message, index) => (
-                                <div key={index} className="w-fit flex flex-col rounded-md border p-2" style={(message.sender==JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id) ? {alignSelf:'self-end'} : {alignSelf:'self-start'}} ref={index === senderMessagesList.length - 1 ? lastItemRef : null}>
+                                // <div key={index} className="w-fit flex flex-col rounded-md border p-2" style={(message.sender==JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id) ? {alignSelf:'self-end'} : {alignSelf:'self-start'}} ref={index === senderMessagesList.length - 1 ? lastItemRef : null}>
+                                <div key={index} className="w-fit flex flex-col rounded-md border p-2" style={(message.sender==selectedDealer) ? {alignSelf:'self-start'} : {alignSelf:'self-end'}} ref={index === senderMessagesList.length - 1 ? lastItemRef : null}>
                                     <Label className="p-1">{message.message}</Label>
                                     {/* <Label className="text-gray-500 p-1">{message.sender}</Label> */}
                                     <p className="text-xs text-gray-500 p-1">{dayjs(message.sentAt).format('MMMM D, YYYY h:mm A')}</p>

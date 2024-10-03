@@ -158,12 +158,19 @@ export async function GET(request,{params}) {
               }
               else { // this fetches all the messages along with broadcasted ones in sequential order
                 query = `(SELECT n.*,u.name as receiverName FROM notifications n JOIN user u ON n.receiver=u.id 
-                          WHERE (n.sender IN ("`+params.ids[2]+`", "`+params.ids[3]+`") AND n.receiver = "`+params.ids[3]+`" ) 
-                          OR (n.receiver IN ("`+params.ids[2]+`", "`+params.ids[3]+`") AND n.sender = "`+params.ids[3]+`") 
+                          WHERE n.sender IN ("`+params.ids[2]+`", "`+params.ids[3]+`") 
+                          OR n.receiver IN ("`+params.ids[2]+`", "`+params.ids[3]+`") 
                           ORDER BY n.sentAt ASC)
                           UNION ALL 
                           (SELECT *,'All' as receiverName FROM notifications where receiver = "All" ORDER BY sentAt ASC) 
                           ORDER BY sentAt ASC;`;
+                // query = `(SELECT n.*,u.name as receiverName FROM notifications n JOIN user u ON n.receiver=u.id 
+                //           WHERE (n.sender IN ("`+params.ids[2]+`", "`+params.ids[3]+`") AND n.receiver = "`+params.ids[3]+`" ) 
+                //           OR (n.receiver IN ("`+params.ids[2]+`", "`+params.ids[3]+`") AND n.sender = "`+params.ids[3]+`") 
+                //           ORDER BY n.sentAt ASC)
+                //           UNION ALL 
+                //           (SELECT *,'All' as receiverName FROM notifications where receiver = "All" ORDER BY sentAt ASC) 
+                //           ORDER BY sentAt ASC;`;
               }
               
               const [rows, fields] = await connection.execute(query);
