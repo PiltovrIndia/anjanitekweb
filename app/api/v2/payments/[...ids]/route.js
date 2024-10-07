@@ -55,14 +55,15 @@ export async function GET(request,{params}) {
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           if(params.ids[1] == 'websingle'){
-            const paymentDate1 = new Date(params.ids[7]);
-            console.log(params.ids[7]);
-            console.log(paymentDate1);
-            
             // apply payment to multiple invoices at a time
             // applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular)
             await applyPayment(params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], paymentDate, params.ids[8],params.ids[9]);
-            // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[9], decodeURIComponent(params.ids[5]), paymentDate1, params.ids[7], params.ids[8]);
+            return Response.json({status: 200, message:'Success!'}, {status: 200})
+          }
+          if(params.ids[1] == 'webbulk'){
+            // apply payment to multiple SELECTED invoices at a time
+            // applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular)
+            await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], JSON.parse(decodeURIComponent(params.ids[5])), decodeURIComponent(params.ids[6]), new Date(params.ids[7]), params.ids[8],params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           else {
@@ -93,6 +94,107 @@ export async function GET(request,{params}) {
         
     }
   }
+
+
+  // apply payment to SELECTED invoices one by one
+  // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
+  async function applyPaymentToSelectedInvoices(id, paymentAmount, type, invoicesList, transactionId, paymentDate, adminId, particular) {
+    
+    var amount = paymentAmount;
+
+    // get the pool connection to db
+    const connection = await pool.getConnection(); 
+
+    try {
+        await connection.beginTransaction();
+        
+        // 1. get the selected invoices provided
+        // 2. update the invoices table with pending amount for the selected invoices
+        // 3. update the payments table with the transaction of selected invoices
+        // 4. Send notification to Dealer(s)
+        // 5. Include the notification in the chat history and SENT BY will be the respective executive.
+
+        // 2
+        // collect the invoices list for updating in payments table
+        var invcs = '';
+
+        invoicesList.forEach(async (invoice, index) => {
+          console.log(`Item ${index}:`, invoice.invoiceNo);
+          
+          invcs = invcs + invoice.invoiceNo + ","; // get the invoice which is getting updated
+          
+          await connection.query(
+                `UPDATE invoices SET 
+                    amountPaid = amountPaid + ?, 
+                    pending = pending - ?,
+                    status = ?
+                    WHERE invoiceNo = ?`,
+                [invoice.appliedAmount, invoice.appliedAmount, invoice.status, invoice.invoiceNo]
+            );
+            
+            // if(paymentAmount > 0)  invcs += ','; // add , for next invoice in the list
+            // invcs += ',';
+
+        });
+
+        // 3
+        const [balance] = await connection.query('SELECT balance FROM payments WHERE id = "'+id+'" ORDER BY paymentDate DESC LIMIT 1',[]);
+        
+        var bal = 0;
+        if(type == 'credit' && balance.length > 0){
+            bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) - parseFloat(amount);
+        }
+        else {
+            bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
+        }
+        
+        const q = 'INSERT INTO payments (amount, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+        const [payments] = await connection.query(q,[amount, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
+
+        // 4
+        // send notification to Dealer(s)
+
+        // get the gcm_regIds of Students to notify
+            // Split the branches string into an array
+            var query = 'SELECT u.name, u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo)  as mappedTo FROM user u where u.id="'+id+'"';
+            const [nrows, nfields] = await connection.execute(query);
+            
+            // get the gcm_regIds list from the query result
+            var gcmIds = [];
+            for (let index = 0; index < nrows.length; index++) {
+              const element = nrows[index].gcm_regId;
+              const element1 = nrows[index].mappedTo;
+              const dealer_name = nrows[index].name;
+              
+              if(element.length > 3){
+                gcmIds.push(element); 
+                // send notification to the dealer
+                const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+id, element, 'Single');
+              }
+              if(element1.length > 3){
+                gcmIds.push(element1); 
+                // send notification to the executive
+                const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+dealer_name, element1, 'Single');
+              }
+            }
+            // send the notification
+            // const notificationResult = gcmIds.length > 0 ? await send_notification('Payment of ₹'+amount+' is updated for '+id, gcmIds, 'Multiple') : null;
+                
+        // 5
+        // Include in the chat history
+        // create query for insert
+        const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
+        const [rows, fields] = await connection.execute(q1, [ nrows[0].mapTo, id, paymentDate, decodeURIComponent('Payment of ₹'+amount+' is updated'), 0, '-' ]);
+        connection.release();
+
+        await connection.commit();
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
 
 
   // apply payment to the invoices one by one
@@ -181,8 +283,8 @@ export async function GET(request,{params}) {
             var query = 'SELECT u.name, u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo)  as mappedTo FROM user u where u.id="'+id+'" AND CHAR_LENGTH(u.gcm_regId) > 3';
             const [nrows, nfields] = await connection.execute(query);
             
-            console.log(query);
-            console.log(nrows);
+            // console.log(query);
+            // console.log(nrows);
             
             // get the gcm_regIds list from the query result
             var gcmIds = [];
@@ -222,30 +324,11 @@ export async function GET(request,{params}) {
 }
 
 
-    // function to call the SMS API
-    // async function sendSMS(type, name, number, date){
 
-    //     var query = '';
 
-    //     if(type == 'S3'){
-    //         query = "http://webprossms.webprosindia.com/submitsms.jsp?user=SVCEWB&key=c280f55d6bXX&mobile="+number+"&message=Dear Parent, your ward "+name+", has left the campus for outing at "+date+". SVECWB Hostels&senderid=SVECWB&accusage=1&entityid=1001168809218467265&tempid=1007626043853520503";
-    //     }
-    //     else if(type == 'S4'){
-    //         query = "http://webprossms.webprosindia.com/submitsms.jsp?user=SVCEWB&key=c280f55d6bXX&mobile="+number+"&message=Dear Parent, your ward "+name+" has returned to the campus from outing at "+date+". SVECWB Hostels&senderid=SVECWB&accusage=1&entityid=1001168809218467265&tempid=1007892539567152714";
-    //     }
-    //     else if(type == 'S4.5'){
-    //         query = "http://webprossms.webprosindia.com/submitsms.jsp?user=SVCEWB&key=c280f55d6bXX&mobile="+number+"&message=Dear Parent, your ward "+name+" has not returned to the campus after her outing from "+date+". SVECWB Hostels&senderid=SVECWB&accusage=1&entityid=1001168809218467265&tempid=1007149047352803219";
-    //     }
-    //     const result  = await fetch(query, {
-    //           method: "POST",
-    //           headers: {
-    //               "Content-Type": "application/json",
-    //               Accept: "application/json",
-    //           },
-    //         });
-    //           const queryResult = await result.text() // get data
-    //         //   console.log(queryResult);
-    //   }
+
+
+
   
   // send the notification using onesignal.
   // use the playerIds of the users.

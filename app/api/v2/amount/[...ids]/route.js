@@ -197,7 +197,7 @@ export async function GET(request,{params}) {
     
                 return Response.json({status: 200, data: rows, message:'Details found!'}, {status: 200})
             }
-            else if(params.ids[1] == 'U6'){ // get all invoices of dealers assigned to a list of executives
+            else if(params.ids[1] == 'U6'){ // get all invoices of dealers assigned to a list of executives that are unpaid
             
                 if(params.ids[2] == 'SuperAdmin'){
                     const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where status!="Paid" ORDER BY expiryDate ASC`);
@@ -296,6 +296,20 @@ export async function GET(request,{params}) {
                     }
                     else {
 
+                        connection.release();
+                        return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                    }
+                }
+                else if(params.ids[2] == 'Dealer'){
+                    
+                    // get the list of dealers mapped to each executive
+                    const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where billTo = "`+params.ids[3]+`" and status!="Paid" ORDER BY invoiceDate ASC`);
+                    connection.release();
+                    
+                    if(rows2.length > 0){
+                        return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                    }
+                    else {
                         connection.release();
                         return Response.json({status: 404, message:'No Data found!'}, {status: 200})
                     }

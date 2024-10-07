@@ -34,6 +34,7 @@ export async function GET(request,{params}) {
                     // create query for insert
                     const q = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
                     // create new notification
+                    // const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], params.ids[7] ]);
                     const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], params.ids[7] ]);
                     
 
@@ -49,9 +50,15 @@ export async function GET(request,{params}) {
                         }
                         else {
                             // conditionsString = conditionsString + ' role="dealer" ';
-                            query = 'SELECT u.gcm_regId from user u JOIN dealer d where d.dealerId=u.id AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
+                            // check if state is provided?
+                            if(params.ids[7] == '-'){
+                              query = 'SELECT gcm_regId from user where role="Dealer" AND CHAR_LENGTH(gcm_regId) > 3'
+                            }
+                            else {
+                              query = 'SELECT u.gcm_regId from user u JOIN dealer d where d.dealerId=u.id AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
+                            }
                         }
-                        // console.log(query);
+                        console.log(query);
                         
                         // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
                         const [nrows, nfields] = await connection.execute(query);
@@ -68,17 +75,21 @@ export async function GET(request,{params}) {
                         }
 
                         // var gcmIds = 
-                        // console.log(gcmIds);
+                        console.log(gcmIds);
 
                         // send the notification
                         var notificationResult;
                           if(gcmIds.length > 1){ 
-                            notificationResult = await send_notification(params.ids[5], gcmIds, 'Multiple');
+                            console.log('Multiple');
+                            
+                            notificationResult = await send_notification(decodeURIComponent(params.ids[5]), gcmIds, 'Multiple');
                           }
                           else if(gcmIds.length == 1){ 
-                            notificationResult = await send_notification(params.ids[5], gcmIds[0], 'Single');
+                            console.log('Single');
+                            notificationResult = await send_notification(decodeURIComponent(params.ids[5]), gcmIds[0], 'Single');
                           }
                           else {
+                            console.log('Null');
                             notificationResult = null;
                           }
                         
@@ -158,12 +169,21 @@ export async function GET(request,{params}) {
               }
               else { // this fetches all the messages along with broadcasted ones in sequential order
                 query = `(SELECT n.*,u.name as receiverName FROM notifications n JOIN user u ON n.receiver=u.id 
-                          WHERE n.sender IN ("`+params.ids[2]+`", "`+params.ids[3]+`") 
-                          OR n.receiver IN ("`+params.ids[2]+`", "`+params.ids[3]+`") 
+                          WHERE n.sender IN ("`+params.ids[3]+`") 
+                          OR n.receiver IN ("`+params.ids[3]+`") 
                           ORDER BY n.sentAt ASC)
                           UNION ALL 
                           (SELECT *,'All' as receiverName FROM notifications where receiver = "All" ORDER BY sentAt ASC) 
                           ORDER BY sentAt ASC;`;
+
+                // query = `(SELECT n.*,u.name as receiverName FROM notifications n JOIN user u ON n.receiver=u.id 
+                //           WHERE n.sender IN ("`+params.ids[2]+`", "`+params.ids[3]+`") 
+                //           OR n.receiver IN ("`+params.ids[2]+`", "`+params.ids[3]+`") 
+                //           ORDER BY n.sentAt ASC)
+                //           UNION ALL 
+                //           (SELECT *,'All' as receiverName FROM notifications where receiver = "All" ORDER BY sentAt ASC) 
+                //           ORDER BY sentAt ASC;`;
+
                 // query = `(SELECT n.*,u.name as receiverName FROM notifications n JOIN user u ON n.receiver=u.id 
                 //           WHERE (n.sender IN ("`+params.ids[2]+`", "`+params.ids[3]+`") AND n.receiver = "`+params.ids[3]+`" ) 
                 //           OR (n.receiver IN ("`+params.ids[2]+`", "`+params.ids[3]+`") AND n.sender = "`+params.ids[3]+`") 
@@ -266,7 +286,7 @@ export async function GET(request,{params}) {
             contents: {
               'en': message,
             },
-            include_external_user_ids: playerIds,
+            include_external_user_ids: playerId,
           };
         }
   

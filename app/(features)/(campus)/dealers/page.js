@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus } from 'phosphor-react'
+import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, CheckCircle } from 'phosphor-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
@@ -99,6 +99,28 @@ fetch("/api/v2/user/"+pass+"/U6/"+role+"/"+id, {
     },
 });
 
+// get the invoices of selected dealer
+const getAllInvoicesDataForSelectedAPI = async (pass, selectedDealerId) => 
+    
+fetch("/api/v2/amount/"+pass+"/U6/Dealer/"+selectedDealerId, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// update invoices of selected dealer
+const updateInvoicesDataForSelectedAPI = async (pass, selectedDealerId, amount, invoicesList, transactionId, paymentDate, adminId, particular) => 
+    // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
+fetch("/api/v2/payments/"+pass+"/webbulk/"+selectedDealerId+"/"+amount+"/credit/"+encodeURIComponent(JSON.stringify(invoicesList))+"/"+transactionId+"/"+paymentDate+"/"+adminId+"/"+particular, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
 
 // get the SalesManagers for SalesExecutives
 const getAllSalesPersonsDataAPI = async (pass, role, offset) => 
@@ -147,6 +169,8 @@ export default function Outing() {
     const [updatingPerson, setupdatingPerson] = useState(false);
     const [searching, setSearching] = useState(true);
     const [searchingSales, setSearchingSales] = useState(false);
+    const [searchingInvoices, setSearchingInvoices] = useState(false);
+    const [updatingInvoices, setUpdatingInvoices] = useState(false);
     const [loadingIds, setLoadingIds] = useState(new Set());
     
     // branch type selection whether all branches and years or specific ones
@@ -165,7 +189,17 @@ export default function Outing() {
     const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
     const [initialDatesValues, setInititalDates] = React.useState({from: dayjs().subtract(0,'day'),to: dayjs(),});
-    // const [currentStatus, setCurrentStatus] = useState('All');
+    const [searchQuery, setSearchQuery] = useState(''); // State for search input
+    const [selectedDealer, setSelectedDealer] = useState(null); // State to store selected dealer
+    const [open, setOpen] = useState(false); // State to control sheet open/close
+    
+    const [dealerInvoices, setDealerInvoices] = useState([]); // all invoices of dealer sorted
+    const [sortedInvoices, setSortedInvoices] = useState([]); // 
+    const [dealerPending, setDealerPending] = useState(0); // amount entered by admin for update
+    const [updatedInvoices, setUpdatedInvoices] = useState([]);   // get updated invoices list
+    const [totalCredit, setTotalCredit] = useState(0);
+    const [remainingCredit, setRemainingCredit] = useState(0);
+  
     const [currentStatus, setCurrentStatus] = useState('InOuting');
     //create new date object
     const today = new dayjs();
@@ -262,6 +296,15 @@ export default function Outing() {
             getAllDealers(initialDatesValues.from,initialDatesValues.to);
         }
     }, [user, completed]);
+
+    // useEffect(() => {
+    //     console.log("Updated");
+        
+    //     // Sort dealerInvoices by invoiceDate in ascending order
+    //     // const sorted = [...dealerInvoices].sort((a, b) => new Date(a.invoiceDate) - new Date(b.invoiceDate));
+    //     // // Set sorted invoices to state
+    //     // setSortedInvoices(sorted);
+    //   }, [dealerInvoices]);
 
 
 
@@ -735,8 +778,297 @@ const sendMessageNow = async (e) => {
     }
     
 }
-  
+
+
+
+    // Get all invoices of selected dealer
+    async function getInvoicesOfSelectedDealer(dealerId){
+        
+        setSearchingInvoices(true);
+
+        try {    
+            
+            const result  = await getAllInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId) 
+            const queryResult = await result.json() // get data
+
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                // check if data exits
+                if(queryResult.data.length > 0){
+                    
+                    // Sort dealerInvoices by invoiceDate in ascending order
+                    const sortedInvoices = queryResult.data.sort((a, b) => new Date(a.invoiceDate) - new Date(b.invoiceDate));
+                    setSortedInvoices(sortedInvoices);
+                    
+                    var pendingCount = 0
+                    // add the variable into each object of the list
+                    const updatedList = sortedInvoices.map(invoice => {
+                        pendingCount += parseFloat(invoice.pending); 
+                        return { ...invoice, appliedAmount: 0, remaining: invoice.pending };
+                    });
+                    setDealerInvoices(updatedList);
+                    setDealerPending(pendingCount);
+
+                }
+                else {
+                    setSortedInvoices([]);
+                    setDealerInvoices([]);
+                }
+
+                setSearchingInvoices(false);
+            }
+            else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                setSortedInvoices([]);
+                setDealerInvoices([]);
+                setSearchingInvoices(false);
+            }
+            else if(queryResult.status == 404) {
+                setSortedInvoices([]);
+                setDealerInvoices([]);
+                setSearchingInvoices(false);
+
+                toast({
+                    description: "No more..",
+                  })
+                  
+                
+            }
+        }
+        catch (e){
+            
+            toast({ description: "Issue loading. Please refresh or try again later!", })
+        }
+    }
+
+
+    // Update selected invoices of selected dealer
+    async function updateInvoices(dealerId){
+        
+        const invoicesWithAppliedAmount = dealerInvoices.filter(invoice => invoice.appliedAmount > 0);
+        
+        // check if atleast 1 invoice is selected.
+        if(invoicesWithAppliedAmount.length > 0){
+            setUpdatingInvoices(true);
+
+
+            try {    
+                console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
+                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
+                const queryResult = await result.json() // get data
+
+                console.log(queryResult);
+                // check for the status
+                if(queryResult.status == 200){
+
+                        
+                    // reset the numbers to 0
+                    setRemainingCredit(0);
+                    setTotalCredit(0);
+
+                    // get the new invoices after updating
+                    getInvoicesOfSelectedDealer(dealerId);
+
+                    setUpdatingInvoices(false);
+                    
+                }
+                else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                    setDealerInvoices([]);
+                    setUpdatingInvoices(false);
+                    
+                }
+                else if(queryResult.status == 404) {
+                    setDealerInvoices([]);
+                    toast({
+                        description: "No more",
+                    })
+                    
+                    setUpdatingInvoices(false);
+                    
+                }
+            }
+            catch (e){
+                
+                toast({ description: "Issue loading. Please refresh or try again later!", })
+            }
+        }
+        else {
+            toast({ description: "Add credit and select invoice", })
+        }
+    }
+
+
+  // Function to handle search input change
+  const handleSearchChange = (e) => {
+    const query = e.target.value.toLowerCase();
+    setSearchQuery(query);
+
+    // Filter the dealers based on the search query
+    const filtered = allDealers.filter(dealer => dealer.accountName.toLowerCase().includes(query) );
+
+    setAllDealersFiltered(filtered); // Update the filtered dealers list
+  };
+
+  // Function to handle row click and open the sheet
+  const handleRowClick = (dealer) => {
+    setSelectedDealer(dealer); // Set the selected dealer
+    setOpen(true); // Open the sheet
     
+    setDealerPending(0);
+    setRemainingCredit(0);
+    setTotalCredit(0);
+
+    // make the API call to get the invoices.
+    getInvoicesOfSelectedDealer(dealer.id);
+  };
+  
+
+  // Function to handle closing the sheet and resetting selectedDealer
+  const handleSheetOpenChange = (open) => {
+    if(!open){
+        
+        setRemainingCredit(0);
+        setTotalCredit(0);
+        // setSelectedDealer(null); // Reset the selected dealer
+        setOpen(open); // Close the sheet    
+    }
+  };
+
+  // Function to handle the application of the credit amount
+  const handleCreditAmountChange = (e) => {
+    
+    const updatedList = sortedInvoices.map(invoice => {
+        return { ...invoice, appliedAmount: 0, remaining: invoice.pending };
+    });
+    setDealerInvoices(updatedList);
+    
+    let remainingAmount = parseFloat(e.target.value) || 0;
+    setRemainingCredit(remainingAmount);
+    setTotalCredit(remainingAmount);
+
+  };
+  
+
+  // Function to handle the "Select" action for each invoice
+//   const handleSelect = (invoiceNo) => {
+
+//     // setDealerInvoices((prevInvoices) => {
+//     var prevInvoices = dealerInvoices;
+//       prevInvoices = prevInvoices.map((invoice) => {
+//         if (invoice.invoiceNo === invoiceNo && remainingCredit > 0 && invoice.appliedAmount === 0) {
+            
+//           const applyAmount = Math.min(invoice.pending, remainingCredit);
+//           console.log("Amount applying: "+applyAmount);
+//           console.log("Remaining: "+ (remainingCredit-applyAmount));
+//           setRemainingCredit((prev) => prev - applyAmount);
+          
+//           return {
+//             ...invoice,
+//             appliedAmount: applyAmount,
+//             remaining: invoice.pending - applyAmount,
+//             status: (invoice.pending - applyAmount) == 0 ? 'Paid' : 'PartialPaid'
+//           };
+//         }
+//         return invoice;
+//       });
+//     // });
+
+//     setDealerInvoices(prevInvoices);
+//   };
+
+//   // Function to handle the "Unselect" action for each invoice
+//   const handleUnselect = (invoiceNo) => {
+    
+//     // setDealerInvoices((prevInvoices) => {
+//         var prevInvoices = dealerInvoices;
+//       prevInvoices = prevInvoices.map((invoice) => {
+//         if (invoice.invoiceNo === invoiceNo && invoice.appliedAmount > 0) {
+            
+//             console.log("Amount applying: "+invoice.appliedAmount);
+//             console.log("Remaining: "+ (remainingCredit+invoice.appliedAmount));
+//             setRemainingCredit((prev) => prev + invoice.appliedAmount);
+          
+//           return {
+//             ...invoice,
+//             appliedAmount: 0,
+//             remaining: invoice.pending,
+//             status: invoice.amountPaid > 0 ? 'PartialPaid' : 'NotPaid'
+//           };
+//         }
+//         return invoice;
+//       });
+//     // });
+
+//     setDealerInvoices(prevInvoices);
+//   };
+
+  // Function to handle the "Unselect" action for each invoice
+  const handleSelection = (invoiceItem) => {
+    // if(remainingCredit <= 0){
+    //     // don't do anything
+    // }
+    // else {
+
+        if(invoiceItem.appliedAmount > 0){
+            
+            var prevInvoices = dealerInvoices;
+            prevInvoices = prevInvoices.map((invoice) => {
+            if (invoice.invoiceNo === invoiceItem.invoiceNo && invoice.appliedAmount > 0) {
+                
+                console.log("Amount applying: "+invoice.appliedAmount);
+                console.log("Remaining: "+ (remainingCredit+invoice.appliedAmount));
+                setRemainingCredit((prev) => prev + invoice.appliedAmount);
+                
+                return {
+                ...invoice,
+                appliedAmount: 0,
+                remaining: invoice.pending,
+                status: invoice.amountPaid > 0 ? 'PartialPaid' : 'NotPaid'
+                };
+            }
+            return invoice;
+            });
+
+            setDealerInvoices(prevInvoices);
+        }
+        else {
+            var prevInvoices = dealerInvoices;
+            prevInvoices = prevInvoices.map((invoice) => {
+                if (invoice.invoiceNo === invoiceItem.invoiceNo && remainingCredit > 0 && invoice.appliedAmount === 0) {
+                    
+                const applyAmount = Math.min(invoice.pending, remainingCredit);
+                console.log("Amount applying: "+applyAmount);
+                console.log("Remaining: "+ (remainingCredit-applyAmount));
+                setRemainingCredit((prev) => prev - applyAmount);
+                
+                return {
+                    ...invoice,
+                    appliedAmount: applyAmount,
+                    remaining: invoice.pending - applyAmount,
+                    status: (invoice.pending - applyAmount) == 0 ? 'Paid' : 'PartialPaid'
+                };
+                }
+                return invoice;
+            });
+
+            setDealerInvoices(prevInvoices);
+        }
+    // }
+    
+  };
+
+
+  // Function to handle closing the sheet and resetting selectedDealer
+  const handleSheetClose = () => {
+    
+    setRemainingCredit(0);
+    setTotalCredit(0);
+    setSelectedDealer(null); // Reset the selected dealer
+    setOpen(false); // Close the sheet
+  };
+  
+
   return (
     
         // <div className={styles.verticalsection} style={{height:'100vh',gap:'16px'}}>
@@ -959,32 +1291,48 @@ const sendMessageNow = async (e) => {
 {/* <div className="container mx-auto py-10"> */}
 
 <div className='flex flex-row justify-between items-center mb-2'>
-    <div className='pb-2 text-slate-700 font-semibold'>{allDealers.length} Dealers in total</div>
     
-    {(selectedState == 'All') ?
-    <div className='pb-2 text-slate-700 font-semibold'></div>
-    : <div className='pb-2 text-green-700 font-semibold'>{allDealersFiltered.length} Dealers in {selectedState.split('-')[1]}</div>
-    }
-    {allStates.length == 0 ?
-        <div className="flex flex-row m-12">    
-            <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-            <p className={`${inter.className} ${styles.text3}`}>Loading sales persons...</p> 
-        </div>
-        :
-        // setSelectedMapToPerson(e.target.value)
-        <Select defaultValue={selectedState} onValueChange={(e)=>filterByStates(e)} >
-            <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by state" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectGroup>
-                {/* <SelectLabel>All</SelectLabel> */}
-                {allStates.map((row) => (
-                <SelectItem key={row} value={row} >{row}</SelectItem>))}
-                </SelectGroup>
-            </SelectContent>
-        </Select>
-    }
+    
+    <div className='flex flex-row gap-4 items-center'>
+        <Input
+            type="text"
+            placeholder="Search dealers..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="my-4 w-[300px]" // You can adjust width and margin as needed
+        />
+
+        <div className='pb-2 text-slate-700 font-semibold'>{allDealers.length} Dealers in total</div>
+    </div>
+    
+    <div className='flex flex-row gap-4 items-center'>
+
+        {/* {(selectedState == 'All') ?
+            <div className='pb-2 text-slate-700 font-semibold'></div>
+            : <div className='pb-2 text-green-700 font-semibold'>{allDealersFiltered.length} Dealers in {selectedState.split('-')[1]}</div>
+        }
+         */}
+        {allStates.length == 0 ?
+            <div className="flex flex-row m-12">    
+                <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+            </div>
+            :
+            // setSelectedMapToPerson(e.target.value)
+            <Select defaultValue={selectedState} onValueChange={(e)=>filterByStates(e)} >
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by state" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectGroup>
+                    {/* <SelectLabel>All</SelectLabel> */}
+                    {allStates.map((row) => (
+                    <SelectItem key={row} value={row} >{row}</SelectItem>))}
+                    </SelectGroup>
+                </SelectContent>
+            </Select>
+        }
+    </div>
 </div>
 
 <Card>
@@ -998,8 +1346,9 @@ const sendMessageNow = async (e) => {
             </TableRow>
         </TableHeader>
         <TableBody>
-            {allDealersFiltered.map((row) => (
-                <TableRow key={row.id}>
+        {allDealersFiltered.length > 0 ? 
+            allDealersFiltered.map((row) => (
+                <TableRow key={row.id} className='cursor-pointer' onClick={() => handleRowClick(row)}>
                     <TableCell className="py-2">{row.accountName}<br/>
                         <p className="text-muted-foreground">
                             {row.id} 
@@ -1083,12 +1432,125 @@ const sendMessageNow = async (e) => {
                         }
                     </TableCell>
                 </TableRow>
-            ))}
+            ))
+        : 
+        <TableRow>
+            <TableCell colSpan="2">No data found</TableCell>
+        </TableRow>
+    }
         </TableBody>
     </Table>
 </Card>
-      {/* <DataTable data={allDealers} dataOffset={offset} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset} loadingIds={loadingIds} handleMessageSendClick={handleMessageSendClick}/> */}
-      {/* <DataTable columns={columns} data={allDealers} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset}/> */}
+
+{/* Sheet to show selected dealer details */}
+{selectedDealer && (
+        <Sheet open={open}>
+            
+          <SheetContent className='flex flex-col min-w-[800px]'>
+            
+            <div className="flex-none justify-between items-center mb-2">
+              <h2 className="text-lg font-bold">{selectedDealer.accountName}</h2>
+              <p className='text-muted-foreground'>{selectedDealer.city}, {selectedDealer.state}</p>
+            </div>
+            
+            <div className="flex flex-row items-end justify-between mb-2">
+                <div className="flex flex-row items-end gap-2 mb-2">
+                    <div className="flex flex-col items-start gap-2">
+                        <Label htmlFor="amount" className="text-right">
+                        Enter credit amount:
+                        </Label>
+                        <Input type="number" id="creditAmount" value={totalCredit} onChange={handleCreditAmountChange} className="col-span-3 text-black" placeholder="Enter amount" />
+                    </div>
+                    <p className='text-blue-600'>Remaining: {remainingCredit}</p>
+                </div>
+                
+                <div className="flex flex-col items-end gap-2 mb-2">
+                    <p className='text-black'>Total Outstanding: {dealerPending}</p>
+                    {totalCredit > 0 ? <p className='text-blue-600'>New Outstanding: {dealerPending-totalCredit}</p> : ''}
+                </div>
+            </div>
+            
+            {searchingInvoices ?
+            <div className={styles.horizontalsection}>
+                <SpinnerGap className={`${styles.icon} ${styles.load}`} />
+                <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+            </div>
+            :
+            // updatingInvoices ?
+            //     <div className={styles.horizontalsection}>
+            //         <SpinnerGap className={`${styles.icon} ${styles.load}`} />
+            //         <p className={`${inter.className} ${styles.text3}`}>Updating ...</p> 
+            //     </div>
+            //     :
+            <Card className='flex-1 overflow-auto scroll-smooth'>
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        <TableHead> </TableHead>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Invoice date</TableHead>
+                        <TableHead>Invoice Amount</TableHead>
+                        <TableHead>Pending</TableHead>
+                        <TableHead>Balance</TableHead>
+                        
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {dealerInvoices.length > 0 ? (
+                        dealerInvoices.map((item) => (
+                        <TableRow key={item.invoiceNo} className={(item.appliedAmount > 0) ? "cursor-pointer bg-blue-50" : "cursor-pointer"} onClick={() => handleSelection(item)}>
+                            <TableCell>
+                            {item.appliedAmount > 0 ? 
+                                <CheckCircle size={24} weight='fill' className="text-blue-600"/> 
+                                : <CheckCircle size={24} weight='regular' className="text-slate-400"/> }
+                            </TableCell>
+                            <TableCell>{item.invoiceNo} {item.invoiceType}</TableCell>
+                            <TableCell>{dayjs(item.invoiceDate).format("DD/MM/YY")}</TableCell>
+                            <TableCell>{item.totalAmount}</TableCell>
+                            <TableCell className='flex flex-row items-center py-2'> 
+                                <div>{item.pending}</div> 
+                                {(item.appliedAmount > 0) ? <div className='text-red-600'> - {item.appliedAmount}</div> : ''}
+                            </TableCell>
+                            <TableCell className={(item.appliedAmount > 0) ? 'text-blue-600 font-semibold' : 'text-black'}>{item.remaining}</TableCell>
+                            
+                            {/* <TableCell>
+                                {item.appliedAmount > 0 ? (
+                                <button
+                                    onClick={() => handleUnselect(item.invoiceNo)}
+                                    className="bg-red-500 text-white px-2 py-1 rounded"
+                                >
+                                    Unselect
+                                </button>
+                                ) : (
+                                <button
+                                    onClick={() => handleSelect(item.invoiceNo)}
+                                    className="bg-green-500 text-white px-2 py-1 rounded"
+                                    disabled={remainingCredit <= 0}
+                                >
+                                    Select
+                                </button>
+                                )}
+                            </TableCell> */}
+                        </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                        <TableCell colSpan="2">No data found</TableCell>
+                        </TableRow>
+                    )}
+                    </TableBody>
+                </Table>
+            </Card>
+                
+              
+            }
+            <div className='flex flex-row gap-4'>
+                        <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
+                        <Button variant="secondary" onClick={handleSheetClose}>Close</Button>
+            </div>
+          </SheetContent>
+          </Sheet>
+      )}
       
     </div>
 :
