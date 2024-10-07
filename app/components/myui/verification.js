@@ -161,7 +161,8 @@ async function loginHere(){
                 // As OTP is already sent, show the OTP prompt text field
 
                 // for now, only allow if user is admin
-                if(resultData.data.role == 'admin' || resultData.data.role == 'SuperAdmin' || resultData.data.role == 'SalesManager' || resultData.data.role == 'SalesExecutive'){
+                // if(resultData.data.role == 'admin' || resultData.data.role == 'SuperAdmin' || resultData.data.role == 'SalesManager' || resultData.data.role == 'SalesExecutive'){
+                if(resultData.data.role == 'SuperAdmin'){
                     // otp sent
                     setotpSent(true)
                 }

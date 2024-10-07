@@ -63,6 +63,7 @@ export async function GET(request,{params}) {
           if(params.ids[1] == 'webbulk'){
             // apply payment to multiple SELECTED invoices at a time
             // applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular)
+            
             await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], JSON.parse(decodeURIComponent(params.ids[5])), decodeURIComponent(params.ids[6]), new Date(params.ids[7]), params.ids[8],params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
@@ -101,7 +102,7 @@ export async function GET(request,{params}) {
   async function applyPaymentToSelectedInvoices(id, paymentAmount, type, invoicesList, transactionId, paymentDate, adminId, particular) {
     
     var amount = paymentAmount;
-
+    
     // get the pool connection to db
     const connection = await pool.getConnection(); 
 

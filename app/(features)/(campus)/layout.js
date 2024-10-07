@@ -161,7 +161,7 @@ const inter = Inter({ subsets: ['latin'] })
         <div className={inter.className}>
           <div className={styles.topbar} style={{height:'6vh'}}>
             <div className={styles.horizontalsection}>
-              <Image src="/anjani_title.webp" alt="Anjani Tek" width={160} height={40} priority style={{height:'auto'}}/>
+              <Image src="/anjani_title.webp" alt="Anjani Tek" width={130} height={36} priority style={{height:'auto'}}/>
               {/* <span style={{color: '#CCCCCC'}}>|</span>
               <Image src="/anjani_title.webp" alt="Anjani Tek" width={90} height={40} priority style={{height:'auto'}} /> */}
               {/* <Image src="/svecw_sc_logo.svg" alt="Smart Campus" width={90} height={40} priority style={{height:'auto'}} /> */}
@@ -207,8 +207,8 @@ const inter = Inter({ subsets: ['latin'] })
               
               {userData ?
               <div className={styles.verticalsection} style={{gap:'8px',padding: '8px',backgroundColor: '#f0f0f0',border: '1px solid #e5e5e5',borderRadius: '8px',margin: '0px 12px'}}>
-                  {/* <p className={`${inter.className} ${styles.text3}  ${styles.tag}`} style={{cursor:'pointer'}} >{userData.role}</p>
-                  <p className={`${inter.className} ${styles.text1}`} style={{cursor:'pointer'}} >{userData.username}</p> */}
+                  <p className={`${inter.className} ${styles.text3}  ${styles.tag}`} style={{cursor:'pointer'}} >{userData.name} - {userData.role}</p>
+                  {/* <p className={`${inter.className} ${styles.text1}`} style={{cursor:'pointer'}} >{userData.name}</p> */}
                   <p onClick={clearCookies.bind(this)} className='flex flex-row gap-2 items-center text-slate-600 cursor-pointer' ><Power className={styles.menuicon}/> Log out</p>
               </div>
               : ''}
