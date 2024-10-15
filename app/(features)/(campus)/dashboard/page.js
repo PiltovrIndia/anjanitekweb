@@ -1127,6 +1127,12 @@ const sendMessageNow = async (e) => {
                 <div  className="flex flex-row gap-2">
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
                         <div className="flex flex-row gap-2 items-center">
+                            <p className='text-s text-gray-600 font-normal'>Total Outstanding</p>
+                        </div>
+                        <p className='text-xl text-black font-semibold tracking-wider'>₹{formatter.format(regionsList.find(item => item.state === currentState).pendingATL + regionsList.find(item => item.state === currentState).pendingVCL)}</p>
+                    </Card>
+                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
+                        <div className="flex flex-row gap-2 items-center">
                             <p className='text-s text-gray-600 font-normal'>Outstanding </p>
                             <div className="text-sm font-semibold bg-rose-500 text-rose-100 px-1.5 w-fit border border-rose-600 rounded-2xl tracking-wider">
                                 ATL
@@ -1148,13 +1154,13 @@ const sendMessageNow = async (e) => {
                         <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).invoices}</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={3}>
-                        <p className='text-s text-gray-600 font-normal'>Total Dealers Due</p>
-                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).dealersDue}</p>
+                        <p className='text-s text-gray-600 font-normal'>Due / Total Dealers</p>
+                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).dealersDue} / {regionsList.find(item => item.state === currentState).dealers}</p>
                     </Card>
-                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={4}>
+                    {/* <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={4}>
                         <p className='text-s text-gray-600 font-normal'>Total Dealers</p>
                         <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).dealers}</p>
-                    </Card>
+                    </Card> */}
                 </div>
                     : null}
 

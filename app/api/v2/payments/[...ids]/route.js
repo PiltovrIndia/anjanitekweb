@@ -242,7 +242,7 @@ export async function GET(request,{params}) {
             const amountToApply = Math.min(paymentAmount, invoice.pending); // get the minimum amount to apply
 
             // check if amount being paid is more, accordingly we need to update the status
-            let newStatus = (invoice.pending - amountToApply) > 0 ? 'PartialPaid' : 'Paid';
+            let newStatus = (amountToApply == 0) ? 'NotPaid' : (invoice.pending - amountToApply) > 0 ? 'PartialPaid' : 'Paid';
 
             await connection.query(
                 `UPDATE invoices SET 

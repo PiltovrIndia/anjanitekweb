@@ -108,6 +108,16 @@ fetch("/api/v2/amount/"+pass+"/U4/"+offset+"/"+role, {
     },
 });
 
+// get matching invoices for SuperAdmin
+const getMatchingInvoicesDataAPI = async (pass, invoiceNo, role) => 
+  
+fetch("/api/v2/amount/"+pass+"/U4.1/"+invoiceNo+"/"+role, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
 
 // get the SalesManagers for SalesExecutives
 const getAllSalesPersonsDataAPI = async (pass, role, offset) => 
@@ -164,6 +174,7 @@ export default function Invoices() {
     const [offset, setOffset] = useState(0);
     const [completed, setCompleted] = useState(false);
     const [searching, setSearching] = useState(true);
+    const [searchingOther, setOtherSearching] = useState(true);
     const [searchingSales, setSearchingSales] = useState(false);
     const [loadingIds, setLoadingIds] = useState(new Set());
     const [file, setFile] = useState(null); 
@@ -172,8 +183,10 @@ export default function Invoices() {
     // get all sales people for changing the value
     const [allSalesPeople, setAllSalesPeople] = useState([]);
     const [dataFound, setDataFound] = useState(false);
+    const [searchQuery, setSearchQuery] = useState(''); // State for search input
     const [allInvoices, setAllInvoices] = useState([]);
     const [allInvoicesFiltered, setAllInvoicesFiltered] = useState([]);
+    const [totalInvoicesCount, setTotalInvoicesCount] = useState(0);
     
     const [initialDatesValues, setInititalDates] = React.useState({from: dayjs().subtract(0,'day'),to: dayjs(),});
     // const [currentStatus, setCurrentStatus] = useState('All');
@@ -246,31 +259,13 @@ export default function Invoices() {
                     if(allInvoices.length > 0){
                         setAllInvoices(allInvoices.push(queryResult.data));
                         setAllInvoicesFiltered(allInvoices.push(queryResult.data));
+                        setTotalInvoicesCount(queryResult.total);
                     }
                     else{
                         
                         setAllInvoices(queryResult.data);
                         setAllInvoicesFiltered(queryResult.data);
-
-                        // const getDistinctStates = (list) => {
-                        //     // Use reduce to accumulate distinct states
-                        //     const distinctStates = list.reduce((acc, person) => {
-                        //     if (!acc.includes(person.state)) {
-                        //         acc.push(person.state);
-                        //     }
-                        //     return acc;
-                        //     }, []);
-                        
-                        //     // Add "All" at the beginning of the array
-                        //     distinctStates.unshift("All");
-                        
-                        //     return distinctStates;
-                        // };
-                          
-                        //   // Usage
-                        //   const distinctStates = getDistinctStates(queryResult.data);
-                          
-                        //   setAllStates(distinctStates);
+                        setTotalInvoicesCount(queryResult.total);
                     }
                     
                     setDataFound(true);
@@ -301,6 +296,81 @@ export default function Invoices() {
             else if(queryResult.status == 201) {
                 
                 setSearching(false);
+                setDataFound(false);
+                setCompleted(true);
+            }
+        }
+        catch (e){
+            console.log(e);
+            
+            // show and hide message
+            // setResultType('error');
+            // setResultMessage('Issue loading. Please refresh or try again later!');
+            toast({
+                description: "Issue loading. Please refresh or try again later!",
+              })
+            // setTimeout(function(){
+            //     setResultType('');
+            //     setResultMessage('');
+            // }, 3000);
+        }
+}
+
+    async function getMatchingAllInvoices(invoiceNo){
+        
+        
+        setOtherSearching(true);
+        // setOffset(offset+0); // update the offset for every call
+
+        try {    
+            const result  = await getMatchingInvoicesDataAPI(process.env.NEXT_PUBLIC_API_PASS, invoiceNo, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role) 
+            const queryResult = await result.json() // get data
+// console.log(queryResult);
+
+            // check for the status
+            if(queryResult.status == 200){
+
+                // check if data exits
+                if(queryResult.data.length > 0){
+
+                    // if(allInvoicesFiltered.length > 0){
+                        // setAllInvoices(allInvoicesFiltered.push(queryResult.data));
+                        // setAllInvoicesFiltered(allInvoicesFiltered.push(queryResult.data));
+                        
+                    // }
+                    // else{
+                        
+                        // setAllInvoices(queryResult.data);
+                        setAllInvoicesFiltered(queryResult.data);
+                        
+                    // }
+                    
+                }
+                else {
+                    setDataFound(false);
+                }
+
+                setOtherSearching(false);
+            }
+            else if(queryResult.status == 401) {
+                
+                setOtherSearching(false);
+                setDataFound(false);
+                setCompleted(true);
+            }
+            else if(queryResult.status == 404) {
+                setAllInvoices([]);
+                toast({
+                    description: "No more invoices",
+                  })
+                  
+                  setOtherSearching(false);
+                setDataFound(false);
+                setCompleted(true);
+            }
+            else if(queryResult.status == 201) {
+                
+                setOtherSearching(false);
                 setDataFound(false);
                 setCompleted(true);
             }
@@ -376,19 +446,6 @@ export default function Invoices() {
         }
     }
 
-
-    function selectSalesPerson(e) {
-        setSelectedMapToPerson(e);
-
-        const mapTo = allSalesPeople.find(row => row.id === e).mapTo;
-        console.log(mapTo);
-        
-        const SM = allSalesPeople.find(row => row.id === mapTo).name;
-        console.log(SM);
-
-        setSelectedManager(SM);
-        
-    }
     
     const getNextId = (list) => {
         // Extract numeric part from each ID and find the highest number
@@ -500,6 +557,32 @@ export default function Invoices() {
             toast({description: "Issue loading. Please refresh or try again later!"});
         }
     }
+
+
+  // Function to handle search input change
+  const handleSearchChange = (e) => {
+    if(e.target.value.length == 0){
+        setSearchQuery('');
+        setAllInvoices(allInvoices);
+        setAllInvoicesFiltered(allInvoices);
+    }
+    else {
+        const query = e.target.value.toLowerCase();
+        setSearchQuery(query);
+
+        // Filter the invoice based on the search query
+        const filtered = allInvoices.filter(invoice => invoice.invoiceNo.toLowerCase().includes(query) );
+
+        if(filtered.length > 0){
+            console.log('OK');
+            setAllInvoicesFiltered(filtered); // Update the filtered dealers list
+        }
+        else {
+            console.log('NOT OK');
+            getMatchingAllInvoices(e.target.value.toLowerCase());
+        }
+    }
+  };
   
 
 
@@ -607,7 +690,7 @@ export default function Invoices() {
 {/* <div className="container mx-auto py-10"> */}
 
 <div className='flex flex-row justify-between items-center mb-2'>
-    <div className='pb-2 text-slate-700 font-semibold'>{allInvoices.length} Invoices in total</div>
+    <div className='pb-2 text-slate-700 font-semibold'>{totalInvoicesCount} Invoices in total</div>
     
     {(selectedState == 'All') ?
     <div className='pb-2 text-slate-700 font-semibold'></div>
@@ -632,6 +715,25 @@ export default function Invoices() {
         </Select>
     } */}
 </div>
+
+<div className='flex flex-row gap-4 items-center'>
+        <Input
+            type="text"
+            placeholder="Search dealers..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="my-4 w-[300px]" // You can adjust width and margin as needed
+        />
+
+        {(searchQuery.length > 0) ? <div className='pb-2 text-slate-600'>{allInvoicesFiltered.length} matching invoices</div> : ''}
+
+        {!searchingOther ?
+        <div className="flex flex-row m-12">    
+            <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+        </div>
+        : ''}
+    </div>
 
 <Card>
     <Table>

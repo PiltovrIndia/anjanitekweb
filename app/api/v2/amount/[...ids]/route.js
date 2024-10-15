@@ -182,12 +182,20 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U4'){ // get all invoices for admin based on the role
                 
-                const [rows, fields] = await connection.execute('SELECT * FROM invoices ORDER BY invoiceDate ASC LIMIT 20 OFFSET '+params.ids[2]);
+                const [rows, fields] = await connection.execute('SELECT * FROM invoices ORDER BY invoiceDate ASC LIMIT 400 OFFSET '+params.ids[2]);
+                const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices');
                 connection.release();
     
                 
                 // return Response.json({data:rows}, {status: 200})
                 // return Response.json({data:rows},{data1:fields}, {status: 200})
+                return Response.json({status: 200, data: rows, total: rows1[0].count, message:'Details found!'}, {status: 200})
+              }
+            else if(params.ids[1] == 'U4.1'){ // To search invoices for the web listing.
+                
+                const [rows, fields] = await connection.execute('SELECT * FROM invoices where invoiceNo LIKE "%'+params.ids[2]+'%" LIMIT 20');
+                connection.release();
+                
                 return Response.json({status: 200, data: rows, message:'Details found!'}, {status: 200})
               }
             else if(params.ids[1] == 'U5'){ // get total outstanding of the business for admin
@@ -369,7 +377,8 @@ export async function GET(request,{params}) {
 
         // 1
         // check if amount being paid is more, accordingly we need to update the status
-        var status = (totalAmount == amountPaid) ? 'Pending' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
+        var status = (amountPaid == 0) ? 'NotPaid' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
+        // var status = (totalAmount == amountPaid) ? 'Pending' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
         const pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
         console.log(pending);
         
