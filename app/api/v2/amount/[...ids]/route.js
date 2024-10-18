@@ -49,6 +49,30 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No users found!'+error}, {status: 200})
                 }
             }
+          // get invoices of a dealer by Id for the admins
+          else if(params.ids[1] == 'U2.1'){ 
+                try {
+                    // let q = 'SELECT * FROM users WHERE collegeId LIKE "%'+params.ids[2]+'%"';
+                    // console.log(q);
+                    let q = 'SELECT * FROM `invoices` WHERE billTo="'+params.ids[2]+'" ORDER BY invoiceDate ASC';
+                    const [rows, fields] = await connection.execute(q);
+                    connection.release();
+                    // return successful update
+
+                    // check if users is found
+                    if(rows.length > 0){
+                        // return the requests data
+                        return Response.json({status: 200, data: rows, message:'Details found!'}, {status: 200})
+
+                    }
+                    else {
+                        // users doesn't exist in the system
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No users found!'+error}, {status: 200})
+                }
+            }
             // Get the payments done by the dealer by id
           else if(params.ids[1] == 'U3'){
                 try {

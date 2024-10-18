@@ -719,7 +719,7 @@ export default function Invoices() {
 <div className='flex flex-row gap-4 items-center'>
         <Input
             type="text"
-            placeholder="Search dealers..."
+            placeholder="Search Invoice Number"
             value={searchQuery}
             onChange={handleSearchChange}
             className="my-4 w-[300px]" // You can adjust width and margin as needed
