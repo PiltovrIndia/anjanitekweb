@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, Receipt } from 'phosphor-react'
+import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, Receipt, ArrowDown } from 'phosphor-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
@@ -100,7 +100,7 @@ const updateUser = async (pass, role, id, updateDataBasic) =>
 // get all invoices for SuperAdmin
 const getAllInvoicesDataAPI = async (pass, offset, role) => 
   
-fetch("/api/v2/amount/"+pass+"/U4/"+offset+"/"+role, {
+fetch("/api/v2/amount/"+pass+"/U4.2/"+offset+"/"+role, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -583,11 +583,133 @@ export default function Invoices() {
         }
     }
   };
-  
 
+  function downloadNow() {
+    console.log("Downloading...");
 
+    // Map the data to include only the required fields with new key names
+    const result = allInvoicesFiltered.map(invoice => ({
+        invoiceNo: invoice.invoiceNo,
+        invoiceType: invoice.invoiceType,
+        invoiceDate: dayjs(invoice.invoiceDate).format("YYYY-MM-DD"),
+        invoiceAmount: invoice.totalAmount,
+        amountPaid: invoice.amountPaid,
+        dealerId: invoice.billTo,       // Renaming `billTo` to `dealer`
+        expiryDate: dayjs(invoice.expiryDate).format("YYYY-MM-DD")   // Renaming `totalAmount` to `amount`
+    }));
 
+    // Create and export the Excel file
+    const worksheet = xlsx.utils.json_to_sheet(result);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Invoices');
+    xlsx.writeFile(workbook, 'Invoices_' + dayjs(today.toDate()).format("DD-MM-YYYY").toString() + '.xlsx');
+}
     
+
+function downloadHostelsDataNow() {
+
+    setDownloading(true);
+    
+    console.log("Downloading...");
+    const result = allInvoicesFiltered;
+    const strengthsExcludingHostelId = allInvoicesFiltered.map(({ hostelId, usernames, ...rest }) => rest);
+    // const strengthsExcludingHostelId1 = hostelStrengths.map(({ hostelId, total, InOuting, InHostel, ...rest }) => rest);
+
+    // Prepare data for the second sheet, splitting usernames and collegeIds
+    let expandedStrengths = [];
+    // let expandedStrengths = [['Hostel Name,Student Name,College Id,Phone Number,Checkout On,Expected Return On,Room Number']];
+    // expandedStrengths.push(['Hostel Name,Student Name,College Id,Phone Number,Checkout On,Expected Return On,Room Number']);
+    
+    let v = '';
+    allInvoicesFiltered.forEach(hostel => {
+        const { hostelId, hostelName, usernames, total, InOuting, InHostel, ...rest } = hostel;
+        const usernameList = usernames ? usernames.split(',') : [];
+        // const collegeIdList = collegeIds ? collegeIds.split(',') : [];
+        
+        // this line will help in adding filters for specific section in excel.
+        v = "A2:H"+(usernameList.length+1)+"";
+        
+        usernameList.forEach(entry => {
+            const [username, collegeId, phoneNumber, college, checkoutOn, returningOn, roomNumber] = entry.split('=');
+            expandedStrengths.push({
+                hostelName,
+                roomNumber: roomNumber ? roomNumber.trim() : '',
+                collegeId: collegeId ? collegeId.trim() : '',
+                username: username ? username.trim() : '',
+                college: college ? college.trim() : '',
+                checkoutOn: checkoutOn ? dayjs(checkoutOn).format("DD/MM/YY hh:mm A").trim() : '',
+                returningOn: returningOn ? dayjs(returningOn).format("DD/MM/YY hh:mm A").trim() : '',
+                phoneNumber: phoneNumber ? phoneNumber.trim() : '',
+                ...rest
+            });
+        });
+    });
+
+    // Create a new workbook and worksheets
+    const workbook = xlsx.utils.book_new();
+    const worksheet1 = xlsx.utils.aoa_to_sheet([["SRI VISHNU EDUCATIONAL SOCIETY :: BHIMAVARAM"]]);
+    // worksheet1 = xlsx.utils.aoa_to_sheet([["NIGHT ATTENDANCE REPORT : "+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()]]);
+    const worksheet2 = xlsx.utils.aoa_to_sheet([["SRI VISHNU EDUCATIONAL SOCIETY :: BHIMAVARAM"]]);
+    // worksheet2 = xlsx.utils.aoa_to_sheet([["NIGHT ATTENDANCE REPORT : "+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()]]);
+
+    worksheet1['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+    worksheet2['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+
+    // Manually add header row to the worksheets
+    xlsx.utils.sheet_add_aoa(worksheet1, [["NIGHT ATTENDANCE REPORT : "+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()+" - STUDENTS IN OUTING"]], { origin: "A2" });
+    xlsx.utils.sheet_add_aoa(worksheet2, [["NIGHT ATTENDANCE REPORT : "+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()+" - STUDENTS IN OUTING"]], { origin: "A2" });
+    
+    // Manually add header row to the worksheets
+    xlsx.utils.sheet_add_aoa(worksheet1, [Object.keys(strengthsExcludingHostelId[0])], { origin: "A3" });
+    xlsx.utils.sheet_add_aoa(worksheet2, [Object.keys(expandedStrengths[0])], { origin: "A3" });
+
+    // Now add the data starting from the next row
+    xlsx.utils.sheet_add_json(worksheet1, strengthsExcludingHostelId, { origin: "A4", skipHeader: true });
+    xlsx.utils.sheet_add_json(worksheet2, expandedStrengths, { origin: "A4", skipHeader: true });
+
+    // Apply bold style to the first two rows
+    const boldStyle = { font: { bold: true } };
+
+    // Apply the bold style to the first row
+    worksheet1['A1'].s = boldStyle;
+    worksheet1['A2'].s = boldStyle;
+
+    worksheet2['A1'].s = boldStyle;
+    worksheet2['A2'].s = boldStyle;
+
+    for (let col = 0; col < 8; col++) {
+        const cellRef1 = xlsx.utils.encode_cell({ r: 0, c: col });
+        const cellRef2 = xlsx.utils.encode_cell({ r: 1, c: col });
+
+        if (!worksheet1[cellRef1]) worksheet1[cellRef1] = {};
+        if (!worksheet1[cellRef2]) worksheet1[cellRef2] = {};
+
+        worksheet1[cellRef1].s = boldStyle;
+        worksheet1[cellRef2].s = boldStyle;
+
+        if (!worksheet2[cellRef1]) worksheet2[cellRef1] = {};
+        if (!worksheet2[cellRef2]) worksheet2[cellRef2] = {};
+
+        worksheet2[cellRef1].s = boldStyle;
+        worksheet2[cellRef2].s = boldStyle;
+    }
+
+    // Apply autofilter to the data range (excluding the fixed header rows)
+    worksheet2['!autofilter'] = { ref: 'A3:H' + (expandedStrengths.length + 1) };
+
+    // // workbook
+    // const workbook = xlsx.utils.book_new();
+
+    xlsx.utils.book_append_sheet(workbook,worksheet1,'All Hostels');
+    xlsx.utils.book_append_sheet(workbook,worksheet2,'InOuting Students');
+
+    // worksheet1['!freeze'] = {xSplit: 0, ySplit: 2};
+    // worksheet1['!autofilter']={ref: v }
+    xlsx.writeFile(workbook, 'NightAttendanceReport_InOuting_'+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()+'.xlsx');
+
+    setDownloading(false);
+}
+
 
 
   return (
@@ -716,7 +838,9 @@ export default function Invoices() {
     } */}
 </div>
 
-<div className='flex flex-row gap-4 items-center'>
+{(allInvoicesFiltered.length > 0) ?
+<div className='flex flex-row justify-between items-center'>
+    <div className='flex flex-row gap-4 items-center'>
         <Input
             type="text"
             placeholder="Search Invoice Number"
@@ -734,6 +858,13 @@ export default function Invoices() {
         </div>
         : ''}
     </div>
+
+    
+        {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> InOuting Students</Button> */}
+        <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button>
+    </div>
+: ''    
+}
 
 <Card>
     <Table>

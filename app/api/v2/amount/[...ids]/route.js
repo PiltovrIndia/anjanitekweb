@@ -222,6 +222,17 @@ export async function GET(request,{params}) {
                 
                 return Response.json({status: 200, data: rows, message:'Details found!'}, {status: 200})
               }
+              else if(params.ids[1] == 'U4.2'){ // get all invoices for admin in web
+                
+                const [rows, fields] = await connection.execute('SELECT * FROM invoices ORDER BY invoiceDate ASC');
+                const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices');
+                connection.release();
+    
+                
+                // return Response.json({data:rows}, {status: 200})
+                // return Response.json({data:rows},{data1:fields}, {status: 200})
+                return Response.json({status: 200, data: rows, total: rows1[0].count, message:'Details found!'}, {status: 200})
+              }
             else if(params.ids[1] == 'U5'){ // get total outstanding of the business for admin
                 
                 const [rows, fields] = await connection.execute('SELECT * FROM `invoices` where status!="Paid"');
