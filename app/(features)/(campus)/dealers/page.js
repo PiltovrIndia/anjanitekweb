@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, CheckCircle } from 'phosphor-react'
+import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, CheckCircle, ArrowDown } from 'phosphor-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
@@ -31,7 +31,10 @@ const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
 import Image from 'next/image'
 // import fs from 'fs'
 import path from 'path'
+import * as XLSX from 'xlsx';
 
+
+const xlsx = require('xlsx');
 
 
 // import { EnvelopeOpenIcon } from "@radix-ui/react-icons"
@@ -212,6 +215,14 @@ export default function Outing() {
     const getDataData = async () => {
         console.log("Hello1");
     }
+
+
+    // Create an instance of Intl.NumberFormat for Indian numbering system with two decimal places
+    const formatter = new Intl.NumberFormat('en-IN', {
+        style: 'decimal',  // Use 'currency' for currency formatting
+        minimumFractionDigits: 2,  // Minimum number of digits after the decimal
+        maximumFractionDigits: 2   // Maximum number of digits after the decimal
+    });
 
     ///////////////////////////////
     // IMPORTANT
@@ -1069,6 +1080,25 @@ const sendMessageNow = async (e) => {
   };
   
 
+
+  function downloadNow() {
+    console.log("Downloading...");
+
+    // Map the data to include only the required fields with new key names
+    const result = allDealersFiltered.map(dealer => ({
+        name: dealer.accountName,
+        ATLOutstanding: dealer.pendingATL,
+        VCLOutstanding: dealer.pendingVCL,
+    }));
+
+    // Create and export the Excel file
+    const worksheet = xlsx.utils.json_to_sheet(result);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Dealers');
+    xlsx.writeFile(workbook, 'Dealers_' + dayjs(today.toDate()).format("DD-MM-YYYY").toString() + '.xlsx');
+}
+    
+
   return (
     
         // <div className={styles.verticalsection} style={{height:'100vh',gap:'16px'}}>
@@ -1332,6 +1362,7 @@ const sendMessageNow = async (e) => {
                 </SelectContent>
             </Select>
         }
+        <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button>
     </div>
 </div>
 
@@ -1341,7 +1372,9 @@ const sendMessageNow = async (e) => {
             <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Sales Person</TableHead>
-                <TableHead>State</TableHead>
+                {/* <TableHead>State</TableHead> */}
+                <TableHead>ATL</TableHead>
+                <TableHead>VCL</TableHead>
                 <TableHead></TableHead>
             </TableRow>
         </TableHeader>
@@ -1358,8 +1391,14 @@ const sendMessageNow = async (e) => {
                         <div className="text-sm text-slate-500 bg-slate-50 px-1 py-1 w-fit border border-slate-200 rounded">
                             {row.salesperson}
                         </div>
-                        </TableCell>
-                    <TableCell>{row.state}</TableCell>
+                    </TableCell>
+                    <TableCell>
+                        <p className='text-sm text-rose-500 font-semibold tracking-wider'>₹{formatter.format(row.pendingATL)}</p>
+                    </TableCell>
+                    <TableCell>
+                        <p className='text-sm text-red-500 font-semibold tracking-wider'>₹{formatter.format(row.pendingVCL)}</p>
+                    </TableCell>
+                    {/* <TableCell>{row.state}</TableCell> */}
                     <TableCell>
                     {/* {allSalesPeople.length == 0 ? getSalesPersons() : null}} */}
                             <Sheet>

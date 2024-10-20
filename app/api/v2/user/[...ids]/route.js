@@ -431,7 +431,17 @@ export async function GET(request,{params}) {
                     // we shall use the role to identify the dealers below them
                     var query = '';
                     if(params.ids[2] == 'SuperAdmin'){
-                        query = `SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer"`;
+                        // query = `SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer"`;
+                        query = `SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,
+                                    (SELECT name FROM user WHERE id = u.mapTo) AS salesperson,
+                                    COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' THEN i.pending ELSE 0 END), 0) AS pendingATL,
+                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' THEN i.pending ELSE 0 END), 0) AS pendingVCL
+                                    FROM dealer d 
+                                    LEFT JOIN user u ON d.dealerId = u.id 
+                                    LEFT JOIN invoices i ON i.billTo = d.dealerId
+                                    where u.role="Dealer"
+                                    GROUP BY u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst
+                                    ORDER BY pendingATL DESC;`;
                         const [rows, fields] = await connection.execute(query)
                         connection.release();
                             
@@ -477,7 +487,17 @@ export async function GET(request,{params}) {
                         // get the dealers
                         if(dealers.length > 0){
                             const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                            const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
+                            // const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
+                            const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,
+                                                        (SELECT name FROM user WHERE id = u.mapTo) AS salesperson,
+                                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' THEN i.pending ELSE 0 END), 0) AS pendingATL,
+                                                            COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' THEN i.pending ELSE 0 END), 0) AS pendingVCL
+                                                        FROM dealer d 
+                                                        LEFT JOIN user u ON d.dealerId = u.id 
+                                                        LEFT JOIN invoices i ON i.billTo = d.dealerId
+                                                        where u.role="Dealer" and u.id IN (${dealersList})
+                                                        GROUP BY u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst
+                                                        ORDER BY pendingATL DESC;`);
                             connection.release();
                             
                             return Response.json({status: 200, length: rows2.length, data: rows2, message:'Details found!'}, {status: 200})
@@ -508,7 +528,17 @@ export async function GET(request,{params}) {
                         // get the dealers
                         if(dealers.length > 0){
                             const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                            const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
+                            // const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
+                            const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,
+                                                        (SELECT name FROM user WHERE id = u.mapTo) AS salesperson,
+                                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' THEN i.pending ELSE 0 END), 0) AS pendingATL,
+                                                            COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' THEN i.pending ELSE 0 END), 0) AS pendingVCL
+                                                        FROM dealer d 
+                                                        LEFT JOIN user u ON d.dealerId = u.id 
+                                                        LEFT JOIN invoices i ON i.billTo = d.dealerId
+                                                        where u.role="Dealer" and u.id IN (${dealersList})
+                                                        GROUP BY u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst
+                                                        ORDER BY pendingATL DESC;`);
                             connection.release();
                             
                             return Response.json({status: 200, length: rows2.length, data: rows2, message:'Details found!'}, {status: 200})
@@ -533,7 +563,17 @@ export async function GET(request,{params}) {
                         // get the dealers
                         if(dealers.length > 0){
                             const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
-                            const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
+                            // const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
+                            const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,
+                                                        (SELECT name FROM user WHERE id = u.mapTo) AS salesperson,
+                                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' THEN i.pending ELSE 0 END), 0) AS pendingATL,
+                                                            COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' THEN i.pending ELSE 0 END), 0) AS pendingVCL
+                                                        FROM dealer d 
+                                                        LEFT JOIN user u ON d.dealerId = u.id 
+                                                        LEFT JOIN invoices i ON i.billTo = d.dealerId
+                                                        where u.role="Dealer" and u.id IN (${dealersList})
+                                                        GROUP BY u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst
+                                                        ORDER BY pendingATL DESC;`);
                             connection.release();
                             return Response.json({status: 200, length: rows2.length, data: rows2, message:'Details found!'}, {status: 200})
                         }
