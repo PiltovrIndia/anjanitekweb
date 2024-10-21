@@ -391,13 +391,19 @@ export async function GET(request,{params}) {
                 // const pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
                 // console.log(pending);
                 
+                
 
                 const q = `UPDATE invoices SET totalAmount= CAST(`+totalAmount+` AS DECIMAL(10, 2)), amountPaid=  CAST(`+amountPaid+` AS DECIMAL(10, 2)), pending=  CAST(`+pending+` AS DECIMAL(10, 2)), status="`+status+`" WHERE invoiceNo = `+invoiceNo+` `;
                 
-                const [payments] = await connection.query(q,[totalAmount, amountPaid, pending, status, invoiceNo]);
-
-                // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
-                return Response.json({status: 200, message:'Success!'}, {status: 200})
+                const [rows2, fields2] = await connection.execute(q);
+                connection.release();
+                
+                if(rows2.affectedRows > 0){
+                    return Response.json({status: 200, message:'Success!'}, {status: 200})
+                }
+                else {
+                    return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                }
             }
             else if(params.ids[1] == 'U9'){ // DELETE SELECTED INVOICE
             
