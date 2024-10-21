@@ -393,8 +393,8 @@ export async function GET(request,{params}) {
                 
                 
 
-                const q = `UPDATE invoices SET totalAmount= CAST(`+totalAmount+` AS DECIMAL(10, 2)), amountPaid=  CAST(`+amountPaid+` AS DECIMAL(10, 2)), pending=  CAST(`+pending+` AS DECIMAL(10, 2)), status="`+status+`" WHERE invoiceNo = `+invoiceNo+` `;
-                
+                const q = "UPDATE invoices SET totalAmount= CONVERT("+totalAmount+" AS DECIMAL(10, 2)), amountPaid=  CONVERT("+amountPaid+" AS DECIMAL(10, 2)), pending=  CONVERT("+pending+" AS DECIMAL(10, 2)), status='"+status+"' WHERE invoiceNo = '"+invoiceNo+"'";
+                console.log(q);
                 const [rows2, fields2] = await connection.execute(q);
                 connection.release();
                 
