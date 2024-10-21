@@ -155,6 +155,16 @@ const updateUploadInvoicesData = async (pass, items1, adminId) =>
     });
     
 
+// update invoices of selected dealer
+const updateSelectedInvoicesDataForSelectedAPI = async (pass, invoiceNo, invoiceAmount, amountPaid, pending) => 
+    // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
+fetch("/api/v2/amount/"+pass+"/U8/"+invoiceNo+"/"+invoiceAmount+"/"+amountPaid+"/"+pending, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
 
 
 
@@ -169,9 +179,10 @@ export default function Invoices() {
     // user state and requests variable
     const [user, setUser] = useState();
     const [selectedState, setSelectedState] = useState('All');
-    const [selectedMapToPerson, setSelectedMapToPerson] = useState('');
-    const [selectedManager, setSelectedManager] = useState('');
+    const [openInvoice, setOpenInvoice] = useState('');
+    const [selectedInvoice, setSelectedInvoice] = useState('');
     const [offset, setOffset] = useState(0);
+    const [updatingInvoice, setUpdatingInvoice] = useState(false);
     const [completed, setCompleted] = useState(false);
     const [searching, setSearching] = useState(true);
     const [searchingOther, setOtherSearching] = useState(true);
@@ -187,6 +198,12 @@ export default function Invoices() {
     const [allInvoices, setAllInvoices] = useState([]);
     const [allInvoicesFiltered, setAllInvoicesFiltered] = useState([]);
     const [totalInvoicesCount, setTotalInvoicesCount] = useState(0);
+
+    // State variables for each input field
+    const [selectedTotalAmount, setSelectedTotalAmount] = useState(0);
+    const [selectedAmountPaid, setSelectedAmountPaid] = useState(0);
+    const [selectedPendingAmount, setSelectedPendingAmount] = useState(0);
+
     
     const [initialDatesValues, setInititalDates] = React.useState({from: dayjs().subtract(0,'day'),to: dayjs(),});
     // const [currentStatus, setCurrentStatus] = useState('All');
@@ -404,7 +421,7 @@ export default function Invoices() {
             const result  = await getAllSalesPersonsDataAPI(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, 'SalesManager', offset) 
             const queryResult = await result.json() // get data
 
-            console.log(queryResult);
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -491,7 +508,7 @@ export default function Invoices() {
     
     // for invocies upload
     const processInvoicesData = (e) => {
-        console.log('Check1');
+        // console.log('Check1');
         
         if (file) {
             const reader = new FileReader();
@@ -574,11 +591,11 @@ export default function Invoices() {
         const filtered = allInvoices.filter(invoice => invoice.invoiceNo.toLowerCase().includes(query) );
 
         if(filtered.length > 0){
-            console.log('OK');
+            // console.log('OK');
             setAllInvoicesFiltered(filtered); // Update the filtered dealers list
         }
         else {
-            console.log('NOT OK');
+            // console.log('NOT OK');
             getMatchingAllInvoices(e.target.value.toLowerCase());
         }
     }
@@ -606,109 +623,197 @@ export default function Invoices() {
 }
     
 
-function downloadHostelsDataNow() {
+  // Function to handle row click and open the sheet
+  const handleRowClick = (invoice) => {
 
-    setDownloading(true);
+    setSelectedTotalAmount(invoice.totalAmount);
+    setSelectedAmountPaid(invoice.amountPaid);
+    setSelectedPendingAmount(invoice.pending);
+    setSelectedInvoice(invoice); // Set the selected dealer
+    setOpenInvoice(true); // Open the sheet
     
-    console.log("Downloading...");
-    const result = allInvoicesFiltered;
-    const strengthsExcludingHostelId = allInvoicesFiltered.map(({ hostelId, usernames, ...rest }) => rest);
-    // const strengthsExcludingHostelId1 = hostelStrengths.map(({ hostelId, total, InOuting, InHostel, ...rest }) => rest);
+    // setDealerPending(0);
+    // setRemainingCredit(0);
+    // setTotalCredit(0);
 
-    // Prepare data for the second sheet, splitting usernames and collegeIds
-    let expandedStrengths = [];
-    // let expandedStrengths = [['Hostel Name,Student Name,College Id,Phone Number,Checkout On,Expected Return On,Room Number']];
-    // expandedStrengths.push(['Hostel Name,Student Name,College Id,Phone Number,Checkout On,Expected Return On,Room Number']);
-    
-    let v = '';
-    allInvoicesFiltered.forEach(hostel => {
-        const { hostelId, hostelName, usernames, total, InOuting, InHostel, ...rest } = hostel;
-        const usernameList = usernames ? usernames.split(',') : [];
-        // const collegeIdList = collegeIds ? collegeIds.split(',') : [];
+    // make the API call to get the invoices.
+    // getInvoicesOfSelectedDealer(dealer.id);
+  };
+
+
+  // Change amount changes
+  const handleTotalAmountChange = (e) => {
+
+    if(e.target.value.length == 0){
+        setSelectedAmountPaid(selectedInvoice.totalAmount);
+        setSelectedPendingAmount(Math.abs(selectedInvoice.amountPaid-selectedAmountPaid));
+    }
+    else {
+        setSelectedTotalAmount(parseFloat(e.target.value) || 0)
+        setSelectedPendingAmount(Math.abs(selectedAmountPaid-parseFloat(e.target.value)));
+
+    }
+  };
+  
+  // Change amount changes
+  const handleAmountPaidChange = (e) => {
+
+    if(e.target.value.length == 0){
+        setSelectedAmountPaid(selectedInvoice.amountPaid);
+        setSelectedPendingAmount(Math.abs(selectedAmountPaid-selectedInvoice.amountPaid));
+    }
+    else if(parseFloat(e.target.value) > selectedTotalAmount ){
+        toast({description: "Amount Paid is more than the invoice amount",});
+    }
+    else {
+        setSelectedAmountPaid(parseFloat(e.target.value) || 0)
+        setSelectedPendingAmount(Math.abs(selectedTotalAmount-parseFloat(e.target.value)));
+
+    }
+  };
+  
+  // Change amount changes
+//   const handlePendingChange = (e) => {
+
+//     if(e.target.value.length == 0){
         
-        // this line will help in adding filters for specific section in excel.
-        v = "A2:H"+(usernameList.length+1)+"";
+//     }
+//     else if(parseFloat(e.target.value) > selectedInvoice.totalAmount ){
+//         toast({description: "Amount Paid is more than the invoice amount",});
+//     }
+//     else {
+//         setSelectedPendingAmount(parseFloat(e.target.value) || 0)
+//         setSelectedAmountPaid(Math.abs(selectedInvoice.amountPaid-parseFloat(e.target.value)));
+
+//     }
+//   };
+  
+
+    // Update selected invoices of selected dealer
+    async function updateSelectedInvoices(){
         
-        usernameList.forEach(entry => {
-            const [username, collegeId, phoneNumber, college, checkoutOn, returningOn, roomNumber] = entry.split('=');
-            expandedStrengths.push({
-                hostelName,
-                roomNumber: roomNumber ? roomNumber.trim() : '',
-                collegeId: collegeId ? collegeId.trim() : '',
-                username: username ? username.trim() : '',
-                college: college ? college.trim() : '',
-                checkoutOn: checkoutOn ? dayjs(checkoutOn).format("DD/MM/YY hh:mm A").trim() : '',
-                returningOn: returningOn ? dayjs(returningOn).format("DD/MM/YY hh:mm A").trim() : '',
-                phoneNumber: phoneNumber ? phoneNumber.trim() : '',
-                ...rest
-            });
-        });
-    });
+        // const invoicesWithAppliedAmount = dealerInvoices.filter(invoice => invoice.appliedAmount > 0);
+        
+        // check if atleast 1 invoice is selected.
+        if(selectedTotalAmount > 0){
+            setUpdatingInvoice(true);
 
-    // Create a new workbook and worksheets
-    const workbook = xlsx.utils.book_new();
-    const worksheet1 = xlsx.utils.aoa_to_sheet([["SRI VISHNU EDUCATIONAL SOCIETY :: BHIMAVARAM"]]);
-    // worksheet1 = xlsx.utils.aoa_to_sheet([["NIGHT ATTENDANCE REPORT : "+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()]]);
-    const worksheet2 = xlsx.utils.aoa_to_sheet([["SRI VISHNU EDUCATIONAL SOCIETY :: BHIMAVARAM"]]);
-    // worksheet2 = xlsx.utils.aoa_to_sheet([["NIGHT ATTENDANCE REPORT : "+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()]]);
 
-    worksheet1['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
-    worksheet2['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+            try {    
+                // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
+                const result  = await updateSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo)), selectedTotalAmount, selectedAmountPaid, selectedPendingAmount); 
+                const queryResult = await result.json() // get data
 
-    // Manually add header row to the worksheets
-    xlsx.utils.sheet_add_aoa(worksheet1, [["NIGHT ATTENDANCE REPORT : "+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()+" - STUDENTS IN OUTING"]], { origin: "A2" });
-    xlsx.utils.sheet_add_aoa(worksheet2, [["NIGHT ATTENDANCE REPORT : "+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()+" - STUDENTS IN OUTING"]], { origin: "A2" });
-    
-    // Manually add header row to the worksheets
-    xlsx.utils.sheet_add_aoa(worksheet1, [Object.keys(strengthsExcludingHostelId[0])], { origin: "A3" });
-    xlsx.utils.sheet_add_aoa(worksheet2, [Object.keys(expandedStrengths[0])], { origin: "A3" });
+                // console.log(queryResult);
+                // check for the status
+                if(queryResult.status == 200){
 
-    // Now add the data starting from the next row
-    xlsx.utils.sheet_add_json(worksheet1, strengthsExcludingHostelId, { origin: "A4", skipHeader: true });
-    xlsx.utils.sheet_add_json(worksheet2, expandedStrengths, { origin: "A4", skipHeader: true });
+                    var updateStatus = (selectedAmountPaid == 0) ? 'NotPaid' : (selectedTotalAmount - selectedAmountPaid) > 0 ? 'PartialPaid' : 'Paid';
 
-    // Apply bold style to the first two rows
-    const boldStyle = { font: { bold: true } };
+                    // update the listing
+                    // setAllInvoices((invoices) =>
+                    //     invoices.map((item) =>
+                    //     item.invoiceNo === selectedInvoice
+                    //     ? { ...item, status: updateStatus, totalAmount: selectedTotalAmount, amountPaid: selectedAmountPaid, pending: selectedPendingAmount } // Updates the status field
+                    //     : item // Keeps all other items unchanged
+                    // )
+                    // );
+                    setAllInvoicesFiltered((invoices) =>
+                        invoices.map((item) => {
+                          if (item.invoiceNo === selectedInvoice.invoiceNo) {
+                            
+                            return {
+                              ...item,
+                              status: updateStatus,
+                              totalAmount: selectedTotalAmount,
+                              amountPaid: selectedAmountPaid,
+                              pending: selectedPendingAmount,
+                            };
+                          }
+                          return item;
+                        })
+                      );
+                    setAllInvoices((invoices) =>
+                        invoices.map((item) => {
+                          if (item.invoiceNo === selectedInvoice.invoiceNo) {
+                            
+                            return {
+                              ...item,
+                              status: updateStatus,
+                              totalAmount: selectedTotalAmount,
+                              amountPaid: selectedAmountPaid,
+                              pending: selectedPendingAmount,
+                            };
+                          }
+                          return item;
+                        })
+                      );
 
-    // Apply the bold style to the first row
-    worksheet1['A1'].s = boldStyle;
-    worksheet1['A2'].s = boldStyle;
-
-    worksheet2['A1'].s = boldStyle;
-    worksheet2['A2'].s = boldStyle;
-
-    for (let col = 0; col < 8; col++) {
-        const cellRef1 = xlsx.utils.encode_cell({ r: 0, c: col });
-        const cellRef2 = xlsx.utils.encode_cell({ r: 1, c: col });
-
-        if (!worksheet1[cellRef1]) worksheet1[cellRef1] = {};
-        if (!worksheet1[cellRef2]) worksheet1[cellRef2] = {};
-
-        worksheet1[cellRef1].s = boldStyle;
-        worksheet1[cellRef2].s = boldStyle;
-
-        if (!worksheet2[cellRef1]) worksheet2[cellRef1] = {};
-        if (!worksheet2[cellRef2]) worksheet2[cellRef2] = {};
-
-        worksheet2[cellRef1].s = boldStyle;
-        worksheet2[cellRef2].s = boldStyle;
+                    // update the listing
+                    // setAllInvoicesFiltered((invoices) =>
+                    //     invoices.map((item) =>
+                    //     item.invoiceNo === selectedInvoice
+                    //     ? { ...item, status: updateStatus, totalAmount: selectedTotalAmount, amountPaid: selectedAmountPaid, pending: selectedPendingAmount } // Updates the status field
+                    //     : item // Keeps all other items unchanged
+                    // )
+                    // );
+                    
+                      
+                      
+                    // reset the numbers to 0
+                    setSelectedInvoice('');
+                    setSelectedTotalAmount(0);
+                    setSelectedAmountPaid(0);
+                    setSelectedPendingAmount(0);
+                    setUpdatingInvoice(false);
+                    
+                    
+                }
+                else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                    // setDealerInvoices([]);
+                    setUpdatingInvoice(false);
+                    
+                }
+                else if(queryResult.status == 404) {
+                    // setDealerInvoices([]);
+                    toast({
+                        description: "No more",
+                    })
+                    
+                    setUpdatingInvoice(false);
+                    
+                }
+            }
+            catch (e){
+                console.log(e);
+                
+                toast({ description: "Issue loading. Please refresh or try again later!", })
+            }
+        }
+        else {
+            toast({ description: "Adjust amount of invoice", })
+        }
     }
 
-    // Apply autofilter to the data range (excluding the fixed header rows)
-    worksheet2['!autofilter'] = { ref: 'A3:H' + (expandedStrengths.length + 1) };
 
-    // // workbook
-    // const workbook = xlsx.utils.book_new();
 
-    xlsx.utils.book_append_sheet(workbook,worksheet1,'All Hostels');
-    xlsx.utils.book_append_sheet(workbook,worksheet2,'InOuting Students');
+  // Function to handle closing the sheet and resetting selectedDealer
+  const handleSheetClose = () => {
+    
+    // reset the numbers to 0
+    setSelectedInvoice('');
+    setSelectedTotalAmount(0);
+    setSelectedAmountPaid(0);
+    setSelectedPendingAmount(0);
+    setUpdatingInvoice(false);
+    
+    // setRemainingCredit(0);
+    // setTotalCredit(0);
+    // setSelectedDealer(null); // Reset the selected dealer
+    setOpenInvoice(false); // Close the sheet
+  };
+  
 
-    // worksheet1['!freeze'] = {xSplit: 0, ySplit: 2};
-    // worksheet1['!autofilter']={ref: v }
-    xlsx.writeFile(workbook, 'NightAttendanceReport_InOuting_'+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()+'.xlsx');
-
-    setDownloading(false);
-}
 
 
 
@@ -883,7 +988,7 @@ function downloadHostelsDataNow() {
             
             {(allInvoicesFiltered==null) ? '' :
             allInvoicesFiltered.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className='cursor-pointer' onClick={() => handleRowClick(row)}>
                     <TableCell className="py-4">
                         <div className='flex flex-row gap-2 items-center'>
                             {row.invoiceNo} 
@@ -1009,6 +1114,70 @@ function downloadHostelsDataNow() {
         </TableBody>
     </Table>
 </Card>
+
+
+{/* Sheet to show selected invoice details */}
+{selectedInvoice && (
+        <Sheet open={open}>
+            
+          <SheetContent className='flex flex-col min-w-[800px]'>
+            
+            <div className="flex-none justify-between items-center mb-2">
+              <h2 className="text-lg font-bold">{selectedInvoice.invoiceNo}</h2>
+              <p className='text-muted-foreground'>{selectedInvoice.billTo}</p>
+            </div>
+            
+            <div className="flex flex-col mb-2">
+                <div className="flex flex-row items-end gap-2 mb-8">
+                    <div className="flex flex-col items-start gap-2">
+                        <Label htmlFor="amount" className="text-right">
+                        Invoice Amount:
+                        </Label>
+                        <Input type="number" id="totalAmount" value={selectedTotalAmount} onChange={handleTotalAmountChange} className="col-span-3 text-black" placeholder="Enter amount" />
+                    </div>
+                    <p className='text-blue-600'>Previous Invoice Amount: {selectedInvoice.totalAmount}</p>
+                </div>
+                
+                <div className="flex flex-row items-end gap-2 mb-8">
+                    <div className="flex flex-col items-start gap-2">
+                        <Label htmlFor="amount" className="text-right">
+                        Amount Paid:
+                        </Label>
+                        <Input type="number" id="amountPaid" value={selectedAmountPaid}  onChange={handleAmountPaidChange} className="col-span-3 text-black" placeholder="Enter amount" />
+                    </div>
+                    <p className='text-blue-600'>Previous amount paid: {selectedInvoice.amountPaid}</p>
+                </div>
+                
+                <div className="flex flex-row items-end gap-2 mb-2">
+                    <div className="flex flex-col items-start gap-2">
+                        <Label htmlFor="amount" className="text-right">
+                        Pending:
+                        </Label>
+                        <Input disabled type="number" id="pendingAmount" value={selectedPendingAmount} className="col-span-3 text-black" placeholder="Enter amount" />
+                        {/* <Input type="number" id="pendingAmount" value={selectedPendingAmount}  onChange={(e) => setSelectedPendingAmount(parseFloat(e.target.value) || 0)} className="col-span-3 text-black" placeholder="Enter amount" /> */}
+                    </div>
+                    <p className='text-blue-600'>Previous pending: {selectedInvoice.pending}</p>
+                </div>
+                
+                
+            </div>
+            
+            {updatingInvoice ?
+            <div className={styles.horizontalsection}>
+                <SpinnerGap className={`${styles.icon} ${styles.load}`} />
+                <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+            </div>
+            :
+            ''
+            }
+            <div className='flex flex-row gap-4'>
+                        <Button onClick={() => updateSelectedInvoices()}>Update</Button>
+                        <Button variant="secondary" onClick={handleSheetClose}>Close</Button>
+            </div>
+          </SheetContent>
+          </Sheet>
+      )}
+
       {/* <DataTable data={allInvoices} dataOffset={offset} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset} loadingIds={loadingIds} handleMessageSendClick={handleMessageSendClick}/> */}
       {/* <DataTable columns={columns} data={allInvoices} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset}/> */}
       

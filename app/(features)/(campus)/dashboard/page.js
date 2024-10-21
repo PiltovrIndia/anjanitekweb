@@ -274,7 +274,7 @@ export default function Outing() {
   // get messages of a specific receiver
   async function getSenderMessagesData(receiver){
         
-    console.log(receiver);
+    // console.log(receiver);
     
     setSearchingMessages(true);
     setSenderMessagesList([]);
@@ -283,7 +283,7 @@ export default function Outing() {
     try {    
         const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, receiver)
         const queryResult = await result.json() // get data
-        console.log(queryResult);
+        // console.log(queryResult);
         // check for the status
         if(queryResult.status == 200){
 
@@ -320,7 +320,7 @@ export default function Outing() {
     try {    
         var updatedOn = dayjs(new dayjs()).format("YYYY-MM-DD");
         
-        console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+dealerId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/0/-");
+        // console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+dealerId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/0/-");
         // console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/1/"+row.getValue('appointmentId')+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).username+"/"+updatedOn+"/"+row.getValue('collegeId'));
         const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id,dealerId,dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),document.getElementById('message').value,"0","-");
         // const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId+"/All"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/0/-");
@@ -389,7 +389,7 @@ export default function Outing() {
 
                 // check if data exits
                 if(queryResult.data.length > 0){
-                    console.log(queryResult.data);
+                    // console.log(queryResult.data);
                     // set the state
                     // total students
                     const result = queryResult.data;
@@ -607,7 +607,7 @@ const sendMessageNow = async (e) => {
             JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, 'All', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), document.getElementById('message').value,0,'-') 
         const queryResult = await result.json() // get data
 
-        console.log(queryResult);
+        // console.log(queryResult);
         // check for the status
         if(queryResult.status == 200){
 
@@ -656,7 +656,7 @@ const sendMessageNow = async (e) => {
         
             // const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, receiver)
             const queryResult = await result.json() // get data
-            console.log(queryResult);
+            // console.log(queryResult);
             var sentObj = {
                 notificationId: 100000,
                 sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id,
@@ -707,11 +707,11 @@ const sendMessageNow = async (e) => {
         // receiver is always the dealer
         
         try {    
-            console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/websingle/"+selectedDealer+"/"+amountToUpdate+"/credit/"+encodeURIComponent(invoiceNo)+"/"+transactionId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
+            // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/websingle/"+selectedDealer+"/"+amountToUpdate+"/credit/"+encodeURIComponent(invoiceNo)+"/"+transactionId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
             const result  = await sendPaymentUpdate(process.env.NEXT_PUBLIC_API_PASS, selectedDealer, amountToUpdate, invoiceNo, transactionId, dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-');
         
             const queryResult = await result.json() // get data
-            console.log(queryResult);
+            // console.log(queryResult);
 
             // check for the status
             if(queryResult.status == 200){
@@ -846,7 +846,7 @@ const sendMessageNow = async (e) => {
     
     // for invocies upload
     const processInvoicesData = (e) => {
-        console.log('Check1');
+        // console.log('Check1');
         
         if (file) {
             const reader = new FileReader();

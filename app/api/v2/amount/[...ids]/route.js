@@ -378,8 +378,29 @@ export async function GET(request,{params}) {
                 // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
                 return Response.json({status: 200, message:'Success!'}, {status: 200})
             }
+            else if(params.ids[1] == 'U8'){ // Update individual invoice by superAdmin
+            
+                var invoiceNo = decodeURIComponent(params.ids[2]);
+                var totalAmount = params.ids[3];
+                var amountPaid = params.ids[4];
+                var pending = params.ids[5];
+                
+                // check if amount being paid is more, accordingly we need to update the status
+                var status = (amountPaid == 0) ? 'NotPaid' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
+                
+                // const pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
+                // console.log(pending);
+                
+
+                const q = `UPDATE invoices SET totalAmount= CAST(`+totalAmount+` AS DECIMAL(10, 2)), amountPaid=  CAST(`+amountPaid+` AS DECIMAL(10, 2)), pending=  CAST(`+pending+` AS DECIMAL(10, 2)), status="`+status+`" WHERE invoiceNo = `+invoiceNo+` `;
+                
+                const [payments] = await connection.query(q,[totalAmount, amountPaid, pending, status, invoiceNo]);
+
+                // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
+                return Response.json({status: 200, message:'Success!'}, {status: 200})
+            }
             else {
-                return Response.json({status: 404, message:'No Student found!'}, {status: 200})
+                return Response.json({status: 404, message:'Not found!'}, {status: 200})
             }
         }
         else {

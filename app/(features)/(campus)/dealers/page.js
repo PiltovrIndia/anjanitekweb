@@ -426,7 +426,7 @@ export default function Outing() {
             const result  = await getAllSalesPersonsDataAPI(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, 'SalesManager', offset) 
             const queryResult = await result.json() // get data
 
-            console.log(queryResult);
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -473,10 +473,10 @@ export default function Outing() {
         setSelectedMapToPerson(e);
 
         const mapTo = allSalesPeople.find(row => row.id === e).mapTo;
-        console.log(mapTo);
+        // console.log(mapTo);
         
         const SM = allSalesPeople.find(row => row.id === mapTo).name;
-        console.log(SM);
+        // console.log(SM);
 
         setSelectedManager(SM);
         
@@ -560,10 +560,10 @@ export default function Outing() {
                 
                 if (Object.keys(updateDataBasic).length > 0 && Object.keys(updateDataDealer).length > 0) {
 
-                    console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U12/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role+"/"+JSON.stringify(updateDataBasic)+"/"+JSON.stringify(updateDataDealer));
+                    // console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U12/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role+"/"+JSON.stringify(updateDataBasic)+"/"+JSON.stringify(updateDataDealer));
                     const result  = await createUser(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.stringify(updateDataBasic)+"/"+JSON.stringify(updateDataDealer))
                     const queryResult = await result.json() // get data
-                    console.log(queryResult);
+                    // console.log(queryResult);
                     
                     // check if query result status is 200
                     if(queryResult.status == 200) {
@@ -612,8 +612,8 @@ export default function Outing() {
     
     // select Dealer to Update
     async function selectDealerForUpdate(row){
-        console.log("Checking");
-        console.log(row.name);
+        // console.log("Checking");
+        // console.log(row.name);
         
         if(allSalesPeople.length == 0) {
             getSalesPersons()
@@ -646,11 +646,11 @@ export default function Outing() {
                 
                 if (Object.keys(updateDataBasic).length > 0) {
 
-                    console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U13/"+role+"/"+id+"/"+JSON.stringify(updateDataBasic));
+                    // console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U13/"+role+"/"+id+"/"+JSON.stringify(updateDataBasic));
                     
                     const result  = await updateUser(process.env.NEXT_PUBLIC_API_PASS, role, id, JSON.stringify(updateDataBasic))
                     const queryResult = await result.json() // get data
-                    console.log(queryResult);
+                    // console.log(queryResult);
                     
                     // check if query result status is 200
                     if(queryResult.status == 200) {
@@ -710,7 +710,7 @@ export default function Outing() {
             const result  = await updateUser(process.env.NEXT_PUBLIC_API_PASS,role, id, JSON.stringify(updateDataBasic)) 
             const queryResult = await result.json() // get data
 
-            console.log(queryResult);
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -802,7 +802,7 @@ const sendMessageNow = async (e) => {
             const result  = await getAllInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId) 
             const queryResult = await result.json() // get data
 
-            console.log(queryResult);
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -869,7 +869,7 @@ const sendMessageNow = async (e) => {
                 const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
                 const queryResult = await result.json() // get data
 
-                console.log(queryResult);
+                // console.log(queryResult);
                 // check for the status
                 if(queryResult.status == 200){
 
@@ -1027,8 +1027,8 @@ const sendMessageNow = async (e) => {
             prevInvoices = prevInvoices.map((invoice) => {
             if (invoice.invoiceNo === invoiceItem.invoiceNo && invoice.appliedAmount > 0) {
                 
-                console.log("Amount applying: "+invoice.appliedAmount);
-                console.log("Remaining: "+ (remainingCredit+invoice.appliedAmount));
+                // console.log("Amount applying: "+invoice.appliedAmount);
+                // console.log("Remaining: "+ (remainingCredit+invoice.appliedAmount));
                 setRemainingCredit((prev) => prev + invoice.appliedAmount);
                 
                 return {
@@ -1049,8 +1049,8 @@ const sendMessageNow = async (e) => {
                 if (invoice.invoiceNo === invoiceItem.invoiceNo && remainingCredit > 0 && invoice.appliedAmount === 0) {
                     
                 const applyAmount = Math.min(invoice.pending, remainingCredit);
-                console.log("Amount applying: "+applyAmount);
-                console.log("Remaining: "+ (remainingCredit-applyAmount));
+                // console.log("Amount applying: "+applyAmount);
+                // console.log("Remaining: "+ (remainingCredit-applyAmount));
                 setRemainingCredit((prev) => prev - applyAmount);
                 
                 return {

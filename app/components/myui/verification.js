@@ -110,7 +110,7 @@ export default function Vertification() {
 
 // verify the mobileNumber by calling the API
 async function loginHere(){
-    console.log("/api/v2/verify/"+process.env.NEXT_PUBLIC_API_PASS+"/"+document.getElementById('mobileNumber').value+"/"+otp+"/"+generateDeviceID()+"/"+dayjs(new Date(Date.now())).format('YYYY-MM-DD HH:mm:ss'));
+    // console.log("/api/v2/verify/"+process.env.NEXT_PUBLIC_API_PASS+"/"+document.getElementById('mobileNumber').value+"/"+otp+"/"+generateDeviceID()+"/"+dayjs(new Date(Date.now())).format('YYYY-MM-DD HH:mm:ss'));
     try{
         // check for the input
         if(document.getElementById('mobileNumber').value.length > 0){
