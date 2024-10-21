@@ -169,9 +169,9 @@ fetch("/api/v2/amount/"+pass+"/U8/"+invoiceAmount+"/"+amountPaid+"/"+pending+"/"
 });
 
 // delete invoices 
-const deleteSelectedInvoicesDataForSelectedAPI = async (pass, invoiceNo) => 
+const deleteSelectedInvoicesDataForSelectedAPI = async (pass, invoiceId, invoiceNo) => 
     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
-fetch("/api/v2/amount/"+pass+"/U9/"+invoiceNo, {
+fetch("/api/v2/amount/"+pass+"/U9/"+invoiceId, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -809,7 +809,7 @@ export default function Invoices() {
 
             try {    
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
-                const result  = await deleteSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo))); 
+                const result  = await deleteSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, selectedInvoice.invoiceId, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo))); 
                 const queryResult = await result.json() // get data
 
                 // console.log(queryResult);

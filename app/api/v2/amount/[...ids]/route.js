@@ -408,9 +408,10 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U9'){ // DELETE SELECTED INVOICE
             
-                var invoiceNo = decodeURIComponent(params.ids[2]);
+                var invoiceId = params.ids[2];
+                // var invoiceNo = decodeURIComponent(params.ids[2]);
 
-                const q = `DELETE FROM invoices WHERE invoiceNo = `+invoiceNo+` `;
+                const q = "DELETE FROM invoices WHERE invoiceId = "+invoiceId;
                 
                 const [payments] = await connection.query(q,[]);
 
