@@ -158,9 +158,9 @@ const updateUploadInvoicesData = async (pass, items1, adminId) =>
     
 
 // update invoices
-const updateSelectedInvoicesDataForSelectedAPI = async (pass, invoiceNo, invoiceAmount, amountPaid, pending) => 
+const updateSelectedInvoicesDataForSelectedAPI = async (pass, invoiceNo, invoiceAmount, amountPaid, pending, invoiceId) => 
     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
-fetch("/api/v2/amount/"+pass+"/U8/"+invoiceAmount+"/"+amountPaid+"/"+pending+"/"+invoiceNo, {
+fetch("/api/v2/amount/"+pass+"/U8/"+invoiceAmount+"/"+amountPaid+"/"+pending+"/"+invoiceId, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -720,7 +720,7 @@ export default function Invoices() {
 
             try {    
                 console.log("/api/v2/amount/"+process.env.NEXT_PUBLIC_API_PASS+"/U8/"+encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo))+"/"+selectedTotalAmount+"/"+selectedAmountPaid+"/"+selectedPendingAmount);
-                const result  = await updateSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo)), selectedTotalAmount, selectedAmountPaid, selectedPendingAmount); 
+                const result  = await updateSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo)), selectedTotalAmount, selectedAmountPaid, selectedPendingAmount, selectedInvoice.invoiceId); 
                 const queryResult = await result.json() // get data
 
                 console.log(queryResult);
