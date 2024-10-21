@@ -380,11 +380,11 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U8'){ // Update individual invoice by superAdmin
             
-                var invoiceNo = decodeURIComponent(params.ids[2]);
-                var totalAmount = params.ids[3];
-                var amountPaid = params.ids[4];
-                var pending = params.ids[5];
-                
+                var totalAmount = params.ids[2];
+                var amountPaid = params.ids[3];
+                var pending = params.ids[4];
+                var invoiceNo = decodeURIComponent(params.ids[5]);
+
                 // check if amount being paid is more, accordingly we need to update the status
                 var status = (amountPaid == 0) ? 'NotPaid' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
                 
@@ -393,7 +393,7 @@ export async function GET(request,{params}) {
                 
                 
 
-                const q = "UPDATE invoices SET totalAmount= CONVERT("+totalAmount+" AS DECIMAL(10, 2)), amountPaid=  CONVERT("+amountPaid+" AS DECIMAL(10, 2)), pending=  CONVERT("+pending+" AS DECIMAL(10, 2)), status='"+status+"' WHERE invoiceNo = '"+invoiceNo+"'";
+                const q = "UPDATE invoices SET totalAmount= CONVERT("+totalAmount+", DECIMAL(10, 2)), amountPaid=  CONVERT("+amountPaid+", DECIMAL(10, 2)), pending=  CONVERT("+pending+", DECIMAL(10, 2)), status='"+status+"' WHERE invoiceNo = "+invoiceNo;
                 console.log(q);
                 const [rows2, fields2] = await connection.execute(q);
                 connection.release();

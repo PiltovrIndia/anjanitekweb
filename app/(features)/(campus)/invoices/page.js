@@ -160,7 +160,7 @@ const updateUploadInvoicesData = async (pass, items1, adminId) =>
 // update invoices
 const updateSelectedInvoicesDataForSelectedAPI = async (pass, invoiceNo, invoiceAmount, amountPaid, pending) => 
     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
-fetch("/api/v2/amount/"+pass+"/U8/"+invoiceNo+"/"+invoiceAmount+"/"+amountPaid+"/"+pending, {
+fetch("/api/v2/amount/"+pass+"/U8/"+invoiceAmount+"/"+amountPaid+"/"+pending+"/"+invoiceNo, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
