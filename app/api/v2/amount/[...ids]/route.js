@@ -427,7 +427,7 @@ export async function GET(request,{params}) {
     }
     catch (err){
         // some error occured
-        return Response.json({status: 500, message:'Facing issues. Please try again!'}, {status: 200})
+        return Response.json({status: 500, message:'Facing issues. Please try again!'+err}, {status: 200})
     }
   }
 

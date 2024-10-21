@@ -719,7 +719,7 @@ export default function Invoices() {
 
 
             try {    
-                console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/"+encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo))+"/"+selectedTotalAmount+"/"+selectedAmountPaid+"/"+selectedPendingAmount);
+                console.log("/api/v2/amount/"+process.env.NEXT_PUBLIC_API_PASS+"/U8/"+encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo))+"/"+selectedTotalAmount+"/"+selectedAmountPaid+"/"+selectedPendingAmount);
                 const result  = await updateSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo)), selectedTotalAmount, selectedAmountPaid, selectedPendingAmount); 
                 const queryResult = await result.json() // get data
 
