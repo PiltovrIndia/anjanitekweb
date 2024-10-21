@@ -832,6 +832,7 @@ export default function Invoices() {
                 }
                 else if(queryResult.status == 401 || queryResult.status == 201 ) {
                     // setDealerInvoices([]);
+                    setSelectedInvoice('');
                     setDeletingInvoice(false);
                     
                 }
@@ -840,7 +841,7 @@ export default function Invoices() {
                     toast({
                         description: "No more",
                     })
-                    
+                    setSelectedInvoice('');
                     setDeletingInvoice(false);
                     
                 }
