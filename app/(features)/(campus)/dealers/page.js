@@ -1379,6 +1379,7 @@ const sendMessageNow = async (e) => {
             </TableRow>
         </TableHeader>
         <TableBody>
+            
         {allDealersFiltered.length > 0 ? 
             allDealersFiltered.map((row) => (
                 <TableRow key={row.id} className='cursor-pointer' onClick={() => handleRowClick(row)}>

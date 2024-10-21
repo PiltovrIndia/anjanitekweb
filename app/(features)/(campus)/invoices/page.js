@@ -719,14 +719,14 @@ export default function Invoices() {
 
 
             try {    
-                // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/"+encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo))+"/"+selectedTotalAmount+"/"+selectedAmountPaid+"/"+selectedPendingAmount);
+                console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/"+encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo))+"/"+selectedTotalAmount+"/"+selectedAmountPaid+"/"+selectedPendingAmount);
                 const result  = await updateSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo)), selectedTotalAmount, selectedAmountPaid, selectedPendingAmount); 
                 const queryResult = await result.json() // get data
 
-                // console.log(queryResult);
+                console.log(queryResult);
                 // check for the status
                 if(queryResult.status == 200){
-
+                    console.log('Error check 1');
                     var updateStatus = (selectedAmountPaid == 0) ? 'NotPaid' : (selectedTotalAmount - selectedAmountPaid) > 0 ? 'PartialPaid' : 'Paid';
 
                     setAllInvoicesFiltered((invoices) =>
@@ -744,6 +744,7 @@ export default function Invoices() {
                           return item;
                         })
                       );
+                      console.log('Error check 2');
                     setAllInvoices((invoices) =>
                         invoices.map((item) => {
                           if (item.invoiceNo === selectedInvoice.invoiceNo) {
@@ -759,7 +760,7 @@ export default function Invoices() {
                           return item;
                         })
                       );
-                      
+                      console.log('Error check 3');
                     // reset the numbers to 0
                     setSelectedInvoice('');
                     setSelectedTotalAmount(0);
