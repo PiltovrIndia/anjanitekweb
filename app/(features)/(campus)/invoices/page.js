@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, Receipt, ArrowDown } from 'phosphor-react'
+import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, Receipt, ArrowDown, Trash } from 'phosphor-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
@@ -16,7 +16,7 @@ import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/
 import firebase from '../../../firebase';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel} from '@/app/components/ui/select'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/app/components/ui/dropdown-menu"
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,} from "@/app/components/ui/dialog"
+// import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,} from "@/app/components/ui/dialog"
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger,} from "@/app/components/ui/drawer"
 import { Separator } from "@/app/components/ui/separator"
 import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group"
@@ -24,6 +24,8 @@ import { Label } from "@/app/components/ui/label"
 import { Checkbox } from "@/app/components/ui/checkbox"
 import { Input } from "@/app/components/ui/input"
 import { Skeleton } from "@/app/components/ui/skeleton"
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/app/components/ui/dialog"
+
 
 import BlockDatesBtn from '../../../components/myui/blockdatesbtn'
 import OutingRequest from '../../../components/myui/outingrequest'
@@ -155,10 +157,21 @@ const updateUploadInvoicesData = async (pass, items1, adminId) =>
     });
     
 
-// update invoices of selected dealer
+// update invoices
 const updateSelectedInvoicesDataForSelectedAPI = async (pass, invoiceNo, invoiceAmount, amountPaid, pending) => 
     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
 fetch("/api/v2/amount/"+pass+"/U8/"+invoiceNo+"/"+invoiceAmount+"/"+amountPaid+"/"+pending, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// delete invoices 
+const deleteSelectedInvoicesDataForSelectedAPI = async (pass, invoiceNo) => 
+    // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
+fetch("/api/v2/amount/"+pass+"/U9/"+invoiceNo, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -183,6 +196,10 @@ export default function Invoices() {
     const [selectedInvoice, setSelectedInvoice] = useState('');
     const [offset, setOffset] = useState(0);
     const [updatingInvoice, setUpdatingInvoice] = useState(false);
+    const [deletingInvoice, setDeletingInvoice] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+
     const [completed, setCompleted] = useState(false);
     const [searching, setSearching] = useState(true);
     const [searchingOther, setOtherSearching] = useState(true);
@@ -632,12 +649,14 @@ export default function Invoices() {
     setSelectedInvoice(invoice); // Set the selected dealer
     setOpenInvoice(true); // Open the sheet
     
-    // setDealerPending(0);
-    // setRemainingCredit(0);
-    // setTotalCredit(0);
+  };
 
-    // make the API call to get the invoices.
-    // getInvoicesOfSelectedDealer(dealer.id);
+  // Function to handle row click and open the sheet
+  const handleDeleteClick = (invoice) => {
+
+    setSelectedInvoice(invoice); // Set the selected dealer
+    setIsDialogOpen(true); // Open the sheet
+    
   };
 
 
@@ -710,14 +729,6 @@ export default function Invoices() {
 
                     var updateStatus = (selectedAmountPaid == 0) ? 'NotPaid' : (selectedTotalAmount - selectedAmountPaid) > 0 ? 'PartialPaid' : 'Paid';
 
-                    // update the listing
-                    // setAllInvoices((invoices) =>
-                    //     invoices.map((item) =>
-                    //     item.invoiceNo === selectedInvoice
-                    //     ? { ...item, status: updateStatus, totalAmount: selectedTotalAmount, amountPaid: selectedAmountPaid, pending: selectedPendingAmount } // Updates the status field
-                    //     : item // Keeps all other items unchanged
-                    // )
-                    // );
                     setAllInvoicesFiltered((invoices) =>
                         invoices.map((item) => {
                           if (item.invoiceNo === selectedInvoice.invoiceNo) {
@@ -748,17 +759,6 @@ export default function Invoices() {
                           return item;
                         })
                       );
-
-                    // update the listing
-                    // setAllInvoicesFiltered((invoices) =>
-                    //     invoices.map((item) =>
-                    //     item.invoiceNo === selectedInvoice
-                    //     ? { ...item, status: updateStatus, totalAmount: selectedTotalAmount, amountPaid: selectedAmountPaid, pending: selectedPendingAmount } // Updates the status field
-                    //     : item // Keeps all other items unchanged
-                    // )
-                    // );
-                    
-                      
                       
                     // reset the numbers to 0
                     setSelectedInvoice('');
@@ -793,6 +793,63 @@ export default function Invoices() {
         else {
             toast({ description: "Adjust amount of invoice", })
         }
+    }
+
+
+    // Delete selected invoice
+    async function deleteSelectedInvoice(){
+        
+        // const invoicesWithAppliedAmount = dealerInvoices.filter(invoice => invoice.appliedAmount > 0);
+        
+        // check if atleast 1 invoice is selected.
+        
+            setDeletingInvoice(true);
+
+
+            try {    
+                // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
+                const result  = await deleteSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo))); 
+                const queryResult = await result.json() // get data
+
+                // console.log(queryResult);
+                // check for the status
+                if(queryResult.status == 200){
+
+                    setAllInvoicesFiltered((invoices) =>
+                        invoices.filter((item) => item.invoiceNo !== selectedInvoice.invoiceNo)
+                      );
+                      setAllInvoices((invoices) =>
+                        invoices.filter((item) => item.invoiceNo !== selectedInvoice.invoiceNo)
+                      );
+
+                      setSelectedInvoice('');
+                      setIsDialogOpen(false);
+                      toast({ description: "Invoice Deleted!", })
+                    // reset the numbers to 0
+                    setDeletingInvoice(false);
+                    
+                    
+                }
+                else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                    // setDealerInvoices([]);
+                    setDeletingInvoice(false);
+                    
+                }
+                else if(queryResult.status == 404) {
+                    // setDealerInvoices([]);
+                    toast({
+                        description: "No more",
+                    })
+                    
+                    setDeletingInvoice(false);
+                    
+                }
+            }
+            catch (e){
+                console.log(e);
+                
+                toast({ description: "Issue loading. Please refresh or try again later!", })
+            }
     }
 
 
@@ -988,9 +1045,9 @@ export default function Invoices() {
             
             {(allInvoicesFiltered==null) ? '' :
             allInvoicesFiltered.map((row) => (
-                <TableRow key={row.id} className='cursor-pointer' onClick={() => handleRowClick(row)}>
-                    <TableCell className="py-4">
-                        <div className='flex flex-row gap-2 items-center'>
+                <TableRow key={row.id} >
+                    <TableCell>
+                        <div className='flex flex-row gap-2 items-center text-blue-600 font-semibold py-4 cursor-pointer' onClick={() => handleRowClick(row)}>
                             {row.invoiceNo} 
                             {/* <p className="text-sm text-slate-500 bg-slate-50 px-1 py-1 w-fit border border-slate-200 rounded">
                                 {row.invoiceType}
@@ -1022,7 +1079,7 @@ export default function Invoices() {
 
                             }
                         </div>
-                        </TableCell>
+                    </TableCell>
                         <TableCell>
                             <div className="flex flex-row items-center gap-2">
                                 <p className="text-sm font-semibold text-red-500">
@@ -1040,7 +1097,22 @@ export default function Invoices() {
                                 </p>
                             </div>
                         </TableCell>
-                    <TableCell>
+                        <TableCell>
+                            {deletingInvoice ?
+                            <div className="flex flex-row m-12">    
+                                <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                                <p className={`${inter.className} ${styles.text3}`}>Deleting...</p> 
+                            </div>
+                            :
+                            <div className="flex flex-row items-center gap-2">
+                                <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{handleDeleteClick(row)}}><Trash size={24} className="text-red-600"/> &nbsp;Delete</Button>            
+                                {/* <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{setSelectedInvoice(row),setIsDialogOpen(true)}}><Trash size={24} className="text-red-600"/> &nbsp;Delete</Button>             */}
+                                {/* Dialog Component */}
+                                
+                            </div>
+                            }
+                        </TableCell>
+                    {/* <TableCell> */}
                     {/* {allSalesPeople.length == 0 ? getSalesPersons() : null}} */}
                             {/* <Sheet>
                                 <SheetTrigger asChild>
@@ -1108,16 +1180,34 @@ export default function Invoices() {
                             <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>updateActiveStatus(row.id, 0)}><UserMinus size={24} className="text-red-600"/> &nbsp;Deactivate</Button>
                             : <Button variant='outline' className="mx-2 px-2 text-blue-600" onClick={()=>updateActiveStatus(row.id, 1)}><UserPlus size={24} className="text-blue-600"/> &nbsp;Activate</Button>
                         } */}
-                    </TableCell>
+                    {/* </TableCell> */}
                 </TableRow>
             ))}
         </TableBody>
     </Table>
 </Card>
 
+<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <DialogContent>
+    <DialogHeader>
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogDescription>
+        Are you sure you want to delete this invoice? This action cannot be undone.
+        </DialogDescription>
+    </DialogHeader>
+    <DialogFooter>
+        <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>
+        Cancel
+        </Button>
+        <Button variant="destructive" onClick={()=>deleteSelectedInvoice()}>
+        Delete
+        </Button>
+    </DialogFooter>
+    </DialogContent>
+</Dialog>
 
 {/* Sheet to show selected invoice details */}
-{selectedInvoice && (
+{(selectedInvoice && !isDialogOpen) && (
         <Sheet open={open}>
             
           <SheetContent className='flex flex-col min-w-[800px]'>
@@ -1158,7 +1248,6 @@ export default function Invoices() {
                     </div>
                     <p className='text-blue-600'>Previous pending: {selectedInvoice.pending}</p>
                 </div>
-                
                 
             </div>
             

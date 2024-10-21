@@ -399,6 +399,17 @@ export async function GET(request,{params}) {
                 // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
                 return Response.json({status: 200, message:'Success!'}, {status: 200})
             }
+            else if(params.ids[1] == 'U9'){ // DELETE SELECTED INVOICE
+            
+                var invoiceNo = decodeURIComponent(params.ids[2]);
+
+                const q = `DELETE FROM invoices WHERE invoiceNo = `+invoiceNo+` `;
+                
+                const [payments] = await connection.query(q,[]);
+
+                // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
+                return Response.json({status: 200, message:'Success!'}, {status: 200})
+            }
             else {
                 return Response.json({status: 404, message:'Not found!'}, {status: 200})
             }
