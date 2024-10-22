@@ -434,7 +434,11 @@ export async function GET(request,{params}) {
 
                 var invoiceNo1 = invoiceNo.replace(/"/g, '');
 
+                console.log(decodeURIComponent(params.ids[2]));
+                console.log(decodeURIComponent((params.ids[2]).replace(/"/g, '')));
+                console.log(decodeURIComponent(params.ids[2]).replace(/"/g, ''));
                 console.log(invoiceNo);
+                console.log(invoiceNo1);
                 console.log(invoiceType);
                 console.log(invoiceDate);
                 console.log(dealerId);
