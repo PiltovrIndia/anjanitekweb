@@ -408,8 +408,8 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U9'){ // DELETE SELECTED INVOICE
             
-                var invoiceNo = params.ids[2];
-                // var invoiceNo = decodeURIComponent(params.ids[2]);
+                // var invoiceNo = params.ids[2];
+                var invoiceNo = decodeURIComponent(params.ids[2]);
                 console.log("invoiceNo: "+invoiceNo);
                 
 
@@ -431,7 +431,6 @@ export async function GET(request,{params}) {
                 var amountPaid = params.ids[7];
                 var expiryDate = params.ids[8];
                 
-
                 var invoiceNo1 = invoiceNo.replace(/"/g, '');
 
                 console.log(decodeURIComponent(params.ids[2]));
@@ -445,8 +444,7 @@ export async function GET(request,{params}) {
                 console.log(invoiceAmount);
                 console.log(amountPaid);
                 console.log(expiryDate);
-                
-                
+                                
                 await applyInvoicesUpload(invoiceNo1, invoiceType, invoiceDate, dealerId, invoiceAmount, amountPaid, expiryDate);
 
                 return Response.json({status: 200, message:'Success!'}, {status: 200})
