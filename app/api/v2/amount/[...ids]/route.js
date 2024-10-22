@@ -13,6 +13,7 @@ export async function GET(request,{params}) {
     // get the pool connection to db
     const connection = await pool.getConnection();
     
+    
 
     try{
 
@@ -453,6 +454,54 @@ export async function GET(request,{params}) {
 
 
 
+  
+export async function POST(request,{params}) {
+    
+    try{
+
+        // authorize secret key
+        if(await Keyverify(params.ids[0])){
+          
+          
+            if(params.ids[1] == 'U7'){ // Upload invoices in bulk
+            
+                console.log(await request.json());
+                
+                // invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
+                // Parse the JSON string into an array
+                // const decodedItems = decodeURIComponent(params.ids[2]);
+                // const items = JSON.parse(decodedItems);
+                const items = await request.json();
+                
+                items.forEach(async (item, index) => {
+                    // console.log(`Item ${index}:`, item);
+                    await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
+                // await applyPayment(item.gst, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+                });
+
+                // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
+                return Response.json({status: 200, message:'Success!'}, {status: 200})
+            }
+            else {
+                return Response.json({status: 404, message:'Not found!'}, {status: 200})
+            }
+        }
+        else {
+            // wrong secret key
+            return Response.json({status: 401, message:'Unauthorized'}, {status: 200})
+        }
+    }
+    catch (err){
+        // some error occured
+        return Response.json({status: 500, message:'Facing issues. Please try again!'+err}, {status: 200})
+    }
+  }
+
+
+
+
+
+
 
   // apply invoices upload one by one
   // provided: invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, expiryDate
@@ -477,12 +526,13 @@ export async function GET(request,{params}) {
         
 
         const q = 'INSERT INTO invoices (invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)), ?, ?, ? )';
-        console.log(q);
+        // console.log(q);
         
         const [payments] = await connection.query(q,[invoiceNo, invoiceType, invoiceDate, '-','-','-','-',dealerId, dealerId, totalAmount, amountPaid, pending, status, expiryDate, '-']);
 
         await connection.commit();
     } catch (error) {
+        console.log(error);
         await connection.rollback();
         throw error;
     } finally {

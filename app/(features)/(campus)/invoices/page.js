@@ -153,11 +153,12 @@ const updateUploadInvoicesData = async (pass, items1, adminId) =>
     // userId, paymentAmount, type, transactionId, paymentDate,
     // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
     fetch("/api/v2/amount/"+pass+"/U7/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
-        method: "GET",
+        method: "POST",
         headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
         },
+        body: JSON.stringify(items1),
     });
     
 
