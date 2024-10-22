@@ -413,8 +413,7 @@ export async function GET(request,{params}) {
                 var invoiceNo = params.ids[2].replace('***','/');
 
                 const q = "DELETE FROM invoices WHERE invoiceNo = '"+invoiceNo+"'";
-                // const q = "DELETE FROM invoices WHERE invoiceNo = '"+invoiceNo.replace(/"/g, '')+"'";
-                // console.log(q);
+                
                 const [rows2, fields2] = await connection.execute(q);
                 
                 // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
@@ -431,7 +430,6 @@ export async function GET(request,{params}) {
                 var amountPaid = params.ids[7];
                 var expiryDate = params.ids[8];
             
-                console.log(invoiceNo);
                                 
                 await applyInvoicesUpload(invoiceNo, invoiceType, invoiceDate, dealerId, invoiceAmount, amountPaid, expiryDate);
 

@@ -1248,7 +1248,7 @@ export default function Invoices() {
             allInvoicesFiltered.map((row) => (
                 <TableRow key={row.id} >
                     <TableCell>
-                        <div className='flex flex-row gap-2 items-center text-blue-600 font-semibold py-4 cursor-pointer' onClick={() => handleRowClick(row)}>
+                        <div className='flex flex-row gap-2 items-center text-blue-600 font-semibold py-4 w-max cursor-pointer' onClick={() => handleRowClick(row)}>
                             {row.invoiceNo} 
                             {/* <p className="text-sm text-slate-500 bg-slate-50 px-1 py-1 w-fit border border-slate-200 rounded">
                                 {row.invoiceType}
@@ -1268,13 +1268,13 @@ export default function Invoices() {
                     <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY")}</TableCell>
                     {/* <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY hh:mm A")}</TableCell> */}
                     <TableCell>
-                        <div className='flex flex-row gap-2 items-center'>
+                        <div className='flex flex-col gap-1 w-max items-start'>
                             {dayjs(row.expiryDate).format("DD/MM/YY")} 
                             {dayjs(row.expiryDate).diff(dayjs(new Date()), 'days') > 0 ?
-                                <p className="text-sm text-yellow-700 bg-yellow-100 px-1 py-0.5 w-fit border border-yellow-400 rounded">
+                                <p className="text-xs text-yellow-700 bg-yellow-100 px-0.5 py-0.25 w-fit mb-1 border border-yellow-400 rounded">
                                     {dayjs(row.expiryDate).diff(dayjs(new Date()), 'days')+'-days left'}
                                 </p>
-                                : <p className="text-sm text-red-500 bg-red-50 px-1 py-0.5 w-fit border border-red-200 rounded">
+                                : <p className="text-xs text-red-500 bg-red-50 px-0.5 py-0.25 w-fit mb-1 border border-red-200 rounded">
                                    {'Expired'+dayjs(row.expiryDate).diff(dayjs(new Date()), 'days') +' days ago'}
                                 </p>
 

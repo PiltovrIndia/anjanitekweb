@@ -74,7 +74,7 @@ export async function GET(request,{params}) {
             const items = JSON.parse(decodedItems);
             
             items.forEach(async (item, index) => {
-              console.log(`Item ${index}:`, item);
+              // console.log(`Item ${index}:`, item);
               await applyPayment(item.gst, item.amount, item.type, item.invoiceNo, item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
             });
 
@@ -109,7 +109,7 @@ export async function POST(request, {params}) {
               // invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
               const items = await request.json();
 
-              await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], items, decodeURIComponent(params.ids[6]), new Date(params.ids[7]), params.ids[8],params.ids[9]);
+              await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], items, decodeURIComponent(params.ids[5]), new Date(params.ids[6]), params.ids[7],params.ids[8]);
               return Response.json({status: 200, message:'Success!'}, {status: 200})
               
           }
@@ -123,11 +123,10 @@ export async function POST(request, {params}) {
             const items = await request.json();
             
             items.forEach(async (item, index) => {
-              console.log(`Item ${index}:`, item);
-              await applyPayment(item.gst, item.amount, item.type, item.invoiceNo.replace('***','/'), item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+              // console.log(`Item ${index}:`, item);
+              await applyPayment(item.gst, item.amount, item.type, item.invoiceNo.replace('***','/'), item.transactionId, item.paymentDate, params.ids[2],params.ids[3]);
             });
 
-            // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           else {
@@ -172,7 +171,7 @@ export async function POST(request, {params}) {
         var invcs = '';
 
         invoicesList.forEach(async (invoice, index) => {
-          console.log(`Item ${index}:`, invoice.invoiceNo.replace('***','/'));
+          // console.log(`Item ${index}:`, invoice.invoiceNo.replace('***','/'));
           
           invcs = invcs + invoice.invoiceNo.replace('***','/') + ","; // get the invoice which is getting updated
           
@@ -324,7 +323,7 @@ export async function POST(request, {params}) {
             bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
         }
         const q = 'INSERT INTO payments (amount, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
-        console.log(q);
+        // console.log(q);
         
         const [payments] = await connection.query(q,[amount, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
 
