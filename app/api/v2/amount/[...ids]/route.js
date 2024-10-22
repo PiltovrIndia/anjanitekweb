@@ -430,8 +430,19 @@ export async function GET(request,{params}) {
                 var amountPaid = params.ids[7];
                 var expiryDate = params.ids[8];
                 // var invoiceNo = decodeURIComponent(params.ids[2]);
+
+                var invoiceNo1 = invoiceNo.replace(/"/g, '');
+
+                console.log(invoiceNo);
+                console.log(invoiceType);
+                console.log(invoiceDate);
+                console.log(dealerId);
+                console.log(invoiceAmount);
+                console.log(amountPaid);
+                console.log(expiryDate);
                 
-                await applyInvoicesUpload(invoiceNo.replace(/"/g, ''), invoiceType, invoiceDate, dealerId, invoiceAmount, amountPaid, expiryDate);
+                
+                await applyInvoicesUpload(invoiceNo1, invoiceType, invoiceDate, dealerId, invoiceAmount, amountPaid, expiryDate);
 
                 return Response.json({status: 200, message:'Success!'}, {status: 200})
             }
@@ -476,6 +487,8 @@ export async function GET(request,{params}) {
         
 
         const q = 'INSERT INTO invoices (invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)), ?, ?, ? )';
+        console.log(q);
+        
         const [payments] = await connection.query(q,[invoiceNo, invoiceType, invoiceDate, '-','-','-','-',dealerId, dealerId, totalAmount, amountPaid, pending, status, expiryDate, '-']);
 
         await connection.commit();
