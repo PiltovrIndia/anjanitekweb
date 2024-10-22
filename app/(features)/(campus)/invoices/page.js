@@ -175,7 +175,7 @@ fetch("/api/v2/amount/"+pass+"/U8/"+invoiceAmount+"/"+amountPaid+"/"+pending+"/"
 // delete invoices 
 const deleteSelectedInvoicesDataForSelectedAPI = async (pass, invoiceId, invoiceNo) => 
     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
-fetch("/api/v2/amount/"+pass+"/U9/"+encodeURIComponent(""+invoiceNo+""), {
+fetch("/api/v2/amount/"+pass+"/U9/"+encodeURIComponent(JSON.stringify(invoiceNo)), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -884,6 +884,10 @@ export default function Invoices() {
         // check if atleast 1 invoice is selected.
         
             setDeletingInvoice(true);
+            console.log(encodeURIComponent(JSON.stringify(selectedInvoiceForDelete.invoiceNo)));
+            console.log(encodeURIComponent(selectedInvoiceForDelete.invoiceNo));
+            console.log(selectedInvoiceForDelete.invoiceNo);
+            
 
 
             try {    

@@ -12,6 +12,7 @@ export async function GET(request,{params}) {
 
     // get the pool connection to db
     const connection = await pool.getConnection();
+    
 
     try{
 
@@ -409,10 +410,10 @@ export async function GET(request,{params}) {
             else if(params.ids[1] == 'U9'){ // DELETE SELECTED INVOICE
             
                 // var invoiceNo = params.ids[2];
-                var invoiceNo = decodeURIComponent(params.ids[2]);
                 console.log("invoiceNo: "+params.ids[2]);
+                // console.log("invoiceNo: "+invoiceNo);
+                var invoiceNo = JSON.parse(decodeURIComponent(params.ids[2]));
                 console.log("invoiceNo: "+invoiceNo);
-                
 
                 const q = "DELETE FROM invoices WHERE invoiceNo = '"+invoiceNo.replace(/"/g, '')+"'";
                 console.log(q);
