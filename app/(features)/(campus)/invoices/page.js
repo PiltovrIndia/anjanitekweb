@@ -152,7 +152,8 @@ fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message
 const updateUploadInvoicesData = async (pass, items1, adminId) => 
     // userId, paymentAmount, type, transactionId, paymentDate,
     // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
-    fetch("/api/v2/amount/"+pass+"/U7/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
+    // fetch("/api/v2/amount/"+pass+"/U7/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
+    fetch("/api/v2/amount/"+pass+"/U7/"+adminId+"/-", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

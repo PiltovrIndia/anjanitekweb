@@ -455,7 +455,7 @@ export async function GET(request,{params}) {
 
 
   
-export async function POST(request,{params}) {
+export async function POST(request) {
     
     try{
 
@@ -465,19 +465,18 @@ export async function POST(request,{params}) {
           
             if(params.ids[1] == 'U7'){ // Upload invoices in bulk
             
-                console.log(await request.json());
-                
                 // invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
-                // Parse the JSON string into an array
-                // const decodedItems = decodeURIComponent(params.ids[2]);
-                // const items = JSON.parse(decodedItems);
                 const items = await request.json();
                 
-                items.forEach(async (item, index) => {
-                    // console.log(`Item ${index}:`, item);
+                for (const [index, item] of items.entries()){
+                    console.log(`Item ${index}:`, item);
                     await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
-                // await applyPayment(item.gst, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
-                });
+                }
+                    
+                // items.forEach(async (item, index) => {
+                //     console.log(`Item ${index}:`, item);
+                //     await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
+                // });
 
                 // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
                 return Response.json({status: 200, message:'Success!'}, {status: 200})
