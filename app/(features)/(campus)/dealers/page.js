@@ -114,14 +114,26 @@ fetch("/api/v2/amount/"+pass+"/U6/Dealer/"+selectedDealerId, {
 });
 
 // update invoices of selected dealer
+// const updateInvoicesDataForSelectedAPI = async (pass, selectedDealerId, amount, invoicesList, transactionId, paymentDate, adminId, particular) => 
+//     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
+// fetch("/api/v2/payments/"+pass+"/webbulk/"+selectedDealerId+"/"+amount+"/credit/"+encodeURIComponent(JSON.stringify(invoicesList))+"/"+transactionId+"/"+paymentDate+"/"+adminId+"/"+particular, {
+//     method: "GET",
+//     headers: {
+//         "Content-Type": "application/json",
+//         Accept: "application/json",
+//     },
+// });
+
+// update invoices of selected dealer
 const updateInvoicesDataForSelectedAPI = async (pass, selectedDealerId, amount, invoicesList, transactionId, paymentDate, adminId, particular) => 
     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
-fetch("/api/v2/payments/"+pass+"/webbulk/"+selectedDealerId+"/"+amount+"/credit/"+encodeURIComponent(JSON.stringify(invoicesList))+"/"+transactionId+"/"+paymentDate+"/"+adminId+"/"+particular, {
-    method: "GET",
+fetch("/api/v2/payments/"+pass+"/webbulk/"+selectedDealerId+"/"+amount+"/credit/"+transactionId+"/"+paymentDate+"/"+adminId+"/"+particular, {
+    method: "POST",
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
     },
+    body: JSON.stringify(invoicesList),
 });
 
 

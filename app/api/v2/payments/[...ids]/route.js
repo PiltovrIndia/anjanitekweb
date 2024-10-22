@@ -57,12 +57,10 @@ export async function GET(request,{params}) {
           if(params.ids[1] == 'websingle'){
             // apply payment to multiple invoices at a time
             // applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular)
-            await applyPayment(params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], paymentDate, params.ids[8],params.ids[9]);
+            await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5].replace('***','/'), params.ids[6], paymentDate, params.ids[8],params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
           if(params.ids[1] == 'webbulk'){
-            // apply payment to multiple SELECTED invoices at a time
-            // applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular)
             
             await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], JSON.parse(decodeURIComponent(params.ids[5])), decodeURIComponent(params.ids[6]), new Date(params.ids[7]), params.ids[8],params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
@@ -77,7 +75,7 @@ export async function GET(request,{params}) {
             
             items.forEach(async (item, index) => {
               console.log(`Item ${index}:`, item);
-              await applyPayment(item.gst, item.amount, item.type, item.invoiceNo.replace(/"/g, ''), item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+              await applyPayment(item.gst, item.amount, item.type, item.invoiceNo, item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
             });
 
             // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
@@ -95,6 +93,60 @@ export async function GET(request,{params}) {
         
     }
   }
+
+
+
+
+  
+export async function POST(request, {params}) {
+    
+  try{
+      // authorize secret key
+      if(await Keyverify(params.ids[0])){
+
+        if(params.ids[1] == 'webbulk'){ // Upload invoices in bulk
+          
+              // invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
+              const items = await request.json();
+
+              await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], items, decodeURIComponent(params.ids[6]), new Date(params.ids[7]), params.ids[8],params.ids[9]);
+              return Response.json({status: 200, message:'Success!'}, {status: 200})
+              
+          }
+          else if(params.ids[1] == 'web'){
+            // bulk upload from the web via excel
+            // apply payment to multiple invoices at a time
+            // id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
+            // Parse the JSON string into an array
+            // const decodedItems = decodeURIComponent(params.ids[2]);
+            // const items = JSON.parse(decodedItems);
+            const items = await request.json();
+            
+            items.forEach(async (item, index) => {
+              console.log(`Item ${index}:`, item);
+              await applyPayment(item.gst, item.amount, item.type, item.invoiceNo.replace('***','/'), item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+            });
+
+            // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
+            return Response.json({status: 200, message:'Success!'}, {status: 200})
+          }
+          else {
+              return Response.json({status: 404, message:'Not found!'}, {status: 200})
+          }
+      }
+      else {
+          // wrong secret key
+          return Response.json({status: 401, message:'Unauthorized'}, {status: 200})
+      }
+  }
+  catch (err){
+      // some error occured
+      return Response.json({status: 500, message:'Facing issues. Please try again!'+err}, {status: 200})
+  }
+}
+
+
+
 
 
   // apply payment to SELECTED invoices one by one
@@ -120,9 +172,9 @@ export async function GET(request,{params}) {
         var invcs = '';
 
         invoicesList.forEach(async (invoice, index) => {
-          // console.log(`Item ${index}:`, invoice.invoiceNo);
+          console.log(`Item ${index}:`, invoice.invoiceNo.replace('***','/'));
           
-          invcs = invcs + invoice.invoiceNo.replace(/"/g, '') + ","; // get the invoice which is getting updated
+          invcs = invcs + invoice.invoiceNo.replace('***','/') + ","; // get the invoice which is getting updated
           
           await connection.query(
                 `UPDATE invoices SET 
@@ -130,7 +182,7 @@ export async function GET(request,{params}) {
                     pending = pending - ?,
                     status = ?
                     WHERE invoiceNo = ?`,
-                [invoice.appliedAmount, invoice.appliedAmount, invoice.status, invoice.invoiceNo.replace(/"/g, '')]
+                [invoice.appliedAmount, invoice.appliedAmount, invoice.status, invoice.invoiceNo.replace('***','/')]
             );
             
             // if(paymentAmount > 0)  invcs += ','; // add , for next invoice in the list
@@ -237,7 +289,7 @@ export async function GET(request,{params}) {
         
             if (paymentAmount <= 0) break;
 
-            invcs += invoice.invoiceNo.replace(/"/g, ''); // get the invoice which is getting updated
+            invcs += invoice.invoiceNo; // get the invoice which is getting updated
 
             const amountToApply = Math.min(paymentAmount, invoice.pending); // get the minimum amount to apply
 
@@ -250,7 +302,7 @@ export async function GET(request,{params}) {
                     pending = pending - ?,
                     status = ?
                     WHERE invoiceNo = ?`,
-                [amountToApply, amountToApply, newStatus, invoice.invoiceNo.replace(/"/g, '')]
+                [amountToApply, amountToApply, newStatus, invoice.invoiceNo]
             );
             paymentAmount -= amountToApply;
             

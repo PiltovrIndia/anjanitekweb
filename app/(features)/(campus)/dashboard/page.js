@@ -141,7 +141,7 @@ const sendDealerMessage = async (pass, sender, receiver, sentAt, message, seen, 
 // update the amount for a dealer
 const sendPaymentUpdate = async (pass, dealer, amount, invoiceNo, transaction, date, adminId, message) => 
   
-    fetch("/api/v2/payments/"+pass+"/websingle/"+dealer+"/"+amount+"/credit/"+encodeURIComponent(invoiceNo)+"/"+transaction+"/"+date+"/"+adminId+"/"+message, {
+    fetch("/api/v2/payments/"+pass+"/websingle/"+dealer+"/"+amount+"/credit/"+invoiceNo.replace('/','***')+"/"+transaction+"/"+date+"/"+adminId+"/"+message, {
     // fetch("/api/v2/payments/"+pass+"/websingle/"+dealer+"/"+amount+"/credit/"+transaction+"/"+date+"/"+adminId+"/"+message+"/"+JSON.stringify(invoiceNo), {
         method: "GET",
         headers: {
@@ -156,23 +156,26 @@ const sendPaymentUpdate = async (pass, dealer, amount, invoiceNo, transaction, d
 const updateUploadData = async (pass, items1, adminId) => 
     // userId, paymentAmount, type, transactionId, paymentDate,
     // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
-    fetch("/api/v2/payments/"+pass+"/web/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
-        method: "GET",
+    // fetch("/api/v2/payments/"+pass+"/web/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
+    fetch("/api/v2/payments/"+pass+"/web/"+adminId+"/-", {
+        method: "POST",
         headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
         },
+        body: JSON.stringify(items1),
     });
 // upload invoices data
 const updateUploadInvoicesData = async (pass, items1, adminId) => 
     // userId, paymentAmount, type, transactionId, paymentDate,
     // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
-    fetch("/api/v2/amount/"+pass+"/U7/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
-        method: "GET",
+    fetch("/api/v2/amount/"+pass+"/U7/"+adminId+"/-", {
+        method: "POST",
         headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
         },
+        body: JSON.stringify(items1),
     });
     
 

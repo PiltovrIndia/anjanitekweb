@@ -469,14 +469,14 @@ export async function POST(request, {params}) {
                 const items = await request.json();
                 
                 for (const [index, item] of items.entries()){
-                    console.log(`Item ${index}:`, item);
+                    // console.log(`Item ${index}:`, item);
                     await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
                 }
                     
-                items.forEach(async (item, index) => {
-                    console.log(`Item ${index}:`, item);
-                    await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
-                });
+                // items.forEach(async (item, index) => {
+                //     console.log(`Item ${index}:`, item);
+                //     await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
+                // });
 
                 // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
                 return Response.json({status: 200, message:'Success!'}, {status: 200})
