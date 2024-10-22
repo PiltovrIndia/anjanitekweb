@@ -371,8 +371,8 @@ export async function GET(request,{params}) {
                 const items = JSON.parse(decodedItems);
                 
                 items.forEach(async (item, index) => {
-                    console.log(`Item ${index}:`, item);
-                    await applyInvoicesUpload(item.invoiceNo, item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
+                    // console.log(`Item ${index}:`, item);
+                    await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
                 // await applyPayment(item.gst, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
                 });
 
@@ -409,18 +409,11 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U9'){ // DELETE SELECTED INVOICE
             
-                // var invoiceNo = params.ids[2];
-                console.log("invoiceNo: "+params.ids[3]);
-                console.log("invoiceNo: "+params.ids[2]);
-                console.log("invoiceNo: "+params.ids[2].replace('***','/'));
+                var invoiceNo = params.ids[2].replace('***','/');
 
-                // console.log("invoiceNo: "+invoiceNo);
-                // var invoiceNo = JSON.parse(decodeURIComponent(params.ids[2]));
-                // console.log("invoiceNo: "+invoiceNo);
-
-                const q = "DELETE FROM invoices WHERE invoiceNo = '"+params.ids[2].replace('***','/')+"'";
+                const q = "DELETE FROM invoices WHERE invoiceNo = '"+invoiceNo+"'";
                 // const q = "DELETE FROM invoices WHERE invoiceNo = '"+invoiceNo.replace(/"/g, '')+"'";
-                console.log(q);
+                // console.log(q);
                 const [rows2, fields2] = await connection.execute(q);
                 
                 // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
@@ -428,30 +421,18 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U10'){ // Create Single INVOICE
             
-                // var invoiceNo = params.ids[2];
-                var invoiceNo = decodeURIComponent(params.ids[2]);
+                var invoiceNo = params.ids[2].replace('***','/');
+                // var invoiceNo = decodeURIComponent(params.ids[2]);
                 var invoiceType = params.ids[3];
                 var invoiceDate = params.ids[4];
                 var dealerId = params.ids[5];
                 var invoiceAmount = params.ids[6];
                 var amountPaid = params.ids[7];
                 var expiryDate = params.ids[8];
-                
-                var invoiceNo1 = invoiceNo.replace(/"/g, '');
-
-                console.log(decodeURIComponent(params.ids[2]));
-                console.log(decodeURIComponent((params.ids[2]).replace(/"/g, '')));
-                console.log(decodeURIComponent(params.ids[2]).replace(/"/g, ''));
+            
                 console.log(invoiceNo);
-                console.log(invoiceNo1);
-                console.log(invoiceType);
-                console.log(invoiceDate);
-                console.log(dealerId);
-                console.log(invoiceAmount);
-                console.log(amountPaid);
-                console.log(expiryDate);
                                 
-                await applyInvoicesUpload(invoiceNo1, invoiceType, invoiceDate, dealerId, invoiceAmount, amountPaid, expiryDate);
+                await applyInvoicesUpload(invoiceNo, invoiceType, invoiceDate, dealerId, invoiceAmount, amountPaid, expiryDate);
 
                 return Response.json({status: 200, message:'Success!'}, {status: 200})
             }

@@ -175,7 +175,7 @@ fetch("/api/v2/amount/"+pass+"/U8/"+invoiceAmount+"/"+amountPaid+"/"+pending+"/"
 // delete invoices 
 const deleteSelectedInvoicesDataForSelectedAPI = async (pass, invoiceId, invoiceNo) => 
     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
-fetch("/api/v2/amount/"+pass+"/U9/"+invoiceNo.replace('/','***')+"/"+encodeURIComponent(encodeURIComponent(JSON.stringify(invoiceNo))), {
+fetch("/api/v2/amount/"+pass+"/U9/"+invoiceNo.replace('/','***'), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -186,7 +186,7 @@ fetch("/api/v2/amount/"+pass+"/U9/"+invoiceNo.replace('/','***')+"/"+encodeURICo
 // delete invoices 
 const createSingleInvoiceDataForSelectedAPI = async (pass, invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, pending, expiryDate) => 
     
-fetch("/api/v2/amount/"+pass+"/U10/"+invoiceNo+"/"+invoiceType+"/"+invoiceDate+"/"+dealerId+"/"+totalAmount+"/"+amountPaid+"/"+pending+"/"+expiryDate, {
+fetch("/api/v2/amount/"+pass+"/U10/"+invoiceNo.replace('/','***')+"/"+invoiceType+"/"+invoiceDate+"/"+dealerId+"/"+totalAmount+"/"+amountPaid+"/"+pending+"/"+expiryDate, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -567,15 +567,23 @@ export default function Invoices() {
                     raw: false, // Do not use raw values (this ensures that dates are processed)
                 });
                 
+                // Replace '/' with '***' in the invoiceNo field for each item in the data array
+                const updatedData = data.map(item => {
+                    if (item.invoiceNo) {
+                        item.invoiceNo = item.invoiceNo.replace('/', '***');
+                    }
+                    return item;
+                });
                 // Optionally process amounts to ensure they are decimals with two decimal places
-                const processedData = data.map(item => ({
-                    ...item,
-                    amount: typeof item.amount === 'number' ? parseFloat(item.amount.toFixed(2)) : item.amount,
-                }));
+                // const processedData = data.map(item => ({
+                //     ...item,
+                //     amount: typeof item.amount === 'number' ? parseFloat(item.amount.toFixed(2)) : item.amount,
+                // }));
     
     
                 // setItems(data);
-                getInvoiceDataDetails(data);
+                // getInvoiceDataDetails(data);
+                getInvoiceDataDetails(updatedData);
                 // const data = XLSX.utils.sheet_to_json(worksheet);
                 // setItems(data);
                 // getDataDetails(data);
@@ -836,7 +844,6 @@ export default function Invoices() {
         
             setCreatingInvoice(true);
 
-            var invoiceee = ""+inputInvoiceNo+"";
             try {    
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
                 const result  = await createSingleInvoiceDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, inputInvoiceNo, inputInvoiceType, dayjs(inputInvoiceDate).format("YYYY-MM-DD hh:mm:ss").toString(), inputInvoiceDealer, inputInvoiceTotalAmount, inputInvoiceAmountPaid, dayjs(dayjs(inputInvoiceDate).add(45, 'day')).format("YYYY-MM-DD hh:mm:ss").toString() ); 
@@ -884,11 +891,6 @@ export default function Invoices() {
         // check if atleast 1 invoice is selected.
         
             setDeletingInvoice(true);
-            console.log(encodeURIComponent(encodeURIComponent(JSON.stringify(selectedInvoiceForDelete.invoiceNo))));
-            console.log(encodeURIComponent(JSON.stringify(selectedInvoiceForDelete.invoiceNo)));
-            console.log(encodeURIComponent(selectedInvoiceForDelete.invoiceNo));
-            console.log(selectedInvoiceForDelete.invoiceNo);
-            
 
 
             try {    
