@@ -410,12 +410,16 @@ export async function GET(request,{params}) {
             else if(params.ids[1] == 'U9'){ // DELETE SELECTED INVOICE
             
                 // var invoiceNo = params.ids[2];
+                console.log("invoiceNo: "+params.ids[3]);
                 console.log("invoiceNo: "+params.ids[2]);
-                // console.log("invoiceNo: "+invoiceNo);
-                var invoiceNo = JSON.parse(decodeURIComponent(params.ids[2]));
-                console.log("invoiceNo: "+invoiceNo);
+                console.log("invoiceNo: "+params.ids[2].replace('***','/'));
 
-                const q = "DELETE FROM invoices WHERE invoiceNo = '"+invoiceNo.replace(/"/g, '')+"'";
+                // console.log("invoiceNo: "+invoiceNo);
+                // var invoiceNo = JSON.parse(decodeURIComponent(params.ids[2]));
+                // console.log("invoiceNo: "+invoiceNo);
+
+                const q = "DELETE FROM invoices WHERE invoiceNo = '"+params.ids[2].replace('***','/')+"'";
+                // const q = "DELETE FROM invoices WHERE invoiceNo = '"+invoiceNo.replace(/"/g, '')+"'";
                 console.log(q);
                 const [rows2, fields2] = await connection.execute(q);
                 
