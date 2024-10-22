@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, Receipt, ArrowDown, Trash } from 'phosphor-react'
+import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, Receipt, ArrowDown, Trash, CalendarPlus } from 'phosphor-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
@@ -19,12 +19,16 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 // import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,} from "@/app/components/ui/dialog"
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger,} from "@/app/components/ui/drawer"
 import { Separator } from "@/app/components/ui/separator"
-import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group"
 import { Label } from "@/app/components/ui/label"
 import { Checkbox } from "@/app/components/ui/checkbox"
 import { Input } from "@/app/components/ui/input"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/app/components/ui/dialog"
+
+import { Calendar } from "@/app/components/ui/calendar";
+import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group";
+import { Popover, PopoverTrigger, PopoverContent } from "@/app/components/ui/popover";
+import { ScrollArea } from "@/app/components/ui/scroll-area"
 
 
 import BlockDatesBtn from '../../../components/myui/blockdatesbtn'
@@ -171,7 +175,18 @@ fetch("/api/v2/amount/"+pass+"/U8/"+invoiceAmount+"/"+amountPaid+"/"+pending+"/"
 // delete invoices 
 const deleteSelectedInvoicesDataForSelectedAPI = async (pass, invoiceId, invoiceNo) => 
     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
-fetch("/api/v2/amount/"+pass+"/U9/"+invoiceId, {
+fetch("/api/v2/amount/"+pass+"/U9/"+invoiceNo, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// delete invoices 
+const createSingleInvoiceDataForSelectedAPI = async (pass, invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, pending, expiryDate) => 
+    
+fetch("/api/v2/amount/"+pass+"/U10/"+invoiceNo+"/"+invoiceType+"/"+invoiceDate+"/"+dealerId+"/"+totalAmount+"/"+amountPaid+"/"+pending+"/"+expiryDate, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -194,6 +209,7 @@ export default function Invoices() {
     const [selectedState, setSelectedState] = useState('All');
     const [openInvoice, setOpenInvoice] = useState('');
     const [selectedInvoice, setSelectedInvoice] = useState('');
+    const [selectedInvoiceForDelete, setSelectedInvoiceForDelete] = useState('');
     const [offset, setOffset] = useState(0);
     const [updatingInvoice, setUpdatingInvoice] = useState(false);
     const [deletingInvoice, setDeletingInvoice] = useState(false);
@@ -207,6 +223,7 @@ export default function Invoices() {
     const [loadingIds, setLoadingIds] = useState(new Set());
     const [file, setFile] = useState(null); 
     const [uploadProgress, setUploadProgress] = useState(false);
+    const [createProgress, setCreatingInvoice] = useState(false);
     
     // get all sales people for changing the value
     const [allSalesPeople, setAllSalesPeople] = useState([]);
@@ -221,6 +238,14 @@ export default function Invoices() {
     const [selectedAmountPaid, setSelectedAmountPaid] = useState(0);
     const [selectedPendingAmount, setSelectedPendingAmount] = useState(0);
 
+    // State variables for each input field for create invoice
+    const [inputInvoiceNo, setInputInvoiceNo] = useState('');
+    const [inputInvoiceType, setInputInvoiceType] = useState('ATL');
+    const [inputInvoiceDate, setInputInvoiceDate] = useState('');
+    const [inputInvoiceDealer, setInputInvoiceDealer] = useState('');
+    const [inputInvoiceTotalAmount, setInputInvoiceTotalAmount] = useState(0);
+    const [inputInvoiceAmountPaid, setInputInvoiceAmountPaid] = useState(0);
+    
     
     const [initialDatesValues, setInititalDates] = React.useState({from: dayjs().subtract(0,'day'),to: dayjs(),});
     // const [currentStatus, setCurrentStatus] = useState('All');
@@ -654,7 +679,8 @@ export default function Invoices() {
   // Function to handle row click and open the sheet
   const handleDeleteClick = (invoice) => {
 
-    setSelectedInvoice(invoice); // Set the selected dealer
+    // setSelectedInvoice(invoice); // Set the selected dealer
+    setSelectedInvoiceForDelete(invoice); // Set the selected dealer
     setIsDialogOpen(true); // Open the sheet
     
   };
@@ -690,6 +716,10 @@ export default function Invoices() {
 
     }
   };
+  function validateInvoiceNo(invoiceNo) {
+    const regex = /^[A-Za-z0-9]{3}-..-..\/\d{4}$/;
+    return regex.test(invoiceNo);
+  }
   
   // Change amount changes
 //   const handlePendingChange = (e) => {
@@ -723,10 +753,10 @@ export default function Invoices() {
                 const result  = await updateSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo)), selectedTotalAmount, selectedAmountPaid, selectedPendingAmount, selectedInvoice.invoiceId); 
                 const queryResult = await result.json() // get data
 
-                console.log(queryResult);
+                
                 // check for the status
                 if(queryResult.status == 200){
-                    console.log('Error check 1');
+                    
                     var updateStatus = (selectedAmountPaid == 0) ? 'NotPaid' : (selectedTotalAmount - selectedAmountPaid) > 0 ? 'PartialPaid' : 'Paid';
 
                     setAllInvoicesFiltered((invoices) =>
@@ -744,7 +774,7 @@ export default function Invoices() {
                           return item;
                         })
                       );
-                      console.log('Error check 2');
+                      
                     setAllInvoices((invoices) =>
                         invoices.map((item) => {
                           if (item.invoiceNo === selectedInvoice.invoiceNo) {
@@ -760,7 +790,7 @@ export default function Invoices() {
                           return item;
                         })
                       );
-                      console.log('Error check 3');
+                      
                     // reset the numbers to 0
                     setSelectedInvoice('');
                     setSelectedTotalAmount(0);
@@ -797,6 +827,55 @@ export default function Invoices() {
     }
 
 
+    // Create invoice
+    async function createInvoice(){
+        
+        // const invoicesWithAppliedAmount = dealerInvoices.filter(invoice => invoice.appliedAmount > 0);
+        
+        // check if atleast 1 invoice is selected.
+        
+            setCreatingInvoice(true);
+
+
+            try {    
+                // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
+                const result  = await createSingleInvoiceDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(JSON.stringify(inputInvoiceNo)), inputInvoiceType, dayjs(inputInvoiceDate).format("YYYY-MM-DD hh:mm:ss").toString(), inputInvoiceDealer, inputInvoiceTotalAmount, inputInvoiceAmountPaid, dayjs(dayjs(inputInvoiceDate).add(45, 'day')).format("YYYY-MM-DD hh:mm:ss").toString() ); 
+                const queryResult = await result.json() // get data
+
+                console.log(queryResult);
+                // check for the status
+                if(queryResult.status == 200){
+
+                      
+                    toast({ description: "Invoice Created!", })
+                    // reset the numbers to 0
+                    setCreatingInvoice(false);
+                    
+                    
+                }
+                else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                    // setDealerInvoices([]);
+                    
+                    setCreatingInvoice(false);
+                    
+                }
+                else if(queryResult.status == 404) {
+                    // setDealerInvoices([]);
+                    toast({
+                        description: "No more",
+                    })
+                    
+                    setCreatingInvoice(false);
+                    
+                }
+            }
+            catch (e){
+                console.log(e);
+                
+                toast({ description: "Issue loading. Please refresh or try again later!", })
+            }
+    }
+
     // Delete selected invoice
     async function deleteSelectedInvoice(){
         
@@ -809,7 +888,7 @@ export default function Invoices() {
 
             try {    
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
-                const result  = await deleteSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, selectedInvoice.invoiceId, encodeURIComponent(JSON.stringify(selectedInvoice.invoiceNo))); 
+                const result  = await deleteSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, selectedInvoiceForDelete.invoiceId, encodeURIComponent(JSON.stringify(selectedInvoiceForDelete.invoiceNo))); 
                 const queryResult = await result.json() // get data
 
                 // console.log(queryResult);
@@ -817,13 +896,13 @@ export default function Invoices() {
                 if(queryResult.status == 200){
 
                     setAllInvoicesFiltered((invoices) =>
-                        invoices.filter((item) => item.invoiceNo !== selectedInvoice.invoiceNo)
+                        invoices.filter((item) => item.invoiceNo !== selectedInvoiceForDelete.invoiceNo)
                       );
                       setAllInvoices((invoices) =>
-                        invoices.filter((item) => item.invoiceNo !== selectedInvoice.invoiceNo)
+                        invoices.filter((item) => item.invoiceNo !== selectedInvoiceForDelete.invoiceNo)
                       );
 
-                      setSelectedInvoice('');
+                      setSelectedInvoiceForDelete('');
                       setIsDialogOpen(false);
                       toast({ description: "Invoice Deleted!", })
                     // reset the numbers to 0
@@ -833,7 +912,7 @@ export default function Invoices() {
                 }
                 else if(queryResult.status == 401 || queryResult.status == 201 ) {
                     // setDealerInvoices([]);
-                    setSelectedInvoice('');
+                    setSelectedInvoiceForDelete('');
                     setDeletingInvoice(false);
                     
                 }
@@ -842,7 +921,7 @@ export default function Invoices() {
                     toast({
                         description: "No more",
                     })
-                    setSelectedInvoice('');
+                    setSelectedInvoiceForDelete('');
                     setDeletingInvoice(false);
                     
                 }
@@ -889,7 +968,7 @@ export default function Invoices() {
 
                 <Sheet>
                     <SheetTrigger asChild>
-                        <Button className="text-white bg-green-600"><Receipt className='font-bold text-lg'/>&nbsp; Upload Invoices Data</Button>
+                        <Button className="text-white bg-green-600"><Receipt className='font-bold text-lg'/>&nbsp; Upload Invoices</Button>
                     </SheetTrigger>
                     <SheetContent>
                         <SheetHeader>
@@ -900,18 +979,6 @@ export default function Invoices() {
                         </SheetHeader>
                         <div className="grid gap-4 py-4">
                             <br/>
-                            {/* <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">
-                                Name
-                                </Label>
-                                <Input id="name" value="Pedro Duarte" className="col-span-3" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="username" className="text-right">
-                                Username
-                                </Label>
-                                <Input id="username" value="@peduarte" className="col-span-3" />
-                            </div> */}
                             <div className="grid w-full max-w-sm items-center gap-1.5">
                                 <Label htmlFor="picture">Data file</Label>
                                 <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
@@ -924,26 +991,149 @@ export default function Invoices() {
                         </SheetFooter>
                     </SheetContent>
                 </Sheet>
+                
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button className="text-white bg-blue-600"><Receipt className='font-bold text-lg'/>&nbsp; Create Invoice</Button>
+                    </SheetTrigger>
+                    <SheetContent className='overflow-y-scroll'>
+                        <SheetHeader>
+                        <SheetTitle>Create Invoice</SheetTitle>
+                        <SheetDescription>
+                            Make sure you enter all details correctly. Click Create now to create.
+                        </SheetDescription>
+                        </SheetHeader>
+                        
+                        <div className='flex flex-col gap-8 mt-4 mb-4'>
+                            <div className="flex flex-col gap-2 mt-4">
+                                <Label htmlFor="invoiceNo">Invoice No:</Label>
+                                <Input id="invoiceNo" type="text" value={inputInvoiceNo} onChange={(e) => setInputInvoiceNo(e.target.value)} placeholder="Enter Invoice No" />
+                            </div>
 
-                {uploadProgress ? <Card className="w-[350px]">
-                <CardHeader>
-                    <CardTitle>Uploading ...</CardTitle>
-                    <CardDescription>Do not close</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form>
-                    <div className="grid w-full items-center gap-4">
-                        <div className="flex flex-col space-y-1.5">
-                            <Skeleton className="h-4 w-[100px] h-[20px]" />
+                            {/* Invoice Type */}
+                            <div className="flex flex-col gap-2">
+                                <Label>Invoice Type:</Label>
+                                <RadioGroup value={inputInvoiceType} onValueChange={(value) => setInputInvoiceType(value)} className='flex flex-row gap-4 mt-2'>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="ATL" id="r1" />
+                                        <Label htmlFor="r1" className="cursor-pointer">ATL</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="VCL" id="r2" />
+                                        <Label htmlFor="r2" className="cursor-pointer">VCL</Label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
+
+                            {/* Invoice Date */}
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="invoiceDate">Invoice Date:</Label>
+                                <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                    variant="outline"
+                                    className="w-[240px] justify-start text-left font-normal"
+                                    >
+                                    {inputInvoiceDate ? dayjs(inputInvoiceDate).format('YYYY-MM-DD') : 'Pick a date'}
+                                    <CalendarPlus className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                    <Calendar
+                                    mode="single"
+                                    selected={inputInvoiceDate}
+                                    onSelect={(date) => setInputInvoiceDate(date)}
+                                    initialFocus
+                                    />
+                                </PopoverContent>
+                                </Popover>
+                            </div>
+
+                            {/* Invoice Dealer */}
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="invoiceDealer">Dealer GST:</Label>
+                                <Input id="invoiceDealer" type="text" value={inputInvoiceDealer} onChange={(e) => setInputInvoiceDealer(e.target.value)} placeholder="Enter Dealer GST" />
+                            </div>
+
+                            {/* Invoice Total Amount */}
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="totalAmount">Total Amount:</Label>
+                                <Input id="totalAmount" type="number" value={inputInvoiceTotalAmount} onChange={(e) => setInputInvoiceTotalAmount(parseFloat(e.target.value) || 0)} placeholder="Total Invoice Amount" />
+                            </div>
+
+                            {/* Amount Paid */}
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="amountPaid">Amount Paid:</Label>
+                                <Input id="amountPaid" type="number" value={inputInvoiceAmountPaid} onChange={(e) => setInputInvoiceAmountPaid( (parseFloat(e.target.value)>inputInvoiceTotalAmount ? inputInvoiceTotalAmount : parseFloat(e.target.value)) || 0)} placeholder="Enter Amount Paid" />
+                            </div>
+
+                            {/* Pending */}
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="pendingInput">Pending:</Label>
+                                <Input disabled id="pendingInput" type="number" value={Math.abs(inputInvoiceTotalAmount-inputInvoiceAmountPaid)} placeholder="0" />
+                            </div>
                         </div>
                         
-                    </div>
-                    </form>
-                </CardContent>
-                {/* <CardFooter className="flex justify-between">
-                    <Button>Send messages</Button>
-                </CardFooter> */}
-            </Card> : null}
+                        {/* <div className="grid gap-4 py-4">
+                            <br/>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="InvoiceNo" className="text-right">
+                                Invoice No
+                                </Label>
+                                <Input id="invoiceno" value={inputInvoiceNo} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="invoiceType" className="text-right">
+                                Invoice Type
+                                </Label>
+                                <Input id="invoiceType" value={inputInvoiceType} className="col-span-3" />
+                            </div>
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <Label htmlFor="picture">Data file</Label>
+                                <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
+                            </div>
+                        </div> */}
+                        <SheetFooter>
+                        <SheetClose asChild>
+                            <Button type="submit" onClick={createInvoice}>Create now</Button>
+                        </SheetClose>
+                        </SheetFooter>
+                    </SheetContent>
+                </Sheet>
+
+                {uploadProgress ? <Card className="w-[350px]">
+                    <CardHeader>
+                        <CardTitle>Uploading ...</CardTitle>
+                        <CardDescription>Do not close</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form>
+                        <div className="grid w-full items-center gap-4">
+                            <div className="flex flex-col space-y-1.5">
+                                <Skeleton className="h-4 w-[100px] h-[20px]" />
+                            </div>
+                            
+                        </div>
+                        </form>
+                    </CardContent>
+                </Card> : null}
+
+                {createProgress ? <Card className="w-[350px]">
+                    <CardHeader>
+                        <CardTitle>Creating ...</CardTitle>
+                        <CardDescription>Do not close</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form>
+                        <div className="grid w-full items-center gap-4">
+                            <div className="flex flex-col space-y-1.5">
+                                <Skeleton className="h-4 w-[100px] h-[20px]" />
+                            </div>
+                            
+                        </div>
+                        </form>
+                    </CardContent>
+                </Card> : null}
 
               <Toaster />
           </div>      
@@ -1209,7 +1399,7 @@ export default function Invoices() {
 </Dialog>
 
 {/* Sheet to show selected invoice details */}
-{(selectedInvoice && !isDialogOpen) && (
+{(selectedInvoice ) && (
         <Sheet open={open}>
             
           <SheetContent className='flex flex-col min-w-[800px]'>

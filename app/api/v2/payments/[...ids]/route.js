@@ -77,7 +77,7 @@ export async function GET(request,{params}) {
             
             items.forEach(async (item, index) => {
               console.log(`Item ${index}:`, item);
-              await applyPayment(item.gst, item.amount, item.type, item.invoiceNo, item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
+              await applyPayment(item.gst, item.amount, item.type, item.invoiceNo.replace(/"/g, ''), item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
             });
 
             // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
@@ -120,9 +120,9 @@ export async function GET(request,{params}) {
         var invcs = '';
 
         invoicesList.forEach(async (invoice, index) => {
-          console.log(`Item ${index}:`, invoice.invoiceNo);
+          // console.log(`Item ${index}:`, invoice.invoiceNo);
           
-          invcs = invcs + invoice.invoiceNo + ","; // get the invoice which is getting updated
+          invcs = invcs + invoice.invoiceNo.replace(/"/g, '') + ","; // get the invoice which is getting updated
           
           await connection.query(
                 `UPDATE invoices SET 
@@ -130,7 +130,7 @@ export async function GET(request,{params}) {
                     pending = pending - ?,
                     status = ?
                     WHERE invoiceNo = ?`,
-                [invoice.appliedAmount, invoice.appliedAmount, invoice.status, invoice.invoiceNo]
+                [invoice.appliedAmount, invoice.appliedAmount, invoice.status, invoice.invoiceNo.replace(/"/g, '')]
             );
             
             // if(paymentAmount > 0)  invcs += ','; // add , for next invoice in the list
@@ -237,7 +237,7 @@ export async function GET(request,{params}) {
         
             if (paymentAmount <= 0) break;
 
-            invcs += invoice.invoiceNo; // get the invoice which is getting updated
+            invcs += invoice.invoiceNo.replace(/"/g, ''); // get the invoice which is getting updated
 
             const amountToApply = Math.min(paymentAmount, invoice.pending); // get the minimum amount to apply
 
@@ -250,7 +250,7 @@ export async function GET(request,{params}) {
                     pending = pending - ?,
                     status = ?
                     WHERE invoiceNo = ?`,
-                [amountToApply, amountToApply, newStatus, invoice.invoiceNo]
+                [amountToApply, amountToApply, newStatus, invoice.invoiceNo.replace(/"/g, '')]
             );
             paymentAmount -= amountToApply;
             

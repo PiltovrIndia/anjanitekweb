@@ -1087,6 +1087,7 @@ const sendMessageNow = async (e) => {
     // Map the data to include only the required fields with new key names
     const result = allDealersFiltered.map(dealer => ({
         name: dealer.accountName,
+        gst: dealer.id,
         ATLOutstanding: dealer.pendingATL,
         VCLOutstanding: dealer.pendingVCL,
     }));

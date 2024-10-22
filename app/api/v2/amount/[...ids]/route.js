@@ -395,7 +395,7 @@ export async function GET(request,{params}) {
                 
 
                 const q = "UPDATE invoices SET totalAmount= CONVERT("+totalAmount+", DECIMAL(10, 2)), amountPaid=  CONVERT("+amountPaid+", DECIMAL(10, 2)), pending=  CONVERT("+pending+", DECIMAL(10, 2)), status='"+status+"' WHERE invoiceId = "+invoiceId;
-                console.log(q);
+                
                 const [rows2, fields2] = await connection.execute(q);
                 connection.release();
                 
@@ -408,14 +408,31 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U9'){ // DELETE SELECTED INVOICE
             
-                var invoiceId = params.ids[2];
+                var invoiceNo = params.ids[2];
                 // var invoiceNo = decodeURIComponent(params.ids[2]);
-
-                const q = "DELETE FROM invoices WHERE invoiceId = "+invoiceId;
+                console.log("invoiceNo: "+invoiceNo);
                 
-                const [payments] = await connection.query(q,[]);
 
+                const q = "DELETE FROM invoices WHERE invoiceNo = '"+invoiceNo.replace(/"/g, '')+"'";
+                console.log(q);
+                const [rows2, fields2] = await connection.execute(q);
+                
                 // await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], paymentDate, params.ids[8], params.ids[9]);
+                return Response.json({status: 200, message:'Success!'}, {status: 200})
+            }
+            else if(params.ids[1] == 'U10'){ // Create Single INVOICE
+            
+                var invoiceNo = params.ids[2];
+                var invoiceType = params.ids[3];
+                var invoiceDate = params.ids[4];
+                var dealerId = params.ids[5];
+                var invoiceAmount = params.ids[6];
+                var amountPaid = params.ids[7];
+                var expiryDate = params.ids[8];
+                // var invoiceNo = decodeURIComponent(params.ids[2]);
+                
+                await applyInvoicesUpload(invoiceNo.replace(/"/g, ''), invoiceType, invoiceDate, dealerId, invoiceAmount, amountPaid, expiryDate);
+
                 return Response.json({status: 200, message:'Success!'}, {status: 200})
             }
             else {
