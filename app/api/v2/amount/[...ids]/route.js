@@ -422,14 +422,15 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U10'){ // Create Single INVOICE
             
-                var invoiceNo = params.ids[2];
+                // var invoiceNo = params.ids[2];
+                var invoiceNo = decodeURIComponent(params.ids[2]);
                 var invoiceType = params.ids[3];
                 var invoiceDate = params.ids[4];
                 var dealerId = params.ids[5];
                 var invoiceAmount = params.ids[6];
                 var amountPaid = params.ids[7];
                 var expiryDate = params.ids[8];
-                // var invoiceNo = decodeURIComponent(params.ids[2]);
+                
 
                 var invoiceNo1 = invoiceNo.replace(/"/g, '');
 
