@@ -175,7 +175,7 @@ fetch("/api/v2/amount/"+pass+"/U8/"+invoiceAmount+"/"+amountPaid+"/"+pending+"/"
 // delete invoices 
 const deleteSelectedInvoicesDataForSelectedAPI = async (pass, invoiceId, invoiceNo) => 
     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
-fetch("/api/v2/amount/"+pass+"/U9/"+invoiceNo, {
+fetch("/api/v2/amount/"+pass+"/U9/"+encodeURIComponent(""+invoiceNo+""), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -836,10 +836,10 @@ export default function Invoices() {
         
             setCreatingInvoice(true);
 
-
+            var invoiceee = ""+inputInvoiceNo+"";
             try {    
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
-                const result  = await createSingleInvoiceDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, encodeURIComponent(inputInvoiceNo), inputInvoiceType, dayjs(inputInvoiceDate).format("YYYY-MM-DD hh:mm:ss").toString(), inputInvoiceDealer, inputInvoiceTotalAmount, inputInvoiceAmountPaid, dayjs(dayjs(inputInvoiceDate).add(45, 'day')).format("YYYY-MM-DD hh:mm:ss").toString() ); 
+                const result  = await createSingleInvoiceDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, inputInvoiceNo, inputInvoiceType, dayjs(inputInvoiceDate).format("YYYY-MM-DD hh:mm:ss").toString(), inputInvoiceDealer, inputInvoiceTotalAmount, inputInvoiceAmountPaid, dayjs(dayjs(inputInvoiceDate).add(45, 'day')).format("YYYY-MM-DD hh:mm:ss").toString() ); 
                 const queryResult = await result.json() // get data
 
                 console.log(queryResult);
@@ -888,7 +888,7 @@ export default function Invoices() {
 
             try {    
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
-                const result  = await deleteSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, selectedInvoiceForDelete.invoiceId, encodeURIComponent(JSON.stringify(selectedInvoiceForDelete.invoiceNo))); 
+                const result  = await deleteSelectedInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, selectedInvoiceForDelete.invoiceId, selectedInvoiceForDelete.invoiceNo); 
                 const queryResult = await result.json() // get data
 
                 // console.log(queryResult);

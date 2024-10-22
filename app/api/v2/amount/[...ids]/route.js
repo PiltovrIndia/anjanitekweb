@@ -410,6 +410,7 @@ export async function GET(request,{params}) {
             
                 // var invoiceNo = params.ids[2];
                 var invoiceNo = decodeURIComponent(params.ids[2]);
+                console.log("invoiceNo: "+params.ids[2]);
                 console.log("invoiceNo: "+invoiceNo);
                 
 
