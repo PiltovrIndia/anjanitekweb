@@ -60,11 +60,11 @@ export async function GET(request,{params}) {
             await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5].replace('***','/'), params.ids[6], paymentDate, params.ids[8],params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
-          if(params.ids[1] == 'webbulk'){
+          // if(params.ids[1] == 'webbulk'){
             
-            await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], JSON.parse(decodeURIComponent(params.ids[5])), decodeURIComponent(params.ids[6]), new Date(params.ids[7]), params.ids[8],params.ids[9]);
-            return Response.json({status: 200, message:'Success!'}, {status: 200})
-          }
+          //   await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], JSON.parse(decodeURIComponent(params.ids[5])), decodeURIComponent(params.ids[6]), new Date(params.ids[7]), params.ids[8],params.ids[9]);
+          //   return Response.json({status: 200, message:'Success!'}, {status: 200})
+          // }
           else {
             // bulk upload from the web via excel
             // apply payment to multiple invoices at a time
@@ -110,6 +110,7 @@ export async function POST(request, {params}) {
               const items = await request.json();
 
               await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], items, decodeURIComponent(params.ids[5]), new Date(params.ids[6]), params.ids[7],params.ids[8]);
+              
               return Response.json({status: 200, message:'Success!'}, {status: 200})
               
           }
@@ -373,7 +374,7 @@ export async function POST(request, {params}) {
     } finally {
         connection.release();
     }
-}
+  }
 
 
 

@@ -394,7 +394,6 @@ export async function GET(request,{params}) {
                 // const pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
                 // console.log(pending);
                 
-                
 
                 const q = "UPDATE invoices SET totalAmount= CONVERT("+totalAmount+", DECIMAL(10, 2)), amountPaid=  CONVERT("+amountPaid+", DECIMAL(10, 2)), pending=  CONVERT("+pending+", DECIMAL(10, 2)), status='"+status+"' WHERE invoiceId = "+invoiceId;
                 
