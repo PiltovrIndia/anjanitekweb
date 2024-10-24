@@ -1084,11 +1084,18 @@ const sendMessageNow = async (e) => {
 
   // Function to handle closing the sheet and resetting selectedDealer
   const handleSheetClose = () => {
+    setSelectedDealer(null); // Set the selected dealer
+    setOpen(false); // Open the sheet
     
+    setDealerPending(0);
     setRemainingCredit(0);
     setTotalCredit(0);
-    setSelectedDealer(null); // Reset the selected dealer
-    setOpen(false); // Close the sheet
+
+    
+    // setRemainingCredit(0);
+    // setTotalCredit(0);
+    // setSelectedDealer(null); // Reset the selected dealer
+    // setOpen(false); // Close the sheet
   };
   
 
@@ -1405,7 +1412,7 @@ const sendMessageNow = async (e) => {
                     {/* <TableCell>{row.state}</TableCell> */}
                     <TableCell>
                     {/* {allSalesPeople.length == 0 ? getSalesPersons() : null}} */}
-                            <Sheet>
+                            <Sheet >
                                 <SheetTrigger asChild>
                                     {/* <Button variant='ghost' className="text-blue-600 font-semibold" onClick={()=>handleRowClick(row)}>{row.accountName} </Button>             */}
                                     <div className="text-blue-600 font-semibold w-fit cursor-pointer" onClick={()=>handleRowClick(row)}>
@@ -1413,7 +1420,7 @@ const sendMessageNow = async (e) => {
                                     </div>
                                 </SheetTrigger>
                                 
-                                <SheetContent className='flex flex-col min-w-[800px]'>
+                                <SheetContent className='flex flex-col min-w-[800px] overflow-scroll'>
                                     {!selectedDealer ?
                                     <Skeleton className="h-4 w-[500px] h-[120px]" >
                                         <div className="flex flex-row m-12">    
@@ -1513,9 +1520,9 @@ const sendMessageNow = async (e) => {
                                             
                                         
                                         }
-                                        <div className='flex flex-row gap-4'>
+                                        <div className='flex flex-row gap-4 my-4'>
                                                     <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
-                                                    <Button variant="secondary" onClick={handleSheetClose}>Close</Button>
+                                                    {/* <Button variant="secondary" onClick={handleSheetClose}>Close</Button> */}
                                         </div>
                                         </div>
                                         }

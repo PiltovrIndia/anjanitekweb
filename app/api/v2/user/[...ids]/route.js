@@ -434,8 +434,8 @@ export async function GET(request,{params}) {
                         // query = `SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer"`;
                         query = `SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,
                                     (SELECT name FROM user WHERE id = u.mapTo) AS salesperson,
-                                    COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' THEN i.pending ELSE 0 END), 0) AS pendingATL,
-                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' THEN i.pending ELSE 0 END), 0) AS pendingVCL
+                                    COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' and i.status IN ("NotPaid","PartialPaid") THEN i.pending ELSE 0 END), 0) AS pendingATL,
+                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' and i.status IN ("NotPaid","PartialPaid") THEN i.pending ELSE 0 END), 0) AS pendingVCL
                                     FROM dealer d 
                                     LEFT JOIN user u ON d.dealerId = u.id 
                                     LEFT JOIN invoices i ON i.billTo = d.dealerId
@@ -490,8 +490,8 @@ export async function GET(request,{params}) {
                             // const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
                             const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,
                                                         (SELECT name FROM user WHERE id = u.mapTo) AS salesperson,
-                                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' THEN i.pending ELSE 0 END), 0) AS pendingATL,
-                                                            COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' THEN i.pending ELSE 0 END), 0) AS pendingVCL
+                                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' and i.status IN ("NotPaid","PartialPaid") THEN i.pending ELSE 0 END), 0) AS pendingATL,
+                                                            COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' and i.status IN ("NotPaid","PartialPaid") THEN i.pending ELSE 0 END), 0) AS pendingVCL
                                                         FROM dealer d 
                                                         LEFT JOIN user u ON d.dealerId = u.id 
                                                         LEFT JOIN invoices i ON i.billTo = d.dealerId
@@ -531,8 +531,8 @@ export async function GET(request,{params}) {
                             // const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
                             const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,
                                                         (SELECT name FROM user WHERE id = u.mapTo) AS salesperson,
-                                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' THEN i.pending ELSE 0 END), 0) AS pendingATL,
-                                                            COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' THEN i.pending ELSE 0 END), 0) AS pendingVCL
+                                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' and i.status IN ("NotPaid","PartialPaid") THEN i.pending ELSE 0 END), 0) AS pendingATL,
+                                                            COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' and i.status IN ("NotPaid","PartialPaid") THEN i.pending ELSE 0 END), 0) AS pendingVCL
                                                         FROM dealer d 
                                                         LEFT JOIN user u ON d.dealerId = u.id 
                                                         LEFT JOIN invoices i ON i.billTo = d.dealerId
@@ -566,8 +566,8 @@ export async function GET(request,{params}) {
                             // const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,(SELECT name FROM user WHERE id = u.mapTo) AS salesperson FROM dealer d LEFT JOIN user u ON d.dealerId = u.id where u.role="Dealer" AND u.id IN (${dealersList})`);
                             const [rows2, fields2] = await connection.execute(`SELECT u.id,d.accountName,d.address1,d.city,d.district,d.state,d.gst,u.*,
                                                         (SELECT name FROM user WHERE id = u.mapTo) AS salesperson,
-                                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' THEN i.pending ELSE 0 END), 0) AS pendingATL,
-                                                            COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' THEN i.pending ELSE 0 END), 0) AS pendingVCL
+                                                        COALESCE(SUM(CASE WHEN i.invoiceType = 'ATL' and i.status IN ("NotPaid","PartialPaid") THEN i.pending ELSE 0 END), 0) AS pendingATL,
+                                                            COALESCE(SUM(CASE WHEN i.invoiceType = 'VCL' and i.status IN ("NotPaid","PartialPaid") THEN i.pending ELSE 0 END), 0) AS pendingVCL
                                                         FROM dealer d 
                                                         LEFT JOIN user u ON d.dealerId = u.id 
                                                         LEFT JOIN invoices i ON i.billTo = d.dealerId
