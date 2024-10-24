@@ -226,7 +226,7 @@ export async function GET(request,{params}) {
               }
               else if(params.ids[1] == 'U4.2'){ // get all invoices for admin in web
                 
-                const [rows, fields] = await connection.execute('SELECT * FROM invoices ORDER BY invoiceDate ASC');
+                const [rows, fields] = await connection.execute('SELECT i.*,u.name FROM invoices i JOIN user u ON i.billTo=u.id ORDER BY i.invoiceDate ASC');
                 const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices');
                 connection.release();
     

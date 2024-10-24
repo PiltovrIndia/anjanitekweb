@@ -309,7 +309,7 @@ export default function Invoices() {
         try {    
             const result  = await getAllInvoicesDataAPI(process.env.NEXT_PUBLIC_API_PASS, offset, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role) 
             const queryResult = await result.json() // get data
-// console.log(queryResult);
+console.log(queryResult);
 
             // check for the status
             if(queryResult.status == 200){
@@ -1264,7 +1264,11 @@ export default function Invoices() {
                             
                         </div>
                     </TableCell>
-                    <TableCell>{row.billTo}</TableCell>
+                    <TableCell>
+                        <div className="w-fit">
+                            {row.name} <br/><span className='text-muted-foreground text-xs font-normal'>{row.billTo}</span> 
+                        </div>
+                    </TableCell>
                     <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY")}</TableCell>
                     {/* <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY hh:mm A")}</TableCell> */}
                     <TableCell>
@@ -1293,9 +1297,15 @@ export default function Invoices() {
                         </TableCell>
                         <TableCell>
                             <div className="flex flex-row items-center gap-2">
-                                <p className="text-sm font-semibold text-black-500">
-                                {row.status}
+                            {(row.status == 'Paid') ?
+                                <p className="text-sm font-semibold text-green-600">
+                                    {row.status}
                                 </p>
+                                : 
+                                <p className="text-sm font-semibold text-amber-600">
+                                    {row.status}
+                                </p>
+                                }
                             </div>
                         </TableCell>
                         <TableCell>
