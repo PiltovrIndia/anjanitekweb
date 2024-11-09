@@ -298,7 +298,7 @@ export default function Outing() {
 
                 // set the user state variable
                 setUser(obj);
-                // setRole(obj.role);
+                setRole(obj.role);
                 
                 // if(!completed){
                 //     getAllDealers(initialDatesValues.from,initialDatesValues.to);
@@ -633,8 +633,10 @@ export default function Outing() {
 
         setUpdateEmail(row.email);
         setUpdateMobile(row.mobile);
-        setSelectedMapToPerson(row.salesperson);
-
+        setSelectedMapToPerson(row.mapTo);
+        // setSelectedMapToPerson(row.salesperson);
+        
+        
     }
 
     // update Dealer
@@ -678,7 +680,7 @@ export default function Outing() {
                       
                           setAllDealers(updatedDealerPeople);
 
-                        toast({description: "Update success!",});
+                        toast({description: "Update success! Refresh to view",});
                         setupdatingPerson(false);
 
                     } else if(queryResult.status == 404) {
