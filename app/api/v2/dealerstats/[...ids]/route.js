@@ -53,6 +53,7 @@ export async function GET(request,{params}) {
                   // get the list of managers or executives mapped to StateHead
                   const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesManager" AND mapTo="'+params.ids[3]+'"');
                   const [rowss, fieldss] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+params.ids[3]+'"');
+                  const [rowsss, fieldsss] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+params.ids[3]+'"');
                   // const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role IN ("SalesManager","SalesExecutive") AND mapTo="'+params.ids[3]+'"');
                   
                   // get the list of dealers mapped to each executive
@@ -69,8 +70,8 @@ export async function GET(request,{params}) {
                   });
                   await Promise.all(promises2); // wait till above finishes
                   
-                  // get the list of dealers mapped to each executive
                   var dealers = [];
+                  // get the list of dealers mapped to each executive
                   const promises = executives.map(async (row) => {
                       const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row+'"');
                       rows1.map((row1) => {
@@ -78,6 +79,12 @@ export async function GET(request,{params}) {
                       })
                   });
                   await Promise.all(promises); // wait till above finishes
+                  
+                  // get the list of dealers mapped directly to StateHead
+                  const promises11 = rowsss.map(async (row) => {
+                      dealers.push(row.id);
+                  });
+                  await Promise.all(promises11);
 
                   // get the dealers
                   if(dealers.length > 0){
