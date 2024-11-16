@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, CheckCircle, ArrowDown } from 'phosphor-react'
+import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, UserPlus, UsersThree, CheckCircle, ArrowDown, CalendarBlank } from 'phosphor-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
@@ -69,7 +69,13 @@ import {
     SheetTitle,
     SheetTrigger,
   } from "../../../../app/components/ui/sheet"
-
+import { Calendar } from "../../../../app/components/ui/calendar"
+  import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+  } from "../../../../app/components/ui/popover"
+import { cn } from "../../../../app/lib/utils"
 
 // create user
 const createUser = async (pass, role, updateDataBasic) =>   
@@ -90,6 +96,20 @@ const updateUser = async (pass, role, id, updateDataBasic) =>
             Accept: "application/json",
         },
     });
+
+// upload bulk dealers data
+const updateBulkDealersData = async (pass, items1) => 
+    // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
+    // fetch("/api/v2/amount/"+pass+"/U7/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
+    fetch("/api/v2/user/"+pass+"/U33/-", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify(items1),
+    });
+    
 
 // get the dealers for SuperAdmin/Admin
 const getAllDealersDataAPI = async (pass, role, id) => 
@@ -173,6 +193,7 @@ export default function Outing() {
     const router = useRouter();
 
     // user state and requests variable
+    const [file, setFile] = useState(null); 
     const [user, setUser] = useState();
     const [role, setRole] = useState('');
     const [selectedState, setSelectedState] = useState('All');
@@ -182,6 +203,7 @@ export default function Outing() {
     const [completed, setCompleted] = useState(false);
     const [creatingPerson, setCreatingPerson] = useState(false);
     const [updatingPerson, setupdatingPerson] = useState(false);
+    const [bulkUploading, setBulkUploading] = useState(false);
     const [searching, setSearching] = useState(true);
     const [searchingSales, setSearchingSales] = useState(false);
     const [searchingInvoices, setSearchingInvoices] = useState(false);
@@ -214,6 +236,7 @@ export default function Outing() {
     const [updatedInvoices, setUpdatedInvoices] = useState([]);   // get updated invoices list
     const [totalCredit, setTotalCredit] = useState(0);
     const [remainingCredit, setRemainingCredit] = useState(0);
+    const [paymentUpdateDate, setPaymentUpdateDate] = useState(new dayjs());
   
     const [currentStatus, setCurrentStatus] = useState('InOuting');
     //create new date object
@@ -533,7 +556,7 @@ export default function Outing() {
                 toast({description: "Creating Dealer. Please wait ...",});
 
                 // var id = getNextId(allDealers); // get the next salesID
-                var id = document.getElementById('dealerId').value;
+                var id1 = document.getElementById('gst').value;
                 var name = document.getElementById('name').value;
                 var emailaddress = document.getElementById('email').value;
                 var mobilenumber = document.getElementById('mobile').value;
@@ -544,9 +567,10 @@ export default function Outing() {
                 var district = document.getElementById('district').value;
                 var state = document.getElementById('state').value;
                 var gst = document.getElementById('gst').value;
+                var dealerId = document.getElementById('dealerId').value;
 
                 const updateDataBasic = {
-                    id: id,
+                    id: id1,
                     name: name,
                     designation: "Dealer",
                     email: emailaddress,
@@ -558,7 +582,7 @@ export default function Outing() {
                     isActive: 1
                 };
                 const updateDataDealer = {
-                    dealerId: id,
+                    dealerId: id1,
                     accountName: name,
                     salesId: selectedMapToPerson,
                     address1: address1,
@@ -567,13 +591,14 @@ export default function Outing() {
                     city: city,
                     district: district,
                     state: state,
-                    gst: gst
+                    gst: gst,
+                    id: dealerId
                 };
                 
                 if (Object.keys(updateDataBasic).length > 0 && Object.keys(updateDataDealer).length > 0) {
 
-                    // console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U12/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role+"/"+JSON.stringify(updateDataBasic)+"/"+JSON.stringify(updateDataDealer));
-                    const result  = await createUser(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.stringify(updateDataBasic)+"/"+JSON.stringify(updateDataDealer))
+                    // console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U12/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role+"/"+JSON.stringify(updateDataBasic)+"/"+encodeURIComponent(JSON.stringify(updateDataDealer)));
+                    const result  = await createUser(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.stringify(updateDataBasic)+"/"+encodeURIComponent(JSON.stringify(updateDataDealer)))
                     const queryResult = await result.json() // get data
                     // console.log(queryResult);
                     
@@ -581,7 +606,7 @@ export default function Outing() {
                     if(queryResult.status == 200) {
                         // set the state variables with the user data
                         
-                        allDealers([updateDataBasic, ...allDealers]);
+                        setAllDealers([updateDataBasic, ...allDealers]);
                         // setAllSalesPeople([...allSalesPeople, updateDataBasic]);
                         toast({description: "Dealer created and added to the list",});
                         setCreatingPerson(false);
@@ -622,6 +647,115 @@ export default function Outing() {
         }
     }
     
+
+
+    const handleFileSelect = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) {
+            setFile(selectedFile);  // Update state
+        } else {
+            console.log("No file selected.");
+        }
+    };
+    
+    
+    // for invocies upload
+    const processBulkDealersData = (e) => {
+        
+        if (file) {
+            const reader = new FileReader();
+    
+            reader.onload = (event) => {
+                const binaryString = event.target.result;
+                const workbook = XLSX.read(binaryString, {type: 'binary'});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // Specify date format directly in the read operation
+                const data = XLSX.utils.sheet_to_json(worksheet, {
+                    dateNF: 'yyyy-mm-dd hh:mm:ss', // Format date columns
+                    raw: false, // Do not use raw values (this ensures that dates are processed)
+                });
+                
+                // Replace '/' with '***' in the invoiceNo field for each item in the data array
+                const updatedData = data.map(item => {
+                    
+                    if (item.dealerId) {
+                        item.address1 = item.address1.replace('/', '***');
+                        item.address2 = item.address2.replace('/', '***');
+                        item.address3 = item.address3.replace('/', '***');
+                        item.mapTo = allSalesPeople.find(salesperson => salesperson.name.toLowerCase() === item.mapTo.toLowerCase()).id;
+                    }
+                    return item;
+                });
+                // Optionally process amounts to ensure they are decimals with two decimal places
+                // const processedData = data.map(item => ({
+                //     ...item,
+                //     amount: typeof item.amount === 'number' ? parseFloat(item.amount.toFixed(2)) : item.amount,
+                // }));
+    
+    
+                // setItems(data);
+                // getInvoiceDataDetails(data);
+                uploadBulkDealerDataDetails(updatedData);
+                // const data = XLSX.utils.sheet_to_json(worksheet);
+                // setItems(data);
+                // getDataDetails(data);
+            };
+    
+            reader.readAsBinaryString(file);
+        } else {
+            console.log("Please select a file first.");
+        }
+    }
+    async function uploadBulkDealerDataDetails(items1){
+        
+        setBulkUploading(true);
+        
+        try {    
+            // console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U33/-");
+            // console.log(items1);
+            
+            const result  = await updateBulkDealersData(process.env.NEXT_PUBLIC_API_PASS, items1)
+            const queryResult = await result.json() // get data
+            // console.log(queryResult.data);
+            
+            // check for the status
+            if(queryResult.status == 200){
+
+
+                setBulkUploading(false);
+                toast({description: "Upload success. Refresh to view updated data"});
+
+                // getAllInvoices('','');
+
+                // toast("Event has been created.")
+
+            }
+            else {
+                
+                setBulkUploading(false);
+            }
+        }
+        catch (e){
+            console.log(e);
+            toast({description: "Issue loading. Please refresh or try again later!"});
+        }
+    }
+
+
+
+
+    // check if sales people are available for bulk update
+    async function checkSalesListForBulkUpdate(){
+        
+        if(allSalesPeople.length == 0) {
+            getSalesPersons()
+        }
+        
+    }
+
+
     // select Dealer to Update
     async function selectDealerForUpdate(row){
         // console.log("Checking");
@@ -880,7 +1014,8 @@ const sendMessageNow = async (e) => {
 
             try {    
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
-                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
+                // const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
+                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
                 const queryResult = await result.json() // get data
 
                 // console.log(queryResult);
@@ -1168,7 +1303,7 @@ const sendMessageNow = async (e) => {
             {(!creating) ?
               <Sheet>
                 <SheetTrigger asChild>
-                    <Button className="text-white bg-blue-700" onClick={()=>{allSalesPeople.length > 0 ? null : getSalesPersons()}}>Create Dealer</Button>
+                    <Button className="text-white bg-blue-700" onClick={()=>{allSalesPeople.length > 0 ? null : getSalesPersons()}}><UserPlus className='font-bold text-lg'/>&nbsp; Create Dealer</Button>
                 </SheetTrigger>
                 <SheetContent>
                     <SheetHeader>
@@ -1184,6 +1319,12 @@ const sendMessageNow = async (e) => {
                             </Label>
                             {/* <p className='font-semibold text-black'>{getNextId(allDealers)}</p> */}
                             <Input id="dealerId" className="col-span-3 text-black" />
+                        </div>
+                        <div className="flex flex-col items-start gap-2 mb-2">
+                            <Label htmlFor="gst" className="text-right">
+                            GST number:
+                            </Label>
+                            <Input id="gst" className="col-span-3 text-black" />
                         </div>
                         <div className="flex flex-col items-start gap-2 mb-2">
                             <Label htmlFor="name" className="text-right">
@@ -1202,12 +1343,6 @@ const sendMessageNow = async (e) => {
                             Mobile:
                             </Label>
                             <Input id="mobile" className="col-span-3 text-black" />
-                        </div>
-                        <div className="flex flex-col items-start gap-2 mb-2">
-                            <Label htmlFor="gst" className="text-right">
-                            GST number:
-                            </Label>
-                            <Input id="gst" className="col-span-3 text-black" />
                         </div>
                         <div className="flex flex-col items-start gap-2 mb-2">
                             <Label htmlFor="mapTo" className="text-right">
@@ -1302,7 +1437,7 @@ const sendMessageNow = async (e) => {
                     </SheetHeader>
                     <SheetFooter>
                         <SheetClose asChild>
-                            <Button type="submit" onClick={createDealer}>Send now</Button>
+                            <Button type="submit" onClick={createDealer}>Create</Button>
                         </SheetClose>
                     </SheetFooter>
                 </SheetContent>
@@ -1312,6 +1447,40 @@ const sendMessageNow = async (e) => {
                     <Label htmlFor="picture">Creating Dealer...</Label>
                 </div>
                 }
+            
+            {(!bulkUploading) ?
+              <Sheet>
+                    <SheetTrigger asChild>
+                        <Button className="text-white bg-green-600" onClick={()=>checkSalesListForBulkUpdate()}><UsersThree className='font-bold text-lg'/>&nbsp; Upload Dealers</Button>
+                    </SheetTrigger>
+                    <SheetContent>
+                        <SheetHeader>
+                        <SheetTitle>File upload</SheetTitle>
+                        <SheetDescription>
+                            Make sure you use the correct format. Click Upload now when file is selected.
+                        </SheetDescription>
+                        </SheetHeader>
+                        <div className="grid gap-4 py-4">
+                            <br/>
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <Label htmlFor="picture">Data file</Label>
+                                <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
+                            </div>
+                        </div>
+                        <SheetFooter>
+                        <SheetClose asChild>
+                            <Button type="submit" onClick={processBulkDealersData}>Upload now</Button>
+                        </SheetClose>
+                        </SheetFooter>
+                    </SheetContent>
+                </Sheet>
+                :
+                <div>
+                    <Label htmlFor="picture">Uploading Dealers...</Label>
+                </div>
+                }
+
+
               <Toaster />
           </div>      
 
@@ -1523,8 +1692,34 @@ const sendMessageNow = async (e) => {
                                         
                                         }
                                         <div className='flex flex-row gap-4 my-4'>
-                                                    <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
-                                                    {/* <Button variant="secondary" onClick={handleSheetClose}>Close</Button> */}
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                        variant={"outline"}
+                                                        className={cn(
+                                                            "w-[240px] justify-start text-left font-normal",
+                                                            !paymentUpdateDate && "text-muted-foreground"
+                                                        )}
+                                                        >
+                                                        
+                                                        <CalendarBlank className="mr-2 h-4 w-4"/> 
+                                                        {dayjs(paymentUpdateDate).format("YYYY-MM-DD").toString() ? dayjs(paymentUpdateDate).format("YYYY-MM-DD").toString() : <span>Pick a date</span>}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <Calendar
+                                                        mode="single"
+                                                        selected={paymentUpdateDate}
+                                                        onSelect={setPaymentUpdateDate}
+                                                        disabled={(paymentUpdateDate) =>
+                                                            paymentUpdateDate > new Date() || paymentUpdateDate < new Date("1900-01-01")
+                                                          }
+                                                        initialFocus
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
+                                                {/* <Button variant="secondary" onClick={handleSheetClose}>Close</Button> */}
                                         </div>
                                         </div>
                                         }

@@ -252,6 +252,7 @@ export async function GET(request,{params}) {
                         // get the list of managers or executives mapped to StateHead
                         const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesManager" AND mapTo="'+params.ids[6]+'"');
                         const [rowss, fieldss] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+params.ids[6]+'"');
+                        const [rowsss, fieldsss] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+params.ids[6]+'"');
                         
                         // get the list of dealers mapped to each executive
                         var executives = [];
@@ -263,10 +264,11 @@ export async function GET(request,{params}) {
                             })
                         });
                         await Promise.all(promises1); // wait till above finishes
+
                         const promises2 = rowss.map(async (rowss1) => {
                                 executives.push(rowss1.id);
                         });
-                        await Promise.all(promises2); // wait till above finishes
+                        await Promise.all(promises2);
                         
                         // get the list of dealers mapped to each executive
                         var dealers = [];
@@ -278,6 +280,12 @@ export async function GET(request,{params}) {
                             })
                         });
                         await Promise.all(promises); // wait till above finishes
+
+                        const promises3 = rowsss.map(async (rowss1) => {
+                            dealers.push(rowss1.id);
+                        });
+                        await Promise.all(promises3);
+                        
 
                             if(dealers.length > 0){
                                 
@@ -748,7 +756,7 @@ export async function GET(request,{params}) {
 
                     // get the list of things to update
                     const userObject = JSON.parse(params.ids[3]);
-                    const userDetailObject = JSON.parse(params.ids[4]);
+                    const userDetailObject = JSON.parse(decodeURIComponent(params.ids[4]));
                     // var updateString = '';
                     var userKeys = '', userValues = '', userDetailKeys = '', userDetailValues = '';
 
@@ -791,8 +799,8 @@ export async function GET(request,{params}) {
                         }
                       }
                       
-                    console.log(`INSERT INTO user (${userKeys}) VALUES (${userValues})`);
-                    console.log(`INSERT INTO dealer (${userDetailKeys}) VALUES (${userDetailValues})`);
+                    // console.log(`INSERT INTO user (${userKeys}) VALUES (${userValues})`);
+                    // console.log(`INSERT INTO dealer (${userDetailKeys}) VALUES (${userDetailValues})`);
 
                     let p = `INSERT INTO user (${userKeys}) VALUES (${userValues})`;
                     let q = `INSERT INTO dealer (${userDetailKeys}) VALUES (${userDetailValues})`;
@@ -1355,8 +1363,8 @@ export async function GET(request,{params}) {
                         }
                       }
                       
-                    console.log(`INSERT INTO user (${userKeys}) VALUES (${userValues})`);
-                    console.log(`INSERT INTO user (${userDetailKeys}) VALUES (${userDetailValues})`);
+                    // console.log(`INSERT INTO user (${userKeys}) VALUES (${userValues})`);
+                    // console.log(`INSERT INTO user (${userDetailKeys}) VALUES (${userDetailValues})`);
 
                     let p = `INSERT INTO user (${userKeys}) VALUES (${userValues})`;
                     let q = `INSERT INTO user_details (${userDetailKeys}) VALUES (${userDetailValues})`;
@@ -1627,6 +1635,212 @@ export async function GET(request,{params}) {
         return Response.json({status: 500, message:'Facing issues. Please try again!'}, {status: 200})
     }
   }
+
+
+
+export async function POST(request, {params}) {
+    
+    try{
+
+        // authorize secret key
+        if(await Keyverify(params.ids[0])){
+          
+            if(params.ids[1] == 'U33'){ // Upload dealers in bulk
+                
+                const items = await request.json();
+
+                    // for (const [index, item] of items.entries()){
+                    //     console.log(`Item ${index}:`, item);
+                        await applyBulkDealersUpload(items);
+                    // }
+                    
+                    // connection.release();
+                    return Response.json({status: 200, message:'Success!'}, {status: 200})
+                    
+            }
+            else {
+                return Response.json({status: 404, message:'Not found!'}, {status: 200})
+            }
+        }
+        else {
+            // wrong secret key
+            return Response.json({status: 401, message:'Unauthorized'}, {status: 200})
+        }
+    }
+    catch (err){
+        // some error occured
+        return Response.json({status: 500, message:'Facing issues. Please try again!'+err}, {status: 200})
+    }
+  }
+
+
+
+
+  // apply dealers upload one by one
+  async function applyBulkDealersUpload(items) {
+    // get the pool connection to db
+    const connection = await pool.getConnection(); 
+    
+    try {
+        await connection.beginTransaction();
+        
+        for (const [index, item] of items.entries()){
+            
+            let p = 'INSERT INTO user (id, name, email, mobile, role, designation, mapTo, userImage, gcm_regId, isActive) VALUES (?,?,?,?,?,?,?,?,?,?)';
+            let p1 = 'INSERT INTO dealer (dealerId, accountName, salesId, address1, address2, address3, city, district, state, gst, id) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
+
+            const [pRows] = await connection.query(p,[item.gst, item.accountName, item.email, item.mobile, 'Dealer', 'Dealer', item.mapTo, '-', '-', 1]);
+            const [p1Rows] = await connection.query(p1,[item.gst, item.accountName, item.mapTo, item.address1.replace('***', '/'), item.address2.replace('***', '/'), item.address3.replace('***', '/'), item.city, item.district, item.state, item.gst, item.dealerId]);
+        }
+
+        await connection.commit();
+    } catch (error) {
+        console.log(error);
+        await connection.rollback();
+        throw error;
+    } finally {
+        await connection.release();
+    }
+}
+
+//   async function applyBulkDealersUpload(item) {
+    
+//     // get the pool connection to db
+//     const connection = await pool.getConnection(); 
+    
+//     try {
+//         await connection.beginTransaction();
+
+        
+        
+//         // const q = 'INSERT INTO invoices (invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)), ?, ?, ? )';
+//         // // console.log(q);
+        
+//         // const [payments] = await connection.query(q,[invoiceNo, invoiceType, invoiceDate, '-','-','-','-',dealerId, dealerId, totalAmount, amountPaid, pending, status, expiryDate, '-']);
+
+
+
+
+//             try {
+
+//                 let p = `INSERT INTO user (id, name, email, mobile, role, designation, mapTo, userImage, gcm_regId, isActive) VALUES (?,?,?,?,?,?,?,?,?,?)`;
+//                 let p1 = `INSERT INTO dealer (dealerId, accountName, salesId, address1, address2, address3, city, district, state, gst, id) VALUES (?,?,?,?,?,?,?,?,?,?,?)`;
+
+//                 const [pRows] = await connection.query(p,[item.gst, item.accountName, item.email, item.mobile, 'Dealer', 'Dealer', item.mapTo, '-', '-', 1]);
+//                 const [p1Rows] = await connection.query(p1,[item.gst, item.accountName, item.mapTo, item.address1, item.address2, item.address3, item.city, item.district, item.state, item.gst, item.dealerId]);
+
+//                 console.log("DONE");
+                
+//                     // connection.release();
+
+//                     if(pRows.affectedRows > 0 && p1Rows.affectedRows > 0){
+//                         // return the requests data
+//                         return Response.json({status: 200, message:'Dealer found!'}, {status: 200})
+    
+//                     }
+//                     else {
+//                         // user doesn't exist in the system
+//                         return Response.json({status: 201, message:'No Student found!'}, {status: 200})
+//                     }
+
+//                 // get the list of things to update
+//                 // const userObject = JSON.parse(params.ids[3]);
+//                 // const userDetailObject = JSON.parse(decodeURIComponent(params.ids[4]));
+//                 // // var updateString = '';
+//                 // var userKeys = '', userValues = '', userDetailKeys = '', userDetailValues = '';
+
+//                 // // parse through the list of things to update and form a string
+//                 // // userObject
+//                 // for (const key in userObject) {
+//                 //     if (userObject.hasOwnProperty(key)) {
+//                 //     const value = userObject[key];
+                    
+//                 //         if(userKeys.length == 0){
+//                 //             // updateString = `${key}='${value}'`;
+//                 //             userKeys = `${key}`;
+//                 //             userValues = `'${value}'`;
+
+//                 //         }
+//                 //         else {
+//                 //             // updateString = updateString + `,${key}='${value}'`;
+//                 //             userKeys = userKeys + `,${key}`;
+//                 //             userValues = userValues + `,'${value}'`;
+//                 //         }
+//                 //     }
+//                 // }
+//                 // // parse through the list of things to update and form a string
+//                 // // userDetailObject
+//                 // for (const key in userDetailObject) {
+//                 //     if (userDetailObject.hasOwnProperty(key)) {
+//                 //     const value = userDetailObject[key];
+                    
+//                 //         if(userDetailKeys.length == 0){
+//                 //             // updateString = `${key}='${value}'`;
+//                 //             userDetailKeys = `${key}`;
+//                 //             userDetailValues = `'${value}'`;
+
+//                 //         }
+//                 //         else {
+//                 //             // updateString = updateString + `,${key}='${value}'`;
+//                 //             userDetailKeys = userDetailKeys + `,${key}`;
+//                 //             userDetailValues = userDetailValues + `,'${value}'`;
+//                 //         }
+//                 //     }
+//                 // }
+                
+//                 // invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
+//                 // const items = await request.json();
+
+//                 // items.map(async (item) => {
+//                 //     let p = `INSERT INTO user (id, name, email, mobile, role, designation, mapTo, userImage, gcm_regId, isActive) VALUES (?,?,?,?,?,?,?,?,?,?)`;
+//                 //     let p1 = `INSERT INTO dealer (dealerId, accountName, salesId, address1, address2, address3, city, district, state, gst, id) VALUES (?,?,?,?,?,?,?,?,?,?,?)`;
+
+//                 //     const [pRows] = await connection.query(p,[item.gst, item.name, item.email, item.mobile, 'Dealer', 'Dealer', item.mapTo, '-', '-', 1]);
+//                 //     const [p1Rows] = await connection.query(p1,[item.gst, item.name, item.mapTo, item.address1, item.address2, item.address3, item.city, item.district, item.state, item.gst, item.dealerId]);
+//                 //     connection.release();
+
+//                 //     if(pRows.affectedRows > 0 && p1Rows.affectedRows > 0){
+//                 //         // return the requests data
+//                 //         return Response.json({status: 200, message:'Dealer found!'}, {status: 200})
+    
+//                 //     }
+//                 //     else {
+//                 //         // user doesn't exist in the system
+//                 //         return Response.json({status: 201, message:'No Student found!'}, {status: 200})
+//                 //     }
+//                 // });
+                
+                
+//                 // return successful update
+
+//                 // // check if user is found
+//                 // if(rows.affectedRows > 0 && rows1.affectedRows > 0){
+//                 //     // return the requests data
+//                 //     return Response.json({status: 200, data: rows, data1: rows1, message:'Details found!'}, {status: 200})
+
+//                 // }
+//                 // else {
+//                 //     // user doesn't exist in the system
+//                 //     return Response.json({status: 201, message:'No Student found!'}, {status: 200})
+//                 // }
+
+//             } catch (error) { // error updating
+//                 return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+//             }
+
+
+//         await connection.commit();
+//     } catch (error) {
+//         console.log(error);
+//         await connection.rollback();
+//         throw error;
+//     } finally {
+//         await connection.release();
+//     }
+// }
+
+
+
   
 
     // send the notification using onesignal.
