@@ -1,7 +1,7 @@
 'use client'
 import { Inter } from 'next/font/google'
 import styles from '../../../app/page.module.css'
-import { Monitor, UserFocus, Chats, ArrowSquareOut, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files, Rows, Power, Receipt } from 'phosphor-react'
+import { Monitor, UserFocus, Chats, ArrowSquareOut, CaretUp, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files, Rows, Power, Receipt } from 'phosphor-react'
 import Image from 'next/image'
 import Biscuits from 'universal-cookie'
 const biscuits = new Biscuits
@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import Registration from './registration/form/page'
 
 import { Toaster } from "@/app/components/ui/toaster"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuContent } from "@/app/components/ui/dropdown-menu"
 
 const inter = Inter({ subsets: ['latin'] })
 // const montserrat = Montserrat({ subsets: ['latin'] })
@@ -107,6 +108,11 @@ const inter = Inter({ subsets: ['latin'] })
 
     
     // Navigation
+    function navigateAppReports(){
+      // biscuits.set('selectedTab', 'Dashboard', {path: '/', expires: new Date(Date.now() + 10800000)})
+      setSelectedTab('App Reports')
+      router.push('/appreports')
+    }
     function navigateDashboard(){
       // biscuits.set('selectedTab', 'Dashboard', {path: '/', expires: new Date(Date.now() + 10800000)})
       setSelectedTab('Dashboard')
@@ -161,14 +167,16 @@ const inter = Inter({ subsets: ['latin'] })
         <div className={inter.className}>
           <div className={styles.topbar} style={{height:'6vh'}}>
             <div className={styles.horizontalsection}>
-              <Image src="/anjani_title.webp" alt="Anjani Tek" width={130} height={36} priority style={{height:'auto'}}/>
+              {/* <Image src="/anjani_title.webp" alt="Anjani Tek" width={130} height={36} priority style={{height:'auto'}}/> */}
+              <Image src="/anjani_logo.webp" alt="Anjani Tek" width={40} height={40} priority style={{height:'auto'}}/>
+              <Image src="/anjani_title.webp" alt="Anjani Tek" width={120} height={32} priority style={{height:'auto'}}/>
               {/* <span style={{color: '#CCCCCC'}}>|</span>
               <Image src="/anjani_title.webp" alt="Anjani Tek" width={90} height={40} priority style={{height:'auto'}} /> */}
               {/* <Image src="/svecw_sc_logo.svg" alt="Smart Campus" width={90} height={40} priority style={{height:'auto'}} /> */}
               {/* <h3>Smart Campus</h3> */}
             </div>
             <div>
-              <p onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >Log out</p>
+              <p onClick={clearCookies.bind(this)} className='text-sm text-red-600' style={{cursor:'pointer'}} >Log out</p>
               {/* <p className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >{userName}</p> */}
               {/* <p className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >{JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).name}</p> */}
               {/* <ProfileBtn show={false} /> */}
@@ -181,7 +189,7 @@ const inter = Inter({ subsets: ['latin'] })
           
         </div>
 
-      <div className={styles.mainlayoutsection} style={{height:'94vh',gap:'0px'}}>
+      <div className={styles.mainlayoutsection} style={{height:'98vh',gap:'0px'}}>
 
         {(role != 'Student') ? 
             <div style={{padding:'24px 0px 24px 0px',height: '100%',borderRight: '1px solid #efefef',width:'15%', display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
@@ -194,6 +202,7 @@ const inter = Inter({ subsets: ['latin'] })
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers Pending' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealersPending.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers Pending</div> */}
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Messages' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateMessages.bind(this)} style={{cursor:'pointer'}}><Chats className={styles.menuicon}/> Messages</div>
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Feed' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateFeed.bind(this)} style={{cursor:'pointer'}}><Rows className={styles.menuicon}/> Feed</div>
+                {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'App Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateAppReports.bind(this)} style={{cursor:'pointer'}}><PresentationChart className={styles.menuicon}/> App Reports</div> */}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Requests' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOuting.bind(this)} style={{cursor:'pointer'}}><PersonSimpleRun className={styles.menuicon}/> Outing Requests</div> */}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOutingReports.bind(this)} style={{cursor:'pointer'}}><Files className={styles.menuicon}/> Outing Reports</div> */}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} style={{cursor:'pointer'}}><ArrowSquareOut className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Outing</div>
@@ -206,11 +215,41 @@ const inter = Inter({ subsets: ['latin'] })
               </div>
               
               {userData ?
-              <div className={styles.verticalsection} style={{gap:'8px',padding: '8px',backgroundColor: '#f0f0f0',border: '1px solid #e5e5e5',borderRadius: '8px',margin: '0px 12px'}}>
-                  <p className={`${inter.className} ${styles.text3}  ${styles.tag}`} style={{cursor:'pointer'}} >{userData.name} - {userData.role}</p>
-                  {/* <p className={`${inter.className} ${styles.text1}`} style={{cursor:'pointer'}} >{userData.name}</p> */}
-                  <p onClick={clearCookies.bind(this)} className='flex flex-row gap-2 items-center text-slate-600 cursor-pointer' ><Power className={styles.menuicon}/> Log out</p>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    {/* <div className={styles.horizontalsection} style={{gap:'8px',padding: '8px',backgroundColor: '#f0f0f0',border: '1px solid #e5e5e5',borderRadius: '8px',margin: '0px 12px'}}> */}
+                    <div className='flex flex-row gap-4 px-4 my-12 items-center'>
+                      <p className='text-sm' style={{cursor:'pointer'}} >{userData.name} - {userData.role}</p>
+                      <CaretUp className="ml-auto" />
+                      {/* <p className={`${inter.className} ${styles.text1}`} style={{cursor:'pointer'}} >{userData.name}</p> */}
+                      {/* <p onClick={clearCookies.bind(this)} className='flex flex-row gap-2 items-center text-slate-600 cursor-pointer' ><Power className={styles.menuicon}/> Log out</p> */}
+                  </div>
+                  {/* <SidebarMenuButton>
+                    <User2 /> Username
+                    <ChevronUp className="ml-auto" />
+                  </SidebarMenuButton> */}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side="top"
+                  className="w-[--radix-popper-anchor-width]"
+                >
+                  {/* <DropdownMenuItem>
+                    <span>Account</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <span>Billing</span>
+                  </DropdownMenuItem> */}
+                  <DropdownMenuItem onClick={clearCookies.bind(this)} >
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+              // <div className={styles.verticalsection} style={{gap:'8px',padding: '8px',backgroundColor: '#f0f0f0',border: '1px solid #e5e5e5',borderRadius: '8px',margin: '0px 12px'}}>
+              //     <p className={`${inter.className} ${styles.text3}  ${styles.tag}`} style={{cursor:'pointer'}} >{userData.name} - {userData.role}</p>
+              //     {/* <p className={`${inter.className} ${styles.text1}`} style={{cursor:'pointer'}} >{userData.name}</p> */}
+              //     <p onClick={clearCookies.bind(this)} className='flex flex-row gap-2 items-center text-slate-600 cursor-pointer' ><Power className={styles.menuicon}/> Log out</p>
+              // </div>
               : ''}
             </div>
           : ''}

@@ -358,10 +358,18 @@ function verifyOTP(){
           <Dashboard />
           :
           
-        <div className='flex flex-col items-center gap-4'>
-            <div className={styles.section_one}>
-            <div className={styles.horizontalsection}>
-              <Image src="/anjani_title.webp" alt="Anjani Tek" width={200} height={60} priority style={{height:'auto'}}/>
+        <div className='flex flex-col h-screen w-screen items-center gap-4 bg-gradient-to-r from-emerald-600 via-emerald-100 to-emerald-600 relative pb-4 '>
+            
+            <div className='flex flex-col h-full w-full justify-center items-center bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.8),transparent)]'>
+            {/* <div className="min-h-screen w-full bg-gradient-to-r from-pink-50 via-purple-50 to-blue-50 relative">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.8),transparent)] pointer-events-none" />
+    </div> */}
+            {/* <div className={styles.section_one}> */}
+            <div className='flex flex-col items-center gap-4'>
+
+              <Image src="/anjani_logo.webp" alt="Anjani Tek" width={100} height={100} />
+              <Image src="/anjani_title1.webp" alt="Anjani Tek" width={400} height={40} priority style={{height:'auto'}}/>
+              {/* <Image src="/anjani_title1.webp" alt="Anjani Tek" width={200} height={60} priority style={{height:'auto'}}/> */}
               {/* <span style={{color: '#CCCCCC'}}>|</span>
               <Image src="/svecw_sc_logo.svg" alt="Smart Campus" width={90} height={40} priority style={{height:'auto'}} /> */}
               {/* <h3>Smart Campus</h3> */}
@@ -381,7 +389,8 @@ function verifyOTP(){
                     <p className={`${inter.className} ${styles.text1}`}>Your Mobile Number </p><br/>
                     <input id="mobileNumber" className={`${inter.className} ${styles.text2} ${styles.textInput}`} placeholder="" onKeyDown={handleKeyPress}/>
                     <br/><br/>
-                    <button id="submit" onClick={loginHere.bind(this)} className={`${inter.className} ${styles.text2} ${styles.primarybtn}`}>Login with OTP</button>
+                    {/* <button id="submit" onClick={loginHere.bind(this)} className={`${inter.className} ${styles.text2} ${styles.primarybtn}`}>Login with OTP</button> */}
+                    <Button id="submit" onClick={loginHere.bind(this)} className="bg-gradient-to-r from-green-800 to-green-700 hover:from-green-900 hover:to-green-800 text-white font-sm text-sm px-8 py-4 rounded-md shadow-inner shadow-md border-0 transition-all duration-300 group relative w-full">Login with OTP</Button>
                     <br/>
                     <br/>
                         {(errorMsg.length > 0) ? 
@@ -447,7 +456,8 @@ function verifyOTP(){
                     <br/>
                     <br/>
                     <button onClick={clearCookies.bind(this)} className={`${inter.className} ${styles.secondarybtn}`}>back</button> &nbsp;&nbsp;
-                    <button onClick={verifyOTP.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Verify OTP</button>
+                    {/* <button onClick={verifyOTP.bind(this)} className={`${inter.className} ${styles.primarybtn}`} >Verify OTP</button> */}
+                    <Button onClick={verifyOTP.bind(this)} className="bg-gradient-to-r from-green-800 to-green-700 hover:from-green-900 hover:to-green-800 text-white font-sm text-sm px-8 py-4 rounded-md shadow-inner shadow-md border-0 transition-all duration-300 group relative">Verify OTP</Button>
                     <div>
                         {(verifyOtpMsg.length) > 0 ?
                         <div>

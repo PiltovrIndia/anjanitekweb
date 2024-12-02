@@ -1,9 +1,8 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, UserPlus, UsersThree, CheckCircle, ArrowDown, CalendarBlank } from 'phosphor-react'
+import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, UserPlus, UsersThree, CheckCircle, ArrowDown, CalendarBlank, Receipt, CurrencyInr, Trash } from 'phosphor-react'
 import React, { useCallback, useEffect, useState } from 'react'
-import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
 import Biscuits from 'universal-cookie'
@@ -24,7 +23,7 @@ import { Label } from "@/app/components/ui/label"
 import { Checkbox } from "@/app/components/ui/checkbox"
 import { Input } from "@/app/components/ui/input"
 import { Skeleton } from "@/app/components/ui/skeleton"
-
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/app/components/ui/tooltip"
 import BlockDatesBtn from '../../../components/myui/blockdatesbtn'
 import OutingRequest from '../../../components/myui/outingrequest'
 const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
@@ -133,6 +132,17 @@ fetch("/api/v2/amount/"+pass+"/U6/Dealer/"+selectedDealerId, {
     },
 });
 
+// get the payments of selected dealer
+const getAllPaymentsDataForSelectedAPI = async (pass, selectedDealerId, offset) => 
+    
+fetch("/api/v2/amount/"+pass+"/U3/"+selectedDealerId+"/"+offset, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
 // update invoices of selected dealer
 // const updateInvoicesDataForSelectedAPI = async (pass, selectedDealerId, amount, invoicesList, transactionId, paymentDate, adminId, particular) => 
 //     // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
@@ -154,6 +164,18 @@ fetch("/api/v2/payments/"+pass+"/webbulk/"+selectedDealerId+"/"+amount+"/credit/
         Accept: "application/json",
     },
     body: JSON.stringify(invoicesList),
+});
+
+// delete payment of selected dealer
+const deleteSelectedPaymentOfSelectedDealerAPI = async (pass, paymentItem) => 
+    // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
+fetch("/api/v2/payments/"+pass+"/delete", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+    body: JSON.stringify(paymentItem),
 });
 
 
@@ -207,6 +229,9 @@ export default function Outing() {
     const [searching, setSearching] = useState(true);
     const [searchingSales, setSearchingSales] = useState(false);
     const [searchingInvoices, setSearchingInvoices] = useState(false);
+    const [searchingPayments, setSearchingPayments] = useState(false);
+    const [deletingPayments, setDeletingPayments] = useState(false);
+    const [offsetPayments, setOffsetPayments] = useState(0);
     const [updatingInvoices, setUpdatingInvoices] = useState(false);
     const [loadingIds, setLoadingIds] = useState(new Set());
     
@@ -229,12 +254,16 @@ export default function Outing() {
     const [searchQuery, setSearchQuery] = useState(''); // State for search input
     const [selectedDealer, setSelectedDealer] = useState(null); // State to store selected dealer
     const [open, setOpen] = useState(false); // State to control sheet open/close
+    const [openPayments, setOpenPayments] = useState(false); // State to control sheet open/close
     
     const [dealerInvoices, setDealerInvoices] = useState([]); // all invoices of dealer sorted
     const [sortedInvoices, setSortedInvoices] = useState([]); // 
+    const [dealerPayments, setDealerPayments] = useState([]); // all invoices of dealer sorted
+    const [sortedPayments, setSortedPayments] = useState([]); // 
     const [dealerPending, setDealerPending] = useState(0); // amount entered by admin for update
     const [updatedInvoices, setUpdatedInvoices] = useState([]);   // get updated invoices list
     const [totalCredit, setTotalCredit] = useState(0);
+    const [transactionId, setTransactionId] = useState('');
     const [remainingCredit, setRemainingCredit] = useState(0);
     const [paymentUpdateDate, setPaymentUpdateDate] = useState(new dayjs());
   
@@ -940,7 +969,143 @@ const sendMessageNow = async (e) => {
 
 
 
-    // Get all invoices of selected dealer
+    // Get all payments of selected dealer
+    async function getPaymentsOfSelectedDealer(dealerId){
+        
+        setSearchingPayments(true);
+
+        try {    
+            
+            const result  = await getAllPaymentsDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, offsetPayments) 
+            const queryResult = await result.json() // get data
+
+            // setOffsetPayments(offsetPayments+20); // update the offset for next use
+
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                // check if data exits
+                if(queryResult.data.length > 0){
+                    
+                    // Sort dealerPayments by paymentDate in ascending order
+                    // const sortedPayments = queryResult.data.sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate));
+                    // setSortedPayments(sortedPayments);
+                    
+                    var pendingCount = 0
+                    // add the variable into each object of the list
+                    // const updatedList = sortedPayments.map(invoice => {
+                    //     pendingCount += parseFloat(invoice.pending); 
+                    //     return { ...invoice, appliedAmount: 0, remaining: invoice.pending };
+                    // });
+                    // setDealerPayments(updatedList);
+                    setDealerPayments(queryResult.data);
+                    // setDealerPending(pendingCount);
+
+                }
+                else {
+                    setSortedPayments([]);
+                    setDealerPayments([]);
+                }
+
+                setSearchingPayments(false);
+            }
+            else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                setSortedPayments([]);
+                setDealerPayments([]);
+                setSearchingPayments(false);
+            }
+            else if(queryResult.status == 404) {
+                setSortedPayments([]);
+                setDealerPayments([]);
+                setSearchingPayments(false);
+
+                toast({
+                    description: "No more..",
+                  })
+                  
+                
+            }
+        }
+        catch (e){
+            
+            toast({ description: "Issue loading. Please refresh or try again later!", })
+        }
+    }
+
+    // Delete a payment of selected dealer
+    async function deleteSelectedPaymentOfSelectedDealer(payment){
+        
+        setDeletingPayments(true);
+
+        try {    
+            
+            const result  = await deleteSelectedPaymentOfSelectedDealerAPI(process.env.NEXT_PUBLIC_API_PASS, payment) 
+            const queryResult = await result.json() // get data
+
+            // setOffsetPayments(offsetPayments+20); // update the offset for next use
+
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                // check if data exits
+                // if(queryResult.data.length > 0){
+                    
+                    // Sort dealerPayments by paymentDate in ascending order
+                    // const sortedPayments = queryResult.data.sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate));
+                    // setSortedPayments(sortedPayments);
+                    
+                    var pendingCount = 0
+                    // add the variable into each object of the list
+                    // const updatedList = sortedPayments.map(invoice => {
+                    //     pendingCount += parseFloat(invoice.pending); 
+                    //     return { ...invoice, appliedAmount: 0, remaining: invoice.pending };
+                    // });
+                    // setDealerPayments(updatedList);
+                    
+                    // Create a new list excluding the object with the given name
+                    setDealerPayments((prevDealerPayments) =>
+                       prevDealerPayments.filter((payment1) => payment1.paymentId !== payment.paymentId)
+                    );
+
+                    toast({
+                        description: "Deleted!",
+                      })
+                    // setDealerPending(pendingCount);
+
+                // }
+                // else {
+                //     setSortedPayments([]);
+                //     setDealerPayments([]);
+                // }
+
+                setDeletingPayments(false);
+            }
+            else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                setSortedPayments([]);
+                setDealerPayments([]);
+                setDeletingPayments(false);
+            }
+            else if(queryResult.status == 404) {
+                setSortedPayments([]);
+                setDealerPayments([]);
+                setDeletingPayments(false);
+
+                toast({
+                    description: "No more..",
+                  })
+                  
+                
+            }
+        }
+        catch (e){
+            
+            toast({ description: "Issue loading. Please refresh or try again later!", })
+        }
+    }
+
+    // get invoices of the selected dealer
     async function getInvoicesOfSelectedDealer(dealerId){
         
         setSearchingInvoices(true);
@@ -1014,8 +1179,9 @@ const sendMessageNow = async (e) => {
 
             try {    
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
+                
                 // const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
-                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
+                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, (transactionId.length == 0) ? '-' : transactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
                 const queryResult = await result.json() // get data
 
                 // console.log(queryResult);
@@ -1083,6 +1249,26 @@ const sendMessageNow = async (e) => {
     getInvoicesOfSelectedDealer(dealer.id);
   };
   
+  const handleDealerPaymentsClick = (dealer) => {
+    setSelectedDealer(dealer); // Set the selected dealer
+    setOpenPayments(true); // Open the sheet
+    
+
+    // make the API call to get the payments.
+    getPaymentsOfSelectedDealer(dealer.id);
+  };
+  
+  const handleDeletePayment = (payment) => {
+    console.log(payment.amount);
+    
+    // setSelectedDealer(dealer); // Set the selected dealer
+    // setOpenPayments(true); // Open the sheet
+    
+
+    // make the API call to get the payments.
+    deleteSelectedPaymentOfSelectedDealer(payment);
+  };
+  
 
   // Function to handle closing the sheet and resetting selectedDealer
   const handleSheetOpenChange = (open) => {
@@ -1106,6 +1292,18 @@ const sendMessageNow = async (e) => {
     let remainingAmount = parseFloat(e.target.value) || 0;
     setRemainingCredit(remainingAmount);
     setTotalCredit(remainingAmount);
+
+  };
+
+  // Function to handle transaction Id input
+  const handleTransactionIdChange = (e) => {
+    
+    // if(e.target.value.length > 0) {
+        setTransactionId(e.target.value);
+    // }
+    // else {
+    //     setTransactionId('-');
+    // }
 
   };
   
@@ -1451,11 +1649,11 @@ const sendMessageNow = async (e) => {
             {(!bulkUploading) ?
               <Sheet>
                     <SheetTrigger asChild>
-                        <Button className="text-white bg-green-600" onClick={()=>checkSalesListForBulkUpdate()}><UsersThree className='font-bold text-lg'/>&nbsp; Upload Dealers</Button>
+                        <Button className="text-white bg-blue-600" onClick={()=>checkSalesListForBulkUpdate()}><UsersThree className='font-bold text-lg'/>&nbsp; Upload Dealers</Button>
                     </SheetTrigger>
                     <SheetContent>
                         <SheetHeader>
-                        <SheetTitle>File upload</SheetTitle>
+                        <SheetTitle>Bulk Upload Dealers</SheetTitle>
                         <SheetDescription>
                             Make sure you use the correct format. Click Upload now when file is selected.
                         </SheetDescription>
@@ -1586,8 +1784,8 @@ const sendMessageNow = async (e) => {
                             <Sheet >
                                 <SheetTrigger asChild>
                                     {/* <Button variant='ghost' className="text-blue-600 font-semibold" onClick={()=>handleRowClick(row)}>{row.accountName} </Button>             */}
-                                    <div className="text-blue-600 font-semibold w-fit cursor-pointer" onClick={()=>handleRowClick(row)}>
-                                        {row.accountName} <br/><span className='text-muted-foreground font-normal'>{row.id}</span> 
+                                    <div className="text-blue-600 tracking-wide font-semibold w-fit cursor-pointer" onClick={()=>handleRowClick(row)}>
+                                        {row.accountName} <br/><span className='text-slate-500 font-normal text-xs'>{row.id}</span> 
                                     </div>
                                 </SheetTrigger>
                                 
@@ -1691,6 +1889,170 @@ const sendMessageNow = async (e) => {
                                             
                                         
                                         }
+                                        <div className='flex flex-col gap-4 my-4 w-min'>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                        variant={"outline"}
+                                                        className={cn(
+                                                            "w-[240px] justify-start text-left font-normal",
+                                                            !paymentUpdateDate && "text-muted-foreground"
+                                                        )}
+                                                        >
+                                                        
+                                                        <CalendarBlank className="mr-2 h-4 w-4"/> 
+                                                        {dayjs(paymentUpdateDate).format("YYYY-MM-DD").toString() ? dayjs(paymentUpdateDate).format("YYYY-MM-DD").toString() : <span>Pick a date</span>}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <Calendar
+                                                        mode="single"
+                                                        selected={paymentUpdateDate}
+                                                        onSelect={setPaymentUpdateDate}
+                                                        disabled={(paymentUpdateDate) =>
+                                                            paymentUpdateDate > new Date() || paymentUpdateDate < new Date("1900-01-01")
+                                                          }
+                                                        initialFocus
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <Input type="text" id="transactionId" value={transactionId} onChange={handleTransactionIdChange} className="col-span-3 text-black" placeholder="Transaction ID" />
+                                                <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
+                                                {/* <Button variant="secondary" onClick={handleSheetClose}>Close</Button> */}
+                                        </div>
+                                        </div>
+                                        }
+                                </SheetContent>
+
+                            </Sheet>
+                    </TableCell>
+                    <TableCell onClick={()=>console.log(row.mapTo)}>
+                        <div className="text-xs tracking-wider text-slate-600 bg-slate-100 px-3 py-1 w-fit rounded-full">
+                            {row.salesperson}
+                        </div>
+                    </TableCell>
+                    <TableCell>
+                        <p className='text-sm text-rose-500 font-semibold tracking-wider'>₹{formatter.format(row.pendingATL)}</p>
+                    </TableCell>
+                    <TableCell>
+                        <p className='text-sm text-red-500 font-semibold tracking-wider'>₹{formatter.format(row.pendingVCL)}</p>
+                    </TableCell>
+                    <TableCell className='flex flex-row my-2'>
+                    {/* {allSalesPeople.length == 0 ? getSalesPersons() : null}} */}
+                    <TooltipProvider delayDuration={100}>
+                        <Sheet>
+                                <Tooltip delayDuration={100}>
+                                    <TooltipTrigger asChild>
+                                    <SheetTrigger asChild>
+                                        <Button variant='ghost' className="mx-1 px-2 text-green-600" onClick={()=>handleRowClick(row)}><Receipt size={24} className="text-blue-600"/></Button>            
+                                    </SheetTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                    <p>View Invoices</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                                
+                                <SheetContent className='flex flex-col min-w-[800px] overflow-scroll'>
+                                    {!selectedDealer ?
+                                    <Skeleton className="h-4 w-[500px] h-[120px]" >
+                                        <div className="flex flex-row m-12">    
+                                            <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                                            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                                        </div>
+                                    </Skeleton> 
+                                    :
+                                    <div>
+                                        <div className="flex-none justify-between items-center mb-2">
+                                        <h2 className="text-lg font-bold">{selectedDealer.accountName}</h2>
+                                        <p className='text-muted-foreground'>{selectedDealer.city}, {selectedDealer.state}</p>
+                                        </div>
+                                        
+                                        <div className="flex flex-row items-end justify-between mb-2">
+                                            <div className="flex flex-row items-end gap-2 mb-2">
+                                                <div className="flex flex-col items-start gap-2">
+                                                    <Label htmlFor="amount" className="text-right">
+                                                    Enter credit amount:
+                                                    </Label>
+                                                    <Input type="number" id="creditAmount" value={totalCredit} onChange={handleCreditAmountChange} className="col-span-3 text-black" placeholder="Enter amount" />
+                                                </div>
+                                                <p className='text-blue-600'>Remaining: {parseFloat(remainingCredit).toFixed(2)}</p>
+                                            </div>
+                                            
+                                            <div className="flex flex-col items-end gap-2 mb-2">
+                                                <p className='text-black'>Total Outstanding: {parseFloat(dealerPending).toFixed(2)}</p>
+                                                {totalCredit > 0 ? <p className='text-blue-600'>New Outstanding: {parseFloat(dealerPending-totalCredit).toFixed(2)}</p> : ''}
+                                            </div>
+                                        </div>
+                                        
+                                        {searchingInvoices ?
+                                        <div className={styles.horizontalsection}>
+                                            <SpinnerGap className={`${styles.icon} ${styles.load}`} />
+                                            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                                        </div>
+                                        :
+                                        <Card className='flex-1 overflow-auto scroll-smooth'>
+                                            <Table>
+                                                <TableHeader>
+                                                <TableRow>
+                                                    <TableHead> </TableHead>
+                                                    <TableHead>ID</TableHead>
+                                                    <TableHead>Invoice date</TableHead>
+                                                    <TableHead>Invoice Amount</TableHead>
+                                                    <TableHead>Pending</TableHead>
+                                                    <TableHead>Balance</TableHead>
+                                                    
+                                                </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                {dealerInvoices.length > 0 ? (
+                                                    dealerInvoices.map((item) => (
+                                                    <TableRow key={item.invoiceNo} className={(item.appliedAmount > 0) ? "cursor-pointer bg-blue-50" : "cursor-pointer"} onClick={() => handleSelection(item)}>
+                                                        <TableCell>
+                                                        {item.appliedAmount > 0 ? 
+                                                            <CheckCircle size={24} weight='fill' className="text-blue-600"/> 
+                                                            : <CheckCircle size={24} weight='regular' className="text-slate-400"/> }
+                                                        </TableCell>
+                                                        <TableCell>{item.invoiceNo} {item.invoiceType}</TableCell>
+                                                        <TableCell>{dayjs(item.invoiceDate).format("DD/MM/YY")}</TableCell>
+                                                        <TableCell>{item.totalAmount}</TableCell>
+                                                        <TableCell className='flex flex-row items-center py-2'> 
+                                                            <div>{parseFloat(item.pending).toFixed(2)}</div> 
+                                                            {(item.appliedAmount > 0) ? <div className='text-red-600'> - {item.appliedAmount}</div> : ''}
+                                                        </TableCell>
+                                                        <TableCell className={(item.appliedAmount > 0) ? 'text-blue-600 font-semibold' : 'text-black'}>{parseFloat(item.remaining).toFixed(2)}</TableCell>
+                                                        
+                                                        {/* <TableCell>
+                                                            {item.appliedAmount > 0 ? (
+                                                            <button
+                                                                onClick={() => handleUnselect(item.invoiceNo)}
+                                                                className="bg-red-500 text-white px-2 py-1 rounded"
+                                                            >
+                                                                Unselect
+                                                            </button>
+                                                            ) : (
+                                                            <button
+                                                                onClick={() => handleSelect(item.invoiceNo)}
+                                                                className="bg-green-500 text-white px-2 py-1 rounded"
+                                                                disabled={remainingCredit <= 0}
+                                                            >
+                                                                Select
+                                                            </button>
+                                                            )}
+                                                        </TableCell> */}
+                                                    </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                    <TableCell colSpan="2">No data found</TableCell>
+                                                    </TableRow>
+                                                )}
+                                                </TableBody>
+                                            </Table>
+                                        </Card>
+                                            
+                                        
+                                        }
+                                        
                                         <div className='flex flex-row gap-4 my-4'>
                                                 <Popover>
                                                     <PopoverTrigger asChild>
@@ -1718,32 +2080,222 @@ const sendMessageNow = async (e) => {
                                                         />
                                                     </PopoverContent>
                                                 </Popover>
+                                                <Input type="text" id="transactionId" value={transactionId} onChange={handleTransactionIdChange} className="col-span-3 text-black" placeholder="Transaction ID or other detail" />
                                                 <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
                                                 {/* <Button variant="secondary" onClick={handleSheetClose}>Close</Button> */}
-                                        </div>
+                                            </div>
+                                            
                                         </div>
                                         }
-                                </SheetContent>
+                                    </SheetContent>
+                                </Sheet>
+                            </TooltipProvider>
+                    
+                    {/* Payments from Dealer */}
+                    <TooltipProvider delayDuration={100}>
+                        <Sheet>
+                                <Tooltip delayDuration={100}>
+                                    <TooltipTrigger asChild>
+                                    <SheetTrigger asChild>
+                                        <Button variant='ghost' className="mx-1 px-2 text-green-600" onClick={()=>handleDealerPaymentsClick(row)}><CurrencyInr size={24} className="text-blue-600"/></Button>            
+                                    </SheetTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                    <p>View Payments</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                                
+                                <SheetContent className='flex flex-col min-w-[800px] overflow-scroll'>
+                                    {!selectedDealer ?
+                                    <Skeleton className="h-4 w-[500px] h-[120px]" >
+                                        <div className="flex flex-row m-12">    
+                                            <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                                            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                                        </div>
+                                    </Skeleton> 
+                                    :
+                                    <div>
+                                        <div className="flex-none justify-between items-center mb-2">
+                                        <h2 className="text-lg font-bold">{selectedDealer.accountName}</h2>
+                                        <p className='text-muted-foreground'>{selectedDealer.city}, {selectedDealer.state}</p>
+                                        </div>
+                                        
+                                        <div className="flex flex-row items-end justify-between mb-2">
+                                            <p className='text-black font-medium'>Payments</p>
+                                            {/* <div className="flex flex-row items-end gap-2 mb-2">
+                                                <div className="flex flex-col items-start gap-2">
+                                                    <Label htmlFor="amount" className="text-right">
+                                                    Enter credit amount:
+                                                    </Label>
+                                                    <Input type="number" id="creditAmount" value={totalCredit} onChange={handleCreditAmountChange} className="col-span-3 text-black" placeholder="Enter amount" />
+                                                </div>
+                                                <p className='text-blue-600'>Remaining: {parseFloat(remainingCredit).toFixed(2)}</p>
+                                            </div>
+                                            
+                                            <div className="flex flex-col items-end gap-2 mb-2">
+                                                <p className='text-black'>Total Outstanding: {parseFloat(dealerPending).toFixed(2)}</p>
+                                                {totalCredit > 0 ? <p className='text-blue-600'>New Outstanding: {parseFloat(dealerPending-totalCredit).toFixed(2)}</p> : ''}
+                                            </div> */}
+                                        </div>
+                                        
+                                        {searchingPayments ?
+                                        <div className={styles.horizontalsection}>
+                                            <SpinnerGap className={`${styles.icon} ${styles.load}`} />
+                                            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                                        </div>
+                                        :
+                                        <Card className='flex-1 overflow-auto scroll-smooth'>
+                                            <Table>
+                                                <TableHeader>
+                                                <TableRow>
+                                                    {/* <TableHead> </TableHead> */}
+                                                    {/* <TableHead>ID</TableHead> */}
+                                                    <TableHead>Payment date</TableHead>
+                                                    <TableHead>Payment Amount</TableHead>
+                                                    <TableHead>Invoices</TableHead>
+                                                    <TableHead> </TableHead>
+                                                    {/* <TableHead>Balance</TableHead> */}
+                                                    
+                                                </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                {dealerPayments.length > 0 ? (
+                                                    dealerPayments.map((item) => (
+                                                    <TableRow key={item.paymentId} >
+                                                        {/* <TableCell>
+                                                        {item.appliedAmount > 0 ? 
+                                                            <CheckCircle size={24} weight='fill' className="text-blue-600"/> 
+                                                            : <CheckCircle size={24} weight='regular' className="text-slate-400"/> }
+                                                        </TableCell> */}
+                                                        {/* <TableCell>{item.invoiceNo} {item.invoiceType}</TableCell> */}
+                                                        <TableCell>{dayjs(item.paymentDate).format("DD/MM/YY")}</TableCell>
+                                                        {/* <TableCell>{parseFloat(item.amount).toFixed(2)}</TableCell> */}
+                                                        <TableCell className='flex flex-col'>
+                                                            <div>
+                                                                {item.amount}
+                                                            </div>
+                                                            {item.amounts.split(',').length>1 ?
+                                                                <div>
+                                                                    {item.amounts}
+                                                                </div>
+                                                            : null
+                                                            }
+                                                        </TableCell>
+                                                        {/* <TableCell className='flex flex-row items-center py-2'> 
+                                                            <div>{parseFloat(item.pending).toFixed(2)}</div> 
+                                                            {(item.appliedAmount > 0) ? <div className='text-red-600'> - {item.appliedAmount}</div> : ''}
+                                                        </TableCell> */}
+                                                        <TableCell>{item.invoiceNo}</TableCell>
+                                                        <TableCell>
+                                                            {/* <Button variant='ghost' className="mx-1 px-2 text-green-600"><Trash size={24} className="text-red-600"/></Button> */}
+                                                            <Dialog>
+                                                                <DialogTrigger asChild>
+                                                                    <Button variant='ghost' className="mx-1 px-2 text-green-600"><Trash size={24} className="text-red-600"/></Button>
+                                                                </DialogTrigger>
+                                                                <DialogContent className="sm:max-w-md">
+                                                                    <DialogHeader>
+                                                                    <DialogTitle>Delete payment</DialogTitle>
+                                                                    <DialogDescription>
+                                                                        This is delete the payment of total {item.amount} from the adjusted invoices.
+                                                                    </DialogDescription>
+                                                                    </DialogHeader>
+                                                                    <DialogFooter className="sm:justify-start">
+                                                                    <DialogClose asChild>
+                                                                        <Button className="mx-1 px-4 gap-2" onClick={()=>handleDeletePayment(item)}><Trash size={24}/> Delete</Button>
+                                                                        
+                                                                    </DialogClose>
+                                                                    </DialogFooter>
+                                                                </DialogContent>
+                                                            </Dialog>
+                                                        </TableCell>
+                                                        
+                                                        {/* <TableCell className={(item.appliedAmount > 0) ? 'text-blue-600 font-semibold' : 'text-black'}>{parseFloat(item.remaining).toFixed(2)}</TableCell> */}
+                                                        
+                                                        {/* <TableCell>
+                                                            {item.appliedAmount > 0 ? (
+                                                            <button
+                                                                onClick={() => handleUnselect(item.invoiceNo)}
+                                                                className="bg-red-500 text-white px-2 py-1 rounded"
+                                                            >
+                                                                Unselect
+                                                            </button>
+                                                            ) : (
+                                                            <button
+                                                                onClick={() => handleSelect(item.invoiceNo)}
+                                                                className="bg-green-500 text-white px-2 py-1 rounded"
+                                                                disabled={remainingCredit <= 0}
+                                                            >
+                                                                Select
+                                                            </button>
+                                                            )}
+                                                        </TableCell> */}
+                                                    </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                    <TableCell colSpan="2">No data found</TableCell>
+                                                    </TableRow>
+                                                )}
+                                                </TableBody>
+                                            </Table>
+                                        </Card>
+                                            
+                                        
+                                        }
+                                        
+                                        {/* <div className='flex flex-row gap-4 my-4'>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                        variant={"outline"}
+                                                        className={cn(
+                                                            "w-[240px] justify-start text-left font-normal",
+                                                            !paymentUpdateDate && "text-muted-foreground"
+                                                        )}
+                                                        >
+                                                        
+                                                        <CalendarBlank className="mr-2 h-4 w-4"/> 
+                                                        {dayjs(paymentUpdateDate).format("YYYY-MM-DD").toString() ? dayjs(paymentUpdateDate).format("YYYY-MM-DD").toString() : <span>Pick a date</span>}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                        <Calendar
+                                                        mode="single"
+                                                        selected={paymentUpdateDate}
+                                                        onSelect={setPaymentUpdateDate}
+                                                        disabled={(paymentUpdateDate) =>
+                                                            paymentUpdateDate > new Date() || paymentUpdateDate < new Date("1900-01-01")
+                                                          }
+                                                        initialFocus
+                                                        />
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
+                                            </div> */}
+                                            
+                                        </div>
+                                        }
+                                    </SheetContent>
+                                </Sheet>
+                            </TooltipProvider>
 
-                            </Sheet>
-                    </TableCell>
-                    <TableCell onClick={()=>console.log(row.mapTo)}>
-                        <div className="text-sm text-slate-500 bg-slate-50 px-1 py-1 w-fit border border-slate-200 rounded">
-                            {row.salesperson}
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                        <p className='text-sm text-rose-500 font-semibold tracking-wider'>₹{formatter.format(row.pendingATL)}</p>
-                    </TableCell>
-                    <TableCell>
-                        <p className='text-sm text-red-500 font-semibold tracking-wider'>₹{formatter.format(row.pendingVCL)}</p>
-                    </TableCell>
-                    <TableCell>
-                    {/* {allSalesPeople.length == 0 ? getSalesPersons() : null}} */}
+                            <TooltipProvider delayDuration={100}>
                             <Sheet>
-                                <SheetTrigger asChild>
-                                    <Button variant='outline' className="mx-2 px-2 text-green-600" onClick={()=>selectDealerForUpdate(row)}><PencilSimpleLine size={24} className="text-green-600"/> &nbsp;Edit</Button>            
-                                </SheetTrigger>
+                                    
+                                <Tooltip delayDuration={100}>
+                                    <TooltipTrigger asChild>
+                                    <SheetTrigger asChild>
+                                        <Button variant='ghost' className="mx-1 px-2 text-green-600" onClick={()=>selectDealerForUpdate(row)}><PencilSimpleLine size={24} className="text-green-600"/></Button>            
+                                    </SheetTrigger>
+                                        {/* <Button variant='ghost' className="mx-2 px-2 text-red-600" onClick={()=>updateActiveStatus(row.id, 0)}><UserMinus size={24} className="text-red-600"/></Button> */}
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                    <p>Edit Dealer details</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                                            
+                                    {/* <Button variant='outline' className="mx-2 px-2 text-green-600" onClick={()=>selectDealerForUpdate(row)}><PencilSimpleLine size={24} className="text-green-600"/> &nbsp;Edit</Button>             */}
+                                
                                 <SheetContent>
                                     <SheetHeader>
                                     <SheetTitle>Edit {row.accountName}</SheetTitle>
@@ -1804,9 +2356,30 @@ const sendMessageNow = async (e) => {
                                     </SheetFooter>
                                 </SheetContent>
                             </Sheet>
+                        </TooltipProvider>
                         {row.isActive == 1 ?
-                            <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>updateActiveStatus(row.id, 0)}><UserMinus size={24} className="text-red-600"/> &nbsp;Deactivate</Button>
-                            : <Button variant='outline' className="mx-2 px-2 text-blue-600" onClick={()=>updateActiveStatus(row.id, 1)}><UserPlus size={24} className="text-blue-600"/> &nbsp;Activate</Button>
+                        <TooltipProvider delayDuration={100}>
+                            <Tooltip delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                    <Button variant='ghost' className="mx-1 px-2 text-red-600" onClick={()=>updateActiveStatus(row.id, 0)}><UserMinus size={24} className="text-red-600"/></Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                <p>Deactivate dealer</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                            : 
+                            <TooltipProvider delayDuration={100}>
+                            <Tooltip delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                    <Button variant='ghost' className="mx-1 px-2 text-blue-600" onClick={()=>updateActiveStatus(row.id, 1)}><UserPlus size={24} className="text-blue-600"/></Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                <p>Activate dealer</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        
                         }
                     </TableCell>
                 </TableRow>

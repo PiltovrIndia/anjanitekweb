@@ -60,6 +60,7 @@ export async function GET(request,{params}) {
             await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5].replace('***','/'), params.ids[6], paymentDate, params.ids[8],params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
+          
           // if(params.ids[1] == 'webbulk'){
             
           //   await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], JSON.parse(decodeURIComponent(params.ids[5])), decodeURIComponent(params.ids[6]), new Date(params.ids[7]), params.ids[8],params.ids[9]);
@@ -108,7 +109,7 @@ export async function POST(request, {params}) {
           
               // invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
               const items = await request.json();
-
+              
               await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], items, decodeURIComponent(params.ids[5]), new Date(params.ids[6]), params.ids[7],params.ids[8]);
               
               return Response.json({status: 200, message:'Success!'}, {status: 200})
@@ -127,6 +128,17 @@ export async function POST(request, {params}) {
               // console.log(`Item ${index}:`, item);
               await applyPayment(item.gst, item.amount, item.type, item.invoiceNo.replace('***','/'), item.transactionId, item.paymentDate, params.ids[2],params.ids[3]);
             });
+
+            return Response.json({status: 200, message:'Success!'}, {status: 200})
+          }
+          else if(params.ids[1] == 'delete'){
+            
+            const paymentItem = await request.json();
+            
+            // items.forEach(async (item, index) => {
+              console.log(`Item :`, paymentItem.invoiceNo);
+              await deletePayment(paymentItem);
+            // });
 
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
@@ -170,12 +182,19 @@ export async function POST(request, {params}) {
         // 2
         // collect the invoices list for updating in payments table
         var invcs = '';
+        var appliedAmounts = '';
 
         invoicesList.forEach(async (invoice, index) => {
           // console.log(`Item ${index}:`, invoice.invoiceNo.replace('***','/'));
           
-          invcs = invcs + invoice.invoiceNo.replace('***','/') + ","; // get the invoice which is getting updated
+          if(invcs.length > 1){
+            invcs = invcs + "," + invoice.invoiceNo.replace('***','/'); // get the invoice which is getting updated
+          }
+          else {
+            invcs = invoice.invoiceNo.replace('***','/')
+          }
           
+          // update the invoices table
           await connection.query(
                 `UPDATE invoices SET 
                     amountPaid = amountPaid + ?, 
@@ -185,31 +204,36 @@ export async function POST(request, {params}) {
                 [invoice.appliedAmount, invoice.appliedAmount, invoice.status, invoice.invoiceNo.replace('***','/')]
             );
             
-            // if(paymentAmount > 0)  invcs += ','; // add , for next invoice in the list
-            // invcs += ',';
-
+            // add applied amounts for each invoice in sequence
+            if(appliedAmounts.length > 0){
+              appliedAmounts = appliedAmounts + "," + invoice.appliedAmount;
+            }
+            else {
+              appliedAmounts = invoice.appliedAmount; // get the sequence of amounts applied to sequence of invoices
+            }
         });
 
         // 3
+        // update the payments table
         const [balance] = await connection.query('SELECT balance FROM payments WHERE id = "'+id+'" ORDER BY paymentDate DESC LIMIT 1',[]);
         
-        var bal = 0;
-        if(type == 'credit' && balance.length > 0){
-            bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) - parseFloat(amount);
-        }
-        else {
-            bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
-        }
-        
-        const q = 'INSERT INTO payments (amount, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
-        const [payments] = await connection.query(q,[amount, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
+          var bal = 0;
+          if(type == 'credit' && balance.length > 0){
+              bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) - parseFloat(amount);
+          }
+          else {
+              bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
+          }
+         
+        const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+        const [payments] = await connection.query(q,[amount, appliedAmounts, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
 
         // 4
         // send notification to Dealer(s)
 
         // get the gcm_regIds of Students to notify
             // Split the branches string into an array
-            var query = 'SELECT u.name, u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo)  as mappedTo FROM user u where u.id="'+id+'"';
+            var query = 'SELECT u.name, u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo) as mappedTo FROM user u where u.id="'+id+'"';
             const [nrows, nfields] = await connection.execute(query);
             
             // get the gcm_regIds list from the query result
@@ -230,9 +254,7 @@ export async function POST(request, {params}) {
                 const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+dealer_name, element1, 'Single');
               }
             }
-            // send the notification
-            // const notificationResult = gcmIds.length > 0 ? await send_notification('Payment of ₹'+amount+' is updated for '+id, gcmIds, 'Multiple') : null;
-                
+
         // 5
         // Include in the chat history
         // create query for insert
@@ -242,6 +264,8 @@ export async function POST(request, {params}) {
 
         await connection.commit();
     } catch (error) {
+      console.log(error);
+      
         await connection.rollback();
         throw error;
     } finally {
@@ -285,11 +309,19 @@ export async function POST(request, {params}) {
         // 2
         // collect the invoices list for updating in payments table
         var invcs = '';
+        var appliedAmounts = '';
         for (const invoice of invoices) {
         
             if (paymentAmount <= 0) break;
 
             invcs += invoice.invoiceNo; // get the invoice which is getting updated
+
+            if(invcs.length > 1){
+              invcs = invcs + "," + invoice.invoiceNo; // add , for next invoice in the list
+            }
+            else{
+              invcs = invoice.invoiceNo;
+            }
 
             const amountToApply = Math.min(paymentAmount, invoice.pending); // get the minimum amount to apply
 
@@ -306,7 +338,14 @@ export async function POST(request, {params}) {
             );
             paymentAmount -= amountToApply;
             
-            if(paymentAmount > 0)  invcs += ','; // add , for next invoice in the list
+            // if(paymentAmount > 0)  invcs += ','; // add , for next invoice in the list
+            // add applied amounts for each invoice in sequence
+            if(appliedAmounts.length > 0){
+              appliedAmounts = appliedAmounts + "," + amountToApply;
+            }
+            else {
+              appliedAmounts = amountToApply; // get the sequence of amounts applied to sequence of invoices
+            }
 
         }
 
@@ -323,10 +362,10 @@ export async function POST(request, {params}) {
         else {
             bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
         }
-        const q = 'INSERT INTO payments (amount, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+        const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
         // console.log(q);
         
-        const [payments] = await connection.query(q,[amount, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
+        const [payments] = await connection.query(q,[amount, appliedAmounts, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
 
         // 4
         // send notification to Dealer(s)
@@ -345,7 +384,7 @@ export async function POST(request, {params}) {
               const element = nrows[index].gcm_regId;
               const element1 = nrows[index].mappedTo;
               const dealer_name = nrows[index].name;
-            //   console.log(element)
+            
               if(element.length > 3){
                 gcmIds.push(element); 
                 // send notification to the dealer
@@ -357,14 +396,74 @@ export async function POST(request, {params}) {
                 const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+dealer_name, element1, 'Single');
               }
             }
-            // send the notification
-            // const notificationResult = gcmIds.length > 0 ? await send_notification('Payment of ₹'+amount+' is updated for '+id, gcmIds, 'Multiple') : null;
                 
         // 5
         // Include in the chat history
         // create query for insert
         const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
         const [rows, fields] = await connection.execute(q1, [ nrows[0].mapTo, id, paymentDate, decodeURIComponent('Payment of ₹'+amount+' is updated'), 0, '-' ]);
+        connection.release();
+
+        await connection.commit();
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+  }
+
+
+  // delete payment from the invoices one by one
+  // id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
+  async function deletePayment(paymentItem) {
+    
+    // get the pool connection to db
+    const connection = await pool.getConnection();
+    
+    try {
+        await connection.beginTransaction();
+        
+        // 1. get the pending invoices and amounts to each invoice for the given payment
+        // 2. update (add) the invoices table with pending amount for the selected invoices
+        // 3. delete the payment from payments table
+        // 4. Delete the notification in the chat history and SENT BY will be the respective executive.
+
+        // 1
+        const invoices = paymentItem.invoiceNo.split(','); // await connection.query(query1,[]);
+        const amounts = paymentItem.amounts.split(','); // await connection.query(query1,[]);
+
+
+        // 2
+        // collect the invoices list for updating in payments table
+        for (let index = 0; index < invoices.length; index++) {
+          const invoice = invoices[index];
+          const amount = parseFloat(amounts[index]);
+
+          const [selectedInvoice] = await connection.query('SELECT * FROM invoices WHERE invoiceNo = "'+invoice+'" ORDER BY invoiceDate DESC LIMIT 1',[]);
+          
+            if (amount <= 0) break;
+
+            // check if amount being paid is more, accordingly we need to update the status
+            const updatedPending = selectedInvoice[0].pending + amount;
+            
+            // get the updated status
+            let newStatus = (updatedPending == selectedInvoice[0].totalAmount) ? 'NotPaid' : 'PartialPaid';
+
+            await connection.query(`UPDATE invoices SET amountPaid = amountPaid - `+amount+`, pending = pending + `+amount+`, status = "`+newStatus+`" WHERE invoiceNo = "`+invoice+`"`, []);
+            
+        }
+
+        // 3
+        // delete from payments list
+        const del = await connection.query('DELETE FROM payments WHERE paymentId = '+paymentItem.paymentId,[]);
+
+        // 4
+        // Delete in the chat history
+        // create query for delete
+        const q11 = await connection.query('DELETE FROM notifications WHERE receiver = "'+paymentItem.id+'" and sentAt = "'+dayjs(new Date(paymentItem.paymentDate)).format('YYYY-MM-DD HH:mm:ss')+'"',[]);
+        // const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
+        // const [rows, fields] = await connection.execute(q11, [ paymentItem.id, dayjs(new Date(paymentItem.paymentDate)).format('YYYY-MM-DD HH:mm:ss')]);
         connection.release();
 
         await connection.commit();

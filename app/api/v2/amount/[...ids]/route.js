@@ -78,7 +78,7 @@ export async function GET(request,{params}) {
             // Get the payments done by the dealer by id
           else if(params.ids[1] == 'U3'){
                 try {
-                    let q = 'SELECT * FROM payments WHERE type="credit" AND id="'+params.ids[2]+'" ORDER BY paymentDate DESC  LIMIT 20 OFFSET '+params.ids[3];
+                    let q = 'SELECT * FROM payments1 WHERE type="credit" AND id="'+params.ids[2]+'" ORDER BY paymentDate DESC LIMIT 20 OFFSET '+params.ids[3];
                     const [rows, fields] = await connection.execute(q);
                     connection.release();
                     // return successful update

@@ -415,13 +415,21 @@
 }
 
 /*************** cards *****************/
-.card_block1{
+.card_block0{
   border: 1px solid #ffffff;
   padding: 20px;
   background: #ffffff;
   border-radius: 8px;
   min-width: 300px !important; 
   box-shadow: 0px 4px 20px 0px #dfe3e6;
+}
+.card_block1{
+  border: 1px solid #ffffff;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 8px;
+  min-width: 300px !important; 
+  box-shadow: 0px 2px 6px 0px #dfe3e6;
 }
 .card_block2{
   /* border: 1px solid #ffffff; */
