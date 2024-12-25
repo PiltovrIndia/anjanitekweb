@@ -13,6 +13,7 @@ import styles from '../../page.module.css'
 import { useRouter } from 'next/navigation'
 const biscuits = new Biscuits
 import dayjs from 'dayjs'
+import { useToast } from "../ui/use-toast"
 import Toast from './toast';
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -43,6 +44,7 @@ export default function Vertification() {
     
     // create a router for auto navigation
     const router = useRouter();
+    const { toast } = useToast();
         
     // session variable to track login
     const [session, setSession] = useState(false);
@@ -73,7 +75,7 @@ export default function Vertification() {
             const obj = JSON.parse(decodeURIComponent(cookieValue))
             
             // for now, only admins can login in to this portal
-            if(obj.role == 'SuperAdmin' || obj.role == 'Admin' || obj.role == 'OutingAdmin' || obj.role == 'OutingIssuer')
+            if(obj.role == 'GlobalAdmin' || obj.role == 'SuperAdmin' || obj.role == 'Admin' || obj.role == 'OutingAdmin' || obj.role == 'OutingIssuer')
             {
                 setSession(true)
                 // router.push('/dashboard')
@@ -162,7 +164,7 @@ async function loginHere(){
 
                 // for now, only allow if user is admin
                 // if(resultData.data.role == 'admin' || resultData.data.role == 'SuperAdmin' || resultData.data.role == 'SalesManager' || resultData.data.role == 'SalesExecutive'){
-                if(resultData.data.role == 'SuperAdmin'){
+                if(resultData.data.role == 'SuperAdmin' || resultData.data.role == 'GlobalAdmin'){
                     // otp sent
                     setotpSent(true)
                 }
@@ -199,12 +201,15 @@ async function loginHere(){
 console.log(e);
 
         // show and hide message
-        setResultType('error');
-        setResultMessage('Error reaching server. Please try again later!');
-        setTimeout(function(){
-            setResultType('');
-            setResultMessage('');
-        }, 3000);
+        toast({
+            description: "Error reaching server. Please try again later!",
+          })
+        // setResultType('error');
+        // setResultMessage('Error reaching server. Please try again later!');
+        // setTimeout(function(){
+        //     setResultType('');
+        //     setResultMessage('');
+        // }, 3000);
     }
 }
 
@@ -299,7 +304,8 @@ function verifyOTP(){
             //     router.push('/dashboard')
             // }
             // else 
-            if(queryResult.data.role.toLocaleLowerCase() == 'SuperAdmin'.toLocaleLowerCase() ||
+            if(queryResult.data.role.toLocaleLowerCase() == 'GlobalAdmin'.toLocaleLowerCase() ||
+            queryResult.data.role.toLocaleLowerCase() == 'SuperAdmin'.toLocaleLowerCase() ||
             queryResult.data.role.toLocaleLowerCase() == 'SalesManager'.toLocaleLowerCase() ||
             queryResult.data.role.toLocaleLowerCase() == 'SalesExecutive'.toLocaleLowerCase()){
                 

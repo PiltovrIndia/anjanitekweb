@@ -713,7 +713,10 @@ export default function Outing() {
                         item.address1 = item.address1.replace('/', '***');
                         item.address2 = item.address2.replace('/', '***');
                         item.address3 = item.address3.replace('/', '***');
-                        item.mapTo = allSalesPeople.find(salesperson => salesperson.name.toLowerCase() === item.mapTo.toLowerCase()).id;
+                        
+                        item.mapTo = allSalesPeople.find(salesperson => salesperson.name?.trim().toLowerCase() === item.mapTo?.trim().toLowerCase())?.id;
+                        
+                        
                     }
                     return item;
                 });
@@ -747,7 +750,7 @@ export default function Outing() {
             
             const result  = await updateBulkDealersData(process.env.NEXT_PUBLIC_API_PASS, items1)
             const queryResult = await result.json() // get data
-            // console.log(queryResult.data);
+            console.log(queryResult.data);
             
             // check for the status
             if(queryResult.status == 200){
@@ -764,6 +767,7 @@ export default function Outing() {
             else {
                 
                 setBulkUploading(false);
+                toast({description: "Upload success. Refresh to view updated data"});
             }
         }
         catch (e){
@@ -1176,12 +1180,14 @@ const sendMessageNow = async (e) => {
         if(invoicesWithAppliedAmount.length > 0){
             setUpdatingInvoices(true);
 
-
+            // check for special characters before passing to api
+            const decodedTransactionId = (transactionId.length == 0) ? '-' : encodeURIComponent(transactionId).replace('/', '***');
+            
             try {    
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
                 
                 // const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
-                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, (transactionId.length == 0) ? '-' : transactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
+                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, decodedTransactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
                 const queryResult = await result.json() // get data
 
                 // console.log(queryResult);
@@ -1297,6 +1303,7 @@ const sendMessageNow = async (e) => {
 
   // Function to handle transaction Id input
   const handleTransactionIdChange = (e) => {
+    // console.log(e.target.value);
     
     // if(e.target.value.length > 0) {
         setTransactionId(e.target.value);

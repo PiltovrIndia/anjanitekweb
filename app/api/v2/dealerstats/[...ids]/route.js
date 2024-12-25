@@ -18,7 +18,7 @@ export async function GET(request,{params}) {
 
               var query = '';
               
-              if(params.ids[2]=='SuperAdmin'){
+              if(params.ids[2]=='SuperAdmin' || params.ids[2]=='GlobalAdmin'){
                   query =
                     `SELECT 
                         'All' AS state, 

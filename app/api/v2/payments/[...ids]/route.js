@@ -107,10 +107,12 @@ export async function POST(request, {params}) {
 
         if(params.ids[1] == 'webbulk'){ // Upload invoices in bulk
           
+              const transactionId = decodeURIComponent(params.ids[5]).replace('***','/');
+          
               // invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
               const items = await request.json();
               
-              await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], items, decodeURIComponent(params.ids[5]), new Date(params.ids[6]), params.ids[7],params.ids[8]);
+              await applyPaymentToSelectedInvoices(params.ids[2], params.ids[3], params.ids[4], items, transactionId, new Date(params.ids[6]), params.ids[7],params.ids[8]);
               
               return Response.json({status: 200, message:'Success!'}, {status: 200})
               

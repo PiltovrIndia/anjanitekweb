@@ -104,7 +104,7 @@ export async function GET(request,{params}) {
                     // const [rows, fields] = await connection.execute(q);
                     // connection.release();
                     
-                    if(params.ids[2] == 'SuperAdmin'){
+                    if(params.ids[2] == 'SuperAdmin' || params.ids[2]=='GlobalAdmin'){
                         const [rows2, fields2] = await connection.execute(`SELECT * FROM payments p JOIN dealer d ON p.id=d.dealerId WHERE p.type="credit" ORDER BY p.paymentDate DESC LIMIT 20 OFFSET `+params.ids[4]);
                         connection.release();
                         return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
@@ -244,7 +244,7 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U6'){ // get all invoices of dealers assigned to a list of executives that are unpaid
             
-                if(params.ids[2] == 'SuperAdmin'){
+                if(params.ids[2] == 'SuperAdmin' || params.ids[2]=='GlobalAdmin'){
                     const [rows2, fields2] = await connection.execute(`SELECT * FROM invoices where status!="Paid" ORDER BY expiryDate ASC`);
                     connection.release();
                     return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})

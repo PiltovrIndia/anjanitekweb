@@ -1274,7 +1274,8 @@ console.log(queryResult);
                     <TableCell>
                         <div className='flex flex-col gap-1 w-max items-start'>
                             {dayjs(row.expiryDate).format("DD/MM/YY")} 
-                            {dayjs(row.expiryDate).diff(dayjs(new Date()), 'days') > 0 ?
+                            {(row.status != 'Paid') ?
+                            dayjs(row.expiryDate).diff(dayjs(new Date()), 'days') > 0 ?
                                 <p className="text-xs text-yellow-700 bg-yellow-100 px-0.5 py-0.25 w-fit mb-1 border border-yellow-400 rounded">
                                     {dayjs(row.expiryDate).diff(dayjs(new Date()), 'days')+'-days left'}
                                 </p>
@@ -1282,7 +1283,7 @@ console.log(queryResult);
                                    {'Expired'+dayjs(row.expiryDate).diff(dayjs(new Date()), 'days') +' days ago'}
                                 </p>
 
-                            }
+                             : null }
                         </div>
                     </TableCell>
                         <TableCell>
