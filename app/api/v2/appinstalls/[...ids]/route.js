@@ -7,7 +7,8 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
 
-const PRIVATE_KEY_PATH = path.join(process.cwd(), 'keys/AuthKey_792XM95A87.p8');
+// const PRIVATE_KEY_PATH = path.join(process.cwd(), 'keys/AuthKey_792XM95A87.p8');
+const PRIVATE_KEY_PATH = path.join(process.cwd(), '');
 const privateKey = fs.readFileSync(PRIVATE_KEY_PATH, 'utf8');
 console.log(privateKey);
 
