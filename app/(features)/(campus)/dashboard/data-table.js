@@ -772,10 +772,10 @@ const columns = [
         {/* pagination */}
       <div className="flex items-center justify-end space-x-2 py-4 px-4">
       
-      {(table.getFilteredRowModel().rows.length > 0) ?
+      {/* {(table.getFilteredRowModel().rows.length > 0) ?
           <div className="flex-1 text-sm text-muted-foreground">{table.getFilteredRowModel().rows.length} dealers</div>
        :   <div className="flex-1 text-sm text-muted-foreground">No Pending dealers</div>
-      }
+      } */}
           <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} >
             Previous
           </Button>

@@ -13,13 +13,7 @@ import { Toaster } from "@/app/components/ui/toaster"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuContent } from "@/app/components/ui/dropdown-menu"
 
 const inter = Inter({ subsets: ['latin'] })
-// const montserrat = Montserrat({ subsets: ['latin'] })
 
-// export const metadata = {
-//     title: 'Dashboard',
-//     description: 'Overview of your campus',
-//   }
-  
   export default function CampusLayout({ children }) {
 
     // // variable to store the active tab
@@ -74,6 +68,12 @@ const inter = Inter({ subsets: ['latin'] })
                 setSelectedTab('Dealers')
                 // getData(obj.role, 'Returned', obj.collegeId, obj.branch);
             }
+            
+            else if(obj.role == 'StockAdmin' || obj.role == 'SuperAdmin'){
+                setSelectedTab('Products')
+                // getData(obj.role, 'Returned', obj.collegeId, obj.branch);
+            }
+            
         //     else if(obj.role == 'SuperAdmin' || obj.role == 'Admin'){
         //         console.log('SuperAdmin');
         //         setViewByStatus('Submitted')
@@ -132,6 +132,11 @@ const inter = Inter({ subsets: ['latin'] })
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
       setSelectedTab('Sales')
       router.push('/sales')
+    }
+    function navigateProducts(){
+      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
+      setSelectedTab('Products')
+      router.push('/products')
     }
     function navigateDealersPending(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
@@ -197,6 +202,7 @@ const inter = Inter({ subsets: ['latin'] })
               <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
               {(role == 'SuperAdmin' || role == 'SalesManager' ) ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dashboard' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDashboard.bind(this)} style={{cursor:'pointer'}}><Monitor className={styles.menuicon}/> Dashboard</div> : <div></div>}
               {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Invoices' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateInvoices.bind(this)} style={{cursor:'pointer'}}><Receipt className={styles.menuicon}/> Invoices</div> : <div></div>}
+              {(role == 'SuperAdmin' || role == 'StockAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Products' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateProducts.bind(this)} style={{cursor:'pointer'}}><Receipt className={styles.menuicon}/> Products</div> : <div></div>}
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealers.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers</div>
                 {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Sales' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSales.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Sales</div> : <div></div>}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers Pending' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealersPending.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers Pending</div> */}

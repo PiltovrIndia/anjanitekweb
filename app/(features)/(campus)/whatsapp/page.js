@@ -63,8 +63,34 @@ fetch("https://graph.facebook.com/v21.0/508449589016103/messages", {
         Accept: "application/json",
         Authorization: "Bearer EAAIEGtA6LXwBO7CunzaZBeFo0ohGrNlUa6TPGFdGQZC0jlEkMq883AZCUSHQn5OdYBMzU6fyHhZCxY6mIlqsVmMd1e9QaqFZCgBkW5P9zQ3y230ZCaah871mu3qZCzH3Hqi61043ZAsxSAEcSz2cqEtZBA9g3WHLVCJuqoZBw5OdKP1iT7iiN9rE5htP5gFXY8jl6sZBwZDZD"
     },
-    body: JSON.stringify( { "messaging_product": "whatsapp", "to": "917799813519", "type": "template", "template": { "name": "hello_world", "language": { "code": "en_US" } } }),
+    body: JSON.stringify( { "messaging_product": "whatsapp", "to": "917799813519", "type": "template", "template": { "name": "hello_world", "language": { "code": "en_US" }  } }),
 });
+
+// // get message to dealers
+// const sendBroadcastMessage = async () => 
+    
+// fetch("https://graph.facebook.com/v21.0/451400844732214/messages", {
+//     method: "POST",
+//     headers: {
+//         "Content-Type": "application/json",
+//         Accept: "application/json",
+//         Authorization: "Bearer EAAIEGtA6LXwBO7CunzaZBeFo0ohGrNlUa6TPGFdGQZC0jlEkMq883AZCUSHQn5OdYBMzU6fyHhZCxY6mIlqsVmMd1e9QaqFZCgBkW5P9zQ3y230ZCaah871mu3qZCzH3Hqi61043ZAsxSAEcSz2cqEtZBA9g3WHLVCJuqoZBw5OdKP1iT7iiN9rE5htP5gFXY8jl6sZBwZDZD"
+//     },
+//     body: JSON.stringify( { "messaging_product": "whatsapp", "to": "917799813519", "type": "template", "template": { "name": "login_otp", "language": { "code": "en_US" }, "components": [{ "type":"body", "parameters": [{ "type": "text", "text":"123456"}, 
+//         {"type":"button", "button":{"link":"https://anjanitek.com/dashboard"}}
+//         {
+//             "type": "button",
+//             "sub_type": "quick_reply",
+//             "index": 0,
+//             "parameters": [
+//                 {
+//                     "type": "text",
+//                     "text": "Yes"
+//                 }
+//             ]
+//         }
+//         ]}] } }),
+// });
 
 
 

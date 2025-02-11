@@ -160,7 +160,7 @@ export async function GET(request,{params}) {
             // get dealer details of the dealer by id
             else if(params.ids[1] == 'U4'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT u.*,d.*, (SELECT name from user where id=u.mapTo ) as mapName from `user` u JOIN dealer d ON u.id=d.dealerId WHERE u.id = "'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('SELECT u.*,d.*, (SELECT name from user where id=u.mapTo ) as mapName, (SELECT mobile from user where id=u.mapTo ) as mapMobile from `user` u JOIN dealer d ON u.id=d.dealerId WHERE u.id = "'+params.ids[2]+'"');
                     connection.release();
 
                     // check if user is found
@@ -405,8 +405,11 @@ export async function GET(request,{params}) {
                                 `+dList+`
                                 ORDER BY i.expiryDate ASC`;
                             
+console.log(query);
 
                                 const [rows1, fields1] = await connection.execute(query);
+                                console.log(rows1);
+                                
                                 connection.release();
                                 // return successful update
 
@@ -873,7 +876,7 @@ export async function GET(request,{params}) {
             
             else if(params.ids[1] == 'U14'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT u.*, (SELECT name from user where id=u.mapTo ) as mapName from `user` u WHERE u.mobile = "'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('SELECT u.*, (SELECT name from user where id=u.mapTo ) as mapName, (SELECT mobile from user where id=u.mapTo ) as mapMobile from `user` u WHERE u.mobile = "'+params.ids[2]+'"');
                     connection.release();
                     // return successful update
 
