@@ -363,14 +363,14 @@ export default function Outing() {
                 console.log('Not found')
                 router.push('/')
             }
-    },[]);
+    },[router]);
 
 
     useEffect(() => {
         if (user && user.id && !completed) {
             getAllDealers(initialDatesValues.from,initialDatesValues.to);
         }
-    }, [user, completed]);
+    }, [user, completed, getAllDealers, initialDatesValues.from, initialDatesValues.to]);
 
     // useEffect(() => {
     //     console.log("Updated");

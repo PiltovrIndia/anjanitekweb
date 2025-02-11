@@ -4,6 +4,7 @@ import { Button } from "@/app/components/ui/button";
 import { Checkbox } from "@/app/components/ui/checkbox";
 import { Badge } from "@/app/components/ui/badge";
 import { X } from "phosphor-react";
+import Image from "next/image";
 
 export default function TagDialog({ product, tags, isOpen, onClose, onSave }) {
   const [selectedTags, setSelectedTags] = useState(product.tags.split(",").map(Number));
@@ -39,7 +40,7 @@ export default function TagDialog({ product, tags, isOpen, onClose, onSave }) {
 
         {/* Selected Tags as Badges */}
         <div>
-            <img
+            <Image
             src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+product.design+'.jpeg?alt=media'}
             alt={product.name}
             className="w-full h-48 object-cover rounded-lg"
@@ -49,7 +50,7 @@ export default function TagDialog({ product, tags, isOpen, onClose, onSave }) {
           {selectedTags.map((tagId) => {
             const tag = tags.find((t) => t.tagId === tagId);
             return (
-                <span class="flex items-center gap-1 bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-700 dark:text-green-400 border border-green-400">
+                <span key={tagId} class="flex items-center gap-1 bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-700 dark:text-green-400 border border-green-400">
                     {tag?.name}
                     <X size={14} className="cursor-pointer" onClick={() => handleRemoveTag(tagId)} />
                 </span>

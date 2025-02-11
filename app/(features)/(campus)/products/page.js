@@ -121,7 +121,7 @@ export default function Products() {
                 console.log('Not found')
                 router.push('/')
             }
-    },[]);
+    },[router]);
 
     useEffect(() => {
         if (user && user.id && !completed) {
@@ -129,7 +129,7 @@ export default function Products() {
             getProductTags();
             getAllProducts();
         }
-    }, [user, completed]);
+    }, [user, completed, getAllProducts, getProductTags]);
 
     const handleTagChange = (tagId) => {
         setSelectedTags((tagsList) =>

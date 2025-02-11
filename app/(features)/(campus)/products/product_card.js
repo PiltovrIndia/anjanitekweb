@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
+import Image from 'next/image';
 
 export default function ProductCard({ product }) {
 
@@ -12,7 +13,7 @@ export default function ProductCard({ product }) {
   return (
     <Card className="w-full max-w-sm shadow-lg hover:shadow-xl transition">
       <CardHeader>
-        <img
+        <Image
           src={imgSrc}
           alt={product.name}
           className="w-full h-48 object-cover rounded-lg"

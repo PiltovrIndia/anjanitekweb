@@ -15,6 +15,7 @@ import { getStorage, ref, listAll, deleteObject, list, uploadBytesResumable, get
 // const storage = getStorage();
 import firebase from '../../../firebase';
 import Toast from '../../../components/myui/toast'
+import { get } from 'http';
 const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
 
 // Create a child reference
@@ -147,7 +148,7 @@ export default function ManageImages() {
     // console.log(capturedStudentImage); // Updated value
 
 
-    },[]);
+    },[router, completed, getData, getUsersData]);
 
     // }, [webcamRef]);
    

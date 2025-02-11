@@ -74,6 +74,7 @@ import {
 import { UserNav } from "@/app/components/user-nav"
 import { Input } from '@/app/components/ui/input';
 import * as XLSX from 'xlsx';
+import { get } from 'http';
 
 
 const xlsx = require('xlsx');
@@ -313,7 +314,7 @@ export default function AppReports() {
                 console.log('Not found')
                 router.push('/')
             }
-    },[]);
+    },[router]);
 
     useEffect(() => {
         if (user && user.id && !completed) {
@@ -321,7 +322,7 @@ export default function AppReports() {
             getDealerStats();
             getAllRequests(days, currentState);
         }
-    }, [user, completed]);
+    }, [user, completed, days, currentState, getAllRequests, getDealerStats]);
 
 
     // get dealer stats

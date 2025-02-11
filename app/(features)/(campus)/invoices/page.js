@@ -282,14 +282,14 @@ export default function Invoices() {
                 console.log('Not found')
                 router.push('/')
             }
-    },[]);
+    },[router]);
 
 
     useEffect(() => {
         if (user && user.id && !completed) {
             getAllInvoices(initialDatesValues.from,initialDatesValues.to);
         }
-    }, [user, completed]);
+    }, [user, completed, getAllInvoices, initialDatesValues.from, initialDatesValues.to]);
 
     // Create an instance of Intl.NumberFormat for Indian numbering system with two decimal places
     const formatter = new Intl.NumberFormat('en-IN', {

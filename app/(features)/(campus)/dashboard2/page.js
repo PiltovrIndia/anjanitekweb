@@ -200,7 +200,7 @@ const formatter = new Intl.NumberFormat('en-IN', {
     // console.log(capturedStudentImage); // Updated value
 
 
-    },[]);
+    },[router, completed, getData, getDealerStats]);
 
     // }, [webcamRef]);
    

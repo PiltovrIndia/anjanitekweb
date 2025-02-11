@@ -366,14 +366,14 @@ export default function Outing() {
                 console.log('Not found')
                 router.push('/')
             }
-    },[]);
+    },[router]);
 
     useEffect(() => {
         if (user && user.id && !completed) {
             getDealerStats();
             getAllRequests(days, currentState);
         }
-    }, [user, completed]);
+    }, [user, completed, days, currentState, getDealerStats, getAllRequests]);
 
 
     // get dealer stats

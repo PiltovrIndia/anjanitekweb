@@ -104,7 +104,7 @@ const inter = Inter({ subsets: ['latin'] })
     // return () => {
     //   window.removeEventListener('beforeunload', handleBeforeUnload);
     // }
-  }, []);
+  }, [router, userName]);
 
     
     // Navigation
