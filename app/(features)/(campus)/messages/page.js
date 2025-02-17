@@ -187,7 +187,7 @@ export default function Messages() {
                 console.log('Not found')
                 router.push('/')
             }
-    },[selectedReceiver, router, receiversList.length]);
+    },[]);
 
     // get the senders data
     // for the user based on their role.

@@ -148,7 +148,7 @@ export default function ManageImages() {
     // console.log(capturedStudentImage); // Updated value
 
 
-    },[router, completed, getData, getUsersData]);
+    },[]);
 
     // }, [webcamRef]);
    

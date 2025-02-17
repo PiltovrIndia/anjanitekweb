@@ -363,14 +363,14 @@ export default function Outing() {
                 console.log('Not found')
                 router.push('/')
             }
-    },[router]);
+    },[]);
 
 
     useEffect(() => {
         if (user && user.id && !completed) {
             getAllDealers(initialDatesValues.from,initialDatesValues.to);
         }
-    }, [user, completed, getAllDealers, initialDatesValues.from, initialDatesValues.to]);
+    }, [user, completed]);
 
     // useEffect(() => {
     //     console.log("Updated");
@@ -1201,17 +1201,19 @@ const sendMessageNow = async (e) => {
 
                     // get the new invoices after updating
                     getInvoicesOfSelectedDealer(dealerId);
-
+                    setTransactionId('');
                     setUpdatingInvoices(false);
                     
                 }
                 else if(queryResult.status == 401 || queryResult.status == 201 ) {
                     setDealerInvoices([]);
+                    setTransactionId('');
                     setUpdatingInvoices(false);
                     
                 }
                 else if(queryResult.status == 404) {
                     setDealerInvoices([]);
+                    setTransactionId('');
                     toast({
                         description: "No more",
                     })
@@ -1924,7 +1926,14 @@ const sendMessageNow = async (e) => {
                                                     </PopoverContent>
                                                 </Popover>
                                                 <Input type="text" id="transactionId" value={transactionId} onChange={handleTransactionIdChange} className="col-span-3 text-black" placeholder="Transaction ID" />
-                                                <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
+                                                {updatingInvoices ?
+                                                    <div className="flex flex-row m-12">    
+                                                        <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                                                        <p className={`${inter.className} ${styles.text3}`}>Updating ...</p> 
+                                                    </div>
+                                                : <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
+                                                }
+                                                {/* <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button> */}
                                                 {/* <Button variant="secondary" onClick={handleSheetClose}>Close</Button> */}
                                         </div>
                                         </div>
@@ -2088,7 +2097,14 @@ const sendMessageNow = async (e) => {
                                                     </PopoverContent>
                                                 </Popover>
                                                 <Input type="text" id="transactionId" value={transactionId} onChange={handleTransactionIdChange} className="col-span-3 text-black" placeholder="Transaction ID or other detail" />
-                                                <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
+                                                {updatingInvoices ?
+                                                    <div className="flex flex-row m-12">    
+                                                        <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                                                        <p className={`${inter.className} ${styles.text3}`}>Updating ...</p> 
+                                                    </div>
+                                                : <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button>
+                                                }
+                                                {/* <Button onClick={() => updateInvoices(selectedDealer.id)}>Update</Button> */}
                                                 {/* <Button variant="secondary" onClick={handleSheetClose}>Close</Button> */}
                                             </div>
                                             

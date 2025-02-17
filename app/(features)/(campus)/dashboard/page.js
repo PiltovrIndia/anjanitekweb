@@ -373,7 +373,7 @@ export default function Outing() {
             getDealerStats();
             getAllRequests(days, currentState);
         }
-    }, [user, completed, days, currentState, getDealerStats, getAllRequests]);
+    }, [user, completed]);
 
 
     // get dealer stats

@@ -322,7 +322,7 @@ export default function AppReports() {
             getDealerStats();
             getAllRequests(days, currentState);
         }
-    }, [user, completed, days, currentState, getAllRequests, getDealerStats]);
+    }, [user, completed]);
 
 
     // get dealer stats
