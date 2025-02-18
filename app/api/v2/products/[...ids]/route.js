@@ -71,14 +71,22 @@ export async function GET(request,{params}) {
             // get products by tags
             else if(params.ids[1] == 'U3'){
                 try {
+                    var str = '';
+                    if(params.ids[2].length > 0){
+                        str = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');
+                    }
+                    else {
+                        str = 'FIND_IN_SET("39", tags)';
+                    }
                     const conditions = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');                    
-                    const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${conditions}`);
-                    // const [rows, fields] = await connection.execute('SELECT * from products (SELECT name from user where id=u.mapTo ) as mapName from `user` u JOIN dealer d ON u.id=d.dealerId WHERE u.id = "'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${conditions} LIMIT 20 OFFSET ${params.ids[3]}`);
+                    const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products WHERE ${conditions}`);
+                    const totalCount = countRows[0].count;
                     connection.release();
 
                     // check if user is found
                     if(rows.length > 0){
-                        return Response.json({status: 200, data: rows, message:'Data found!'}, {status: 200})
+                        return Response.json({status: 200, data: rows, count: totalCount, message:'Data found!'}, {status: 200})
                     }
                     else {
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
