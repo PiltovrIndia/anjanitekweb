@@ -78,9 +78,9 @@ export async function GET(request,{params}) {
                     else {
                         str = 'FIND_IN_SET("39", tags)';
                     }
-                    const conditions = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');                    
-                    const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${conditions} LIMIT 20 OFFSET ${params.ids[3]}`);
-                    const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products WHERE ${conditions}`);
+                    // const conditions = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');                    
+                    const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
+                    const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products WHERE ${str}`);
                     const totalCount = countRows[0].count;
                     connection.release();
 
