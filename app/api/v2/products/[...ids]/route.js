@@ -29,7 +29,7 @@ export async function GET(request,{params}) {
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
                     }
                 } catch (error) { // error updating
-                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                    return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
             // get the list of products
@@ -49,7 +49,7 @@ export async function GET(request,{params}) {
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
                     }
                 } catch (error) { // error updating
-                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                    return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
             // get products by size
@@ -65,7 +65,7 @@ export async function GET(request,{params}) {
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
                     }
                 } catch (error) {
-                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                    return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
             // get products by tags
@@ -78,44 +78,41 @@ export async function GET(request,{params}) {
                     else {
                         str = 'FIND_IN_SET("39", tags)';
                     }
-                    // const conditions = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');                    
+                        // const conditions = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');                    
+                        const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
+                        const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products WHERE ${str}`);
+                        const totalCount = countRows[0].count;
+                        connection.release();
+
+                        // check if user is found
+                        if(rows.length > 0){
+                            return Response.json({status: 200, data: rows, count: totalCount, message:'Data found!'}, {status: 200})
+                        }
+                        else {
+                            return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                        }
+                    } catch (error) { // error updating
+                        return Response.json({status: 404, message:'No product found!'}, {status: 200})
+                }
+            }
+            // get products by search
+            else if(params.ids[1] == 'U4'){
+                try {
+                    var str = `(design LIKE '%${params.ids[2]}%' OR name LIKE '%${params.ids[2]}%')`;
+                    
                     const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
-                    const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products WHERE ${str}`);
-                    const totalCount = countRows[0].count;
                     connection.release();
 
-                    // check if user is found
-                    if(rows.length > 0){
-                        return Response.json({status: 200, data: rows, count: totalCount, message:'Data found!'}, {status: 200})
-                    }
-                    else {
-                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
-                    }
-                } catch (error) { // error updating
-                    return Response.json({status: 404, message:'No user found!'}, {status: 200})
-            }
-
-
-
-
-                // try {
-                //     const [rows, fields] = await connection.execute('SELECT * from dealer d LEFT JOIN user u ON d.dealerId = u.id WHERE d.dealerId = "'+params.ids[2]+'"');
-                //     connection.release();
-                //     // return successful update
-
-                //     // check if user is found
-                //     if(rows.length > 0){
-                //         // return the requests data
-                //         return Response.json({status: 200, data: rows[0], message:'Data found!'}, {status: 200})
-
-                //     }
-                //     else {
-                //         // user doesn't exist in the system
-                //         return Response.json({status: 201, message:'No data found!'}, {status: 200})
-                //     }
-                // } catch (error) { // error updating
-                //     return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
-                // }
+                        // check if user is found
+                        if(rows.length > 0){
+                            return Response.json({status: 200, data: rows, message:'Data found!'}, {status: 200})
+                        }
+                        else {
+                            return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                        }
+                    } catch (error) { // error updating
+                        return Response.json({status: 404, message:'No product found!'}, {status: 200})
+                }
             }
             // get the dealers with pending amount for listing in web
             // getting all instead of limiting
@@ -348,13 +345,13 @@ console.log(query);
                             }
                     }
                 } catch (error) { // error updating
-                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                    return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
             
             
             else {
-                return Response.json({status: 404, message:'No user found!'}, {status: 200})
+                return Response.json({status: 404, message:'No product found!'}, {status: 200})
             }
         }
         else {
