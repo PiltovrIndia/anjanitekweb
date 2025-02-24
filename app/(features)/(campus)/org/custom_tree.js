@@ -32,9 +32,9 @@ export function Tree({ nodes, depth = 0 }) {
                 className="p-0 h-6 w-6"
               >
                 {isOpen ? (
-                  <ChevronDown className="h-4 w-4" />
+                  <ArrowDown className="h-4 w-4" />
                 ) : (
-                  <ChevronRight className="h-4 w-4" />
+                  <ArrowRight className="h-4 w-4" />
                 )}
               </Button>
             )}
