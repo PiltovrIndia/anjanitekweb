@@ -60,6 +60,36 @@ export async function GET(request,{params}) {
             await applyPayment(params.ids[2], params.ids[3], params.ids[4], params.ids[5].replace('***','/'), params.ids[6], paymentDate, params.ids[8],params.ids[9]);
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
+          if(params.ids[1] == 'paymentrequest'){
+            // dealer can place a payment request for approval by admin
+            // paymentrequest, amount, 'credit', id, transactionId, paymentDate, particular, bal
+            const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+            const [payments] = await connection.query(q,[params.ids[2], '', params.ids[3], params.ids[4],'-',params.ids[5].replace('***','/'),params.ids[6],'-', params.ids[7], params.ids[8]]);
+            connection.release();
+
+            // return Response.json({status: 200, message:'Success!'}, {status: 200})
+            if(payments.insertId > 0){
+                return Response.json({status: 200, message:'Updated!', id: payments.insertId}, {status: 200})
+            }
+            else {
+                return Response.json({status: 201, message:'No data found!'}, {status: 200})
+            }
+          }
+          if(params.ids[1] == 'getpaymentrequest'){
+            // dealer can place a payment request for approval by admin
+            // paymentrequest, amount, 'credit', id, transactionId, paymentDate, particular, bal
+            const q = 'SELECT * FROM payments WHERE id=? AND adminId="-"';
+            const [payments] = await connection.query(q,[params.ids[2]]);
+            connection.release();
+
+            // return Response.json({status: 200, message:'Success!'}, {status: 200})
+            if(payments.length > 0){
+                return Response.json({status: 200, message:'Found!', data: payments}, {status: 200})
+            }
+            else {
+                return Response.json({status: 201, message:'No data found!'}, {status: 200})
+            }
+          }
           
           // if(params.ids[1] == 'webbulk'){
             
@@ -168,7 +198,8 @@ export async function POST(request, {params}) {
   async function applyPaymentToSelectedInvoices(id, paymentAmount, type, invoicesList, transactionId, paymentDate, adminId, particular) {
     
     var amount = paymentAmount;
-    
+    var appliedAmounts = invoicesList.map(invoice => invoice.appliedAmount).join(',');
+
     // get the pool connection to db
     const connection = await pool.getConnection(); 
 
@@ -176,15 +207,24 @@ export async function POST(request, {params}) {
         await connection.beginTransaction();
         
         // 1. get the selected invoices provided
+        // 1.1 get the pending balance from invoices table
         // 2. update the invoices table with pending amount for the selected invoices
-        // 3. update the payments table with the transaction of selected invoices
+        // 3. check if the payment update is for the uploaded receipt or manual by admin
+            // update or insert the payment into the table with the transaction of selected invoices
         // 4. Send notification to Dealer(s)
         // 5. Include the notification in the chat history and SENT BY will be the respective executive.
+
+        // 1.1 get the pending balance from invoices table
+        const [balance] = await connection.query('SELECT CAST(SUM(pending) AS DECIMAL(10, 2)) as bal FROM invoices WHERE billTo = "'+id+'" AND status!="Paid"',[]);
+        console.log(balance);
+        
+          var bal = 0;
+          bal = parseFloat(balance.length > 0 ? balance[0].bal : 0) - parseFloat(amount);
 
         // 2
         // collect the invoices list for updating in payments table
         var invcs = '';
-        var appliedAmounts = '';
+        // var appliedAmounts = '';
 
         invoicesList.forEach(async (invoice, index) => {
           // console.log(`Item ${index}:`, invoice.invoiceNo.replace('***','/'));
@@ -207,28 +247,42 @@ export async function POST(request, {params}) {
             );
             
             // add applied amounts for each invoice in sequence
-            if(appliedAmounts.length > 0){
-              appliedAmounts = appliedAmounts + "," + invoice.appliedAmount;
-            }
-            else {
-              appliedAmounts = invoice.appliedAmount; // get the sequence of amounts applied to sequence of invoices
-            }
+            // if(appliedAmounts.length > 0){
+            //   appliedAmounts = appliedAmounts + "," + invoice.appliedAmount;
+            // }
+            // else {
+            //   appliedAmounts = invoice.appliedAmount; // get the sequence of amounts applied to sequence of invoices
+            // }
         });
 
         // 3
         // update the payments table
-        const [balance] = await connection.query('SELECT balance FROM payments WHERE id = "'+id+'" ORDER BY paymentDate DESC LIMIT 1',[]);
+        // const [balance] = await connection.query('SELECT balance FROM payments WHERE id = "'+id+'" ORDER BY paymentDate DESC LIMIT 1',[]);
+        // const [balance] = await connection.query('SELECT CAST(SUM(pending) AS DECIMAL(10, 2)) as bal FROM invoices WHERE billTo = "'+id+'" AND status!="Paid"',[]);
+        // console.log(balance);
         
-          var bal = 0;
-          if(type == 'credit' && balance.length > 0){
-              bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) - parseFloat(amount);
-          }
+        //   var bal = 0;
+        //   bal = parseFloat(balance.length > 0 ? balance[0].bal : 0) - parseFloat(amount);
+          // if(type == 'credit' && balance.length > 0){
+          //     bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) - parseFloat(amount);
+          // }
+          // else {
+          //     bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
+          // }
+        
+          // 3. check if the payment update is for the uploaded receipt or manual by admin
+          if(particular == '-'){
+          
+            const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+            const [payments] = await connection.query(q,[amount, appliedAmounts, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
+    
+          } 
           else {
-              bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
+          
+            const q = 'UPDATE payments SET amounts=?,invoiceNo=?, adminId=?, balance=? WHERE paymentId=?';
+            const [payments] = await connection.query(q,[appliedAmounts,invcs,adminId, bal, particular]);
+    
           }
-         
-        const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
-        const [payments] = await connection.query(q,[amount, appliedAmounts, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
 
         // 4
         // send notification to Dealer(s)
@@ -281,6 +335,7 @@ export async function POST(request, {params}) {
   async function applyPayment(id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular) {
     
     var amount = paymentAmount;
+    var appliedAmounts = invoicesList.map(invoice => invoice.appliedAmount).join(',');
 
     // get the pool connection to db
     const connection = await pool.getConnection(); 
@@ -308,10 +363,18 @@ export async function POST(request, {params}) {
 
         const [invoices] = await connection.query(query1,[]);
 
+
+        // 1.1 get the pending balance from invoices table
+        const [balance] = await connection.query('SELECT CAST(SUM(pending) AS DECIMAL(10, 2)) as bal FROM invoices WHERE billTo = "'+id+'" AND status!="Paid"',[]);
+        console.log(balance);
+        
+          var bal = 0;
+          bal = parseFloat(balance.length > 0 ? balance[0].bal : 0) - parseFloat(amount);
+
         // 2
         // collect the invoices list for updating in payments table
         var invcs = '';
-        var appliedAmounts = '';
+        // var appliedAmounts = '';
         for (const invoice of invoices) {
         
             if (paymentAmount <= 0) break;
@@ -342,32 +405,44 @@ export async function POST(request, {params}) {
             
             // if(paymentAmount > 0)  invcs += ','; // add , for next invoice in the list
             // add applied amounts for each invoice in sequence
-            if(appliedAmounts.length > 0){
-              appliedAmounts = appliedAmounts + "," + amountToApply;
-            }
-            else {
-              appliedAmounts = amountToApply; // get the sequence of amounts applied to sequence of invoices
-            }
+            // if(appliedAmounts.length > 0){
+            //   appliedAmounts = appliedAmounts + "," + amountToApply;
+            // }
+            // else {
+            //   appliedAmounts = amountToApply; // get the sequence of amounts applied to sequence of invoices
+            // }
 
         }
 
         // 3
-        const [balance] = await connection.query('SELECT balance FROM payments WHERE id = "'+id+'" ORDER BY paymentDate DESC LIMIT 1',[]);
+        // const [balance] = await connection.query('SELECT balance FROM payments WHERE id = "'+id+'" ORDER BY paymentDate DESC LIMIT 1',[]);
         // console.log(balance);
         // console.log("plpl"+balance[0].balance);
         // console.log(paymentDate);
 
-        var bal = 0;
-        if(type == 'credit'){
-            bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) - parseFloat(amount);
-        }
+        // var bal = 0;
+        // if(type == 'credit'){
+        //     bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) - parseFloat(amount);
+        // }
+        // else {
+        //     bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
+        // }
+        // const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+        // const [payments] = await connection.query(q,[amount, appliedAmounts, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
+
+        // 3. check if the payment update is for the uploaded receipt or manual by admin
+        if(particular == '-'){
+          
+          const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+          const [payments] = await connection.query(q,[amount, appliedAmounts, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
+  
+        } 
         else {
-            bal = parseFloat(balance.length > 0 ? balance[0].balance : 0) + parseFloat(amount);
-        }
-        const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
-        // console.log(q);
         
-        const [payments] = await connection.query(q,[amount, appliedAmounts, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
+          const q = 'UPDATE payments SET amounts=?,invoiceNo=?, adminId=?, balance=? WHERE paymentId=?';
+          const [payments] = await connection.query(q,[appliedAmounts,invcs,adminId, bal, particular]);
+  
+        }
 
         // 4
         // send notification to Dealer(s)

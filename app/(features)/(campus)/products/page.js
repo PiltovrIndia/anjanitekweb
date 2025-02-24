@@ -129,7 +129,7 @@ export default function Products() {
             getProductTags();
             getAllProducts();
         }
-    }, [user, completed, getAllProducts, getProductTags]);
+    }, [user, completed]);
 
     const handleTagChange = (tagId) => {
         setSelectedTags((tagsList) =>

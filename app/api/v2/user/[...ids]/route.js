@@ -894,6 +894,21 @@ console.log(query);
                 }
             }
             
+            // get the org structure data
+            else if(params.ids[1] == 'U15'){
+                try {
+                    const [rows, fields] = await connection.execute('SELECT  u1.id, u1.name, u1.role, u1.designation, u1.mapTo, u2.name as manager_name, u2.role as manager_role FROM  user u1 LEFT JOIN  user u2 ON u1.mapTo = u2.id ORDER BY  u1.mapTo, u1.id');
+                    connection.release();
+                    // return successful update
+
+                    
+                        return Response.json({status: 200, message:'User found!', data: rows}, {status: 200})
+                    
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No user found!'}, {status: 200})
+                }
+            }
+            
             else {
                 return Response.json({status: 404, message:'No user found!'}, {status: 200})
             }

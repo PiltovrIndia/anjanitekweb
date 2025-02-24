@@ -18,6 +18,8 @@ export default function ProductCard({ product }) {
           alt={product.name}
           className="w-full h-48 object-cover rounded-lg"
           onError={handleError}
+          width={500}
+          height={500}
         />
       </CardHeader>
       <CardContent>

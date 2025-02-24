@@ -56,7 +56,10 @@ import {
 import {columns} from "./columns"
 import {DataTable} from "./data-table"
 import {
-    Card
+    Card,
+    CardDescription,
+    CardHeader,
+    CardTitle
   } from "../../../../app/components/ui/card"
 import {
     Sheet,
@@ -125,6 +128,17 @@ fetch("/api/v2/user/"+pass+"/U6/"+role+"/"+id, {
 const getAllInvoicesDataForSelectedAPI = async (pass, selectedDealerId) => 
     
 fetch("/api/v2/amount/"+pass+"/U6/Dealer/"+selectedDealerId, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// get the pending payment requests of selected dealer
+const getPendingPaymentRequestsAPI = async (pass, selectedDealerId) => 
+    
+fetch("/api/v2/payments/"+pass+"/getpaymentrequest/"+selectedDealerId, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -229,6 +243,7 @@ export default function Outing() {
     const [searching, setSearching] = useState(true);
     const [searchingSales, setSearchingSales] = useState(false);
     const [searchingInvoices, setSearchingInvoices] = useState(false);
+    const [searchingPendingPaymentRequests, setSearchingPendingPaymentRequests] = useState(false);
     const [searchingPayments, setSearchingPayments] = useState(false);
     const [deletingPayments, setDeletingPayments] = useState(false);
     const [offsetPayments, setOffsetPayments] = useState(0);
@@ -258,6 +273,8 @@ export default function Outing() {
     
     const [dealerInvoices, setDealerInvoices] = useState([]); // all invoices of dealer sorted
     const [sortedInvoices, setSortedInvoices] = useState([]); // 
+    const [sortedPendingPayments, setSortedPendingPayments] = useState([]); // 
+    const [selectePendingdPaymentRequest, setSelectePendingdPaymentRequest] = useState('-'); // 
     const [dealerPayments, setDealerPayments] = useState([]); // all invoices of dealer sorted
     const [sortedPayments, setSortedPayments] = useState([]); // 
     const [dealerPending, setDealerPending] = useState(0); // amount entered by admin for update
@@ -1170,6 +1187,63 @@ const sendMessageNow = async (e) => {
         }
     }
 
+    // get pending payment requests raised by dealer
+    async function getPendingPaymentRequests(dealerId){
+        
+        setSearchingPendingPaymentRequests(true);
+
+        try {    
+            
+            const result  = await getPendingPaymentRequestsAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId) 
+            const queryResult = await result.json() // get data
+
+            // console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                // check if data exits
+                if(queryResult.data.length > 0){
+                    
+                    // Sort dealerInvoices by invoiceDate in ascending order
+                    const sortedPendingPayments1 = queryResult.data.sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate));
+                    // setSortedPendingPayments(sortedPendingPayments1);
+                    
+                    // var pendingCount = 0
+                    // add the variable into each object of the list
+                    const updatedList = sortedPendingPayments1.map(payment => {
+                        // pendingCount += parseFloat(invoice.pending); 
+                        return { ...payment, selection: 0};
+                    });
+                    setSortedPendingPayments(updatedList);
+
+                }
+                else {
+                    setSortedPendingPayments([]);
+                }
+
+                setSearchingPendingPaymentRequests(false);
+            }
+            else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                setSortedPendingPayments([]);
+                setSearchingPendingPaymentRequests(false);
+            }
+            else if(queryResult.status == 404) {
+                setSortedPendingPayments([]);
+                setSearchingPendingPaymentRequests(false);
+
+                toast({
+                    description: "No more..",
+                  })
+                  
+                
+            }
+        }
+        catch (e){
+            
+            toast({ description: "Issue loading. Please refresh or try again later!", })
+        }
+    }
+
 
     // Update selected invoices of selected dealer
     async function updateInvoices(dealerId){
@@ -1188,7 +1262,7 @@ const sendMessageNow = async (e) => {
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/credit/"+decodedTransactionId+"/"+dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
                 
                 // const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
-                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, decodedTransactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
+                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, decodedTransactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, selectePendingdPaymentRequest); 
                 const queryResult = await result.json() // get data
 
                 // console.log(queryResult);
@@ -1204,6 +1278,11 @@ const sendMessageNow = async (e) => {
                     getInvoicesOfSelectedDealer(dealerId);
                     setTransactionId('');
                     setUpdatingInvoices(false);
+
+                    // clear pending request if it is selected
+                    const updatedPendingPayments = sortedPendingPayments.filter(payment => payment.paymentId !== selectePendingdPaymentRequest);
+                    setSortedPendingPayments(updatedPendingPayments);
+                    setSelectePendingdPaymentRequest('-');
                     
                 }
                 else if(queryResult.status == 401 || queryResult.status == 201 ) {
@@ -1256,6 +1335,9 @@ const sendMessageNow = async (e) => {
 
     // make the API call to get the invoices.
     getInvoicesOfSelectedDealer(dealer.id);
+
+    // make an API call to get pending payment requests raised by dealers
+    getPendingPaymentRequests(dealer.id);
   };
   
   const handleDealerPaymentsClick = (dealer) => {
@@ -1385,9 +1467,9 @@ const sendMessageNow = async (e) => {
             if (invoice.invoiceNo === invoiceItem.invoiceNo && invoice.appliedAmount > 0) {
                 
                 // console.log("Amount applying: "+invoice.appliedAmount);
-                // console.log("Remaining: "+ (remainingCredit+invoice.appliedAmount));
+                // console.log("Remaining: "+ (remainingCredit+parseFloat(invoice.appliedAmount)).toFixed(2));
                 // setRemainingCredit((prev) => prev + invoice.appliedAmount);
-                setRemainingCredit((prev) => prev + parseFloat(invoice.appliedAmount).toFixed(2));
+                setRemainingCredit((prev) => (parseFloat(prev) + parseFloat(invoice.appliedAmount)).toFixed(2));
                 
                 return {
                 ...invoice,
@@ -1421,6 +1503,68 @@ const sendMessageNow = async (e) => {
             });
 
             setDealerInvoices(prevInvoices);
+        }
+    // }
+    
+  };
+
+  // on click of the single payment request, enter the amount into the textfield
+  // once the textfield is selected, clear the payment requests selection
+  const handlePaymentRequestSelection = (paymentItem) => {
+    
+    console.log(paymentItem.paymentId);
+    (paymentItem.paymentId);
+        
+        if (paymentItem.selection == 0) {
+            var pendingPayments = sortedPendingPayments.map((payment) => {
+                if (payment.paymentId === paymentItem.paymentId) {
+                    
+                    // const updatedList = sortedInvoices.map(invoice => {
+                    //     return { ...invoice, appliedAmount: 0, remaining: invoice.pending };
+                    // });
+                    // setDealerInvoices(updatedList);
+                    
+                    let remainingAmount = parseFloat(paymentItem.amount).toFixed(2) || 0;
+                    setRemainingCredit(remainingAmount);
+                    setTotalCredit(remainingAmount);
+                    setSelectePendingdPaymentRequest(paymentItem.paymentId);
+
+                    
+                    return {
+                        ...payment,
+                        selection: 1,
+                    };
+                } else {
+                    return {
+                        ...payment,
+                        selection: 0,
+                    };
+                }
+            });
+
+            setSortedPendingPayments(pendingPayments);
+        }
+        else {
+            var pendingPayments = sortedPendingPayments.map((payment) => {
+                if (payment.paymentId === paymentItem.paymentId) {
+                    
+                    setRemainingCredit(0);
+                    setTotalCredit(0);
+                    setSelectePendingdPaymentRequest('-');
+
+                    return {
+                        ...payment,
+                        selection: 0,
+                    };
+                } else {
+                    return {
+                        ...payment,
+                        selection: 0,
+                    };
+                }
+            });
+
+            setSortedPendingPayments(pendingPayments);
         }
     // }
     
@@ -1814,7 +1958,7 @@ const sendMessageNow = async (e) => {
                                         <p className='text-muted-foreground'>{selectedDealer.city}, {selectedDealer.state}</p>
                                         </div>
                                         
-                                        <div className="flex flex-row items-end justify-between mb-2">
+                                        <div className="flex flex-row items-end justify-between mb-2 pt-4">
                                             <div className="flex flex-row items-end gap-2 mb-2">
                                                 <div className="flex flex-col items-start gap-2">
                                                     <Label htmlFor="amount" className="text-right">
@@ -1831,6 +1975,105 @@ const sendMessageNow = async (e) => {
                                             </div>
                                         </div>
                                         
+                                        {/* pending payment requests */}
+                                        {searchingPendingPaymentRequests ?
+                                        <div className={styles.horizontalsection}>
+                                            <SpinnerGap className={`${styles.icon} ${styles.load}`} />
+                                            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                                        </div>
+                                        :
+                                        // only one request to be updated at a time
+                                        <Card className='flex-1 overflow-auto scroll-smooth'>
+                                            <CardTitle className='m-4 text-md text-pink-600'>Payment requests</CardTitle>
+                                            {/* <CardHeader>Hello</CardHeader>
+                                            <CardDescription>Check</CardDescription> */}
+                                            <Table>
+                                                <TableHeader>
+                                                <TableRow>
+                                                    <TableHead> </TableHead>
+                                                    
+                                                    <TableHead>Payment date</TableHead>
+                                                    <TableHead>Amount</TableHead>
+                                                    <TableHead>Receipt</TableHead>
+                                                    {/* <TableHead>Pending</TableHead>
+                                                    <TableHead>Balance</TableHead> */}
+                                                    
+                                                </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                {sortedPendingPayments.length > 0 ? (
+                                                    sortedPendingPayments.map((item) => (
+                                                    <TableRow key={item.paymentId} className={(item.selection == 1) ? "cursor-pointer bg-blue-50" : "cursor-pointer"} onClick={() => handlePaymentRequestSelection(item)}>
+                                                        <TableCell>
+                                                        {item.selection == 1 ? 
+                                                            <CheckCircle size={24} weight='fill' className="text-blue-600"/> 
+                                                            : <CheckCircle size={24} weight='regular' className="text-slate-400"/> }
+                                                        </TableCell>
+                                                        
+                                                        <TableCell>{dayjs(item.paymentDate).format("DD/MM/YY")}</TableCell>
+                                                        <TableCell>{item.amount}</TableCell>
+                                                        <TableCell>
+                                                            <Dialog className='bg-blue-400'>
+                                                                <DialogTrigger asChild>
+                                                                    <Button variant='ghost' className="text-blue-600">View receipt</Button>
+                                                                </DialogTrigger>
+                                                                <DialogContent className="sm:max-w-md h-full w-full">
+                                                                        <DialogHeader>
+                                                                            <DialogTitle>Payment Receipt</DialogTitle>
+                                                                            {/* <DialogDescription> */}
+                                                                                
+                                                                            {/* </DialogDescription> */}
+                                                                        </DialogHeader>
+                                                                        <Image src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/receipt%2F'+item.particular+'?alt=media'} alt="Receipt" width={850} height={700} className="mt-2 h-full object-cover rounded-lg" />
+                                                                        <DialogFooter>
+                                                                            <DialogClose asChild>
+                                                                                <Button variant="secondary">Close</Button>
+                                                                            </DialogClose>
+                                                                        </DialogFooter>
+                                                                    </DialogContent>
+
+                                                            </Dialog>
+                                                        </TableCell>
+                                                        {/* <TableCell className='flex flex-row items-center py-2'> 
+                                                            <div>{parseFloat(item.pending).toFixed(2)}</div> 
+                                                            {(item.appliedAmount > 0) ? <div className='text-red-600'> - {item.appliedAmount}</div> : ''}
+                                                        </TableCell>
+                                                        <TableCell className={(item.appliedAmount > 0) ? 'text-blue-600 font-semibold' : 'text-black'}>{parseFloat(item.remaining).toFixed(2)}</TableCell> */}
+                                                        
+                                                        {/* <TableCell>
+                                                            {item.appliedAmount > 0 ? (
+                                                            <button
+                                                                onClick={() => handleUnselect(item.invoiceNo)}
+                                                                className="bg-red-500 text-white px-2 py-1 rounded"
+                                                            >
+                                                                Unselect
+                                                            </button>
+                                                            ) : (
+                                                            <button
+                                                                onClick={() => handleSelect(item.invoiceNo)}
+                                                                className="bg-green-500 text-white px-2 py-1 rounded"
+                                                                disabled={remainingCredit <= 0}
+                                                            >
+                                                                Select
+                                                            </button>
+                                                            )}
+                                                        </TableCell> */}
+                                                    </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                    <TableCell colSpan="2">No pending payment requests from dealer</TableCell>
+                                                    </TableRow>
+                                                )}
+                                                </TableBody>
+                                            </Table>
+                                        </Card>
+                                            
+                                        
+                                        }
+                                        <br/>
+
+                                        {/* invoices */}
                                         {searchingInvoices ?
                                         <div className={styles.horizontalsection}>
                                             <SpinnerGap className={`${styles.icon} ${styles.load}`} />
@@ -1838,6 +2081,7 @@ const sendMessageNow = async (e) => {
                                         </div>
                                         :
                                         <Card className='flex-1 overflow-auto scroll-smooth'>
+                                            <CardTitle className='m-4 text-md text-green-600'>Pending invoices</CardTitle>
                                             <Table>
                                                 <TableHeader>
                                                 <TableRow>

@@ -56,7 +56,7 @@ export async function GET(request,{params}) {
                   const [rowsss, fieldsss] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+params.ids[3]+'"');
                   // const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role IN ("SalesManager","SalesExecutive") AND mapTo="'+params.ids[3]+'"');
                   
-                  // get the list of dealers mapped to each executive
+                  // get the list of executives mapped to each head
                   var executives = [];
                   const promises1 = rows.map(async (row) => {
                       const [rows11, fields1] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+row.id+'"');
@@ -269,6 +269,40 @@ export async function GET(request,{params}) {
               // const notificationResult = await send_notification('Notification check', 'f2d0fbcf-24a7-4ba1-ab2f-886e1ce8f874', 'Single');
                               
               return Response.json({status: 200, data:rows}, {status: 200})
+
+            }
+            // this will give the outstanding amount of each user in the hierarchy
+            else if(params.ids[1] == '1'){
+              
+              // get the pending amount of each state head grouping
+              var q1 = `SELECT SUM(a_pending) as total, mapTo as id FROM user aa JOIN (SELECT count(*),SUM(e_pending) as a_pending, mapTo as a_map FROM user ue JOIN (SELECT SUM(p.total_pending) as e_pending, u.mapTo as e_map FROM user u JOIN (SELECT billTo, SUM(pending) AS total_pending FROM invoices WHERE status != 'Paid' GROUP BY billTo) AS p ON u.id = p.billTo GROUP BY u.mapTo) AS e ON ue.id=e.e_map GROUP BY ue.mapTo) AS h ON aa.id=h.a_map WHERE aa.mapTo!='-' GROUP BY aa.mapTo;`
+              
+              // get the pending amount of each sales executive grouping
+              var q2 = `SELECT SUM(e_pending) as total, mapTo as id FROM user ue
+              JOIN (
+              SELECT SUM(p.total_pending) as e_pending, u.mapTo as e_map FROM user u
+              JOIN (SELECT billTo, SUM(pending) AS total_pending FROM invoices WHERE status != 'Paid' GROUP BY billTo) AS p ON u.id = p.billTo GROUP BY u.mapTo) as e ON ue.id=e.e_map GROUP BY ue.mapTo;`
+
+              // get the pending amount of each sales executive
+              var q3 = "SELECT SUM(p.total_pending) as total, u.mapTo as id FROM user u JOIN (SELECT billTo, SUM(pending) AS total_pending FROM invoices WHERE status != 'Paid' GROUP BY billTo) AS p ON u.id = p.billTo GROUP BY u.mapTo;"
+
+              const [r1, f1] = await connection.execute(q1);
+              const [r2, f2] = await connection.execute(q2);
+              const [r3, f3] = await connection.execute(q3);
+
+              const combinedResults = [...r1, ...r2, ...r3];
+              return Response.json({status: 200, message:'Data found!', data: combinedResults}, {status: 200})
+
+            }
+            // this will give the outstanding amount of each dealer under an Sales executive
+            else if(params.ids[1] == '2'){
+              
+              // get the pending amount of each state head grouping
+              var q1 = 'SELECT total_pending as total, u.id as id FROM user u JOIN (SELECT billTo, SUM(pending) AS total_pending FROM invoices WHERE status != "Paid" GROUP BY billTo) AS p ON u.id = p.billTo WHERE u.mapTo="'+params.ids[2]+'"';
+              
+              const [r1, f1] = await connection.execute(q1);
+
+              return Response.json({status: 200, message:'Data found!', data: r1}, {status: 200})
 
             }
             else{

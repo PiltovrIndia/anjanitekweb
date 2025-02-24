@@ -26,9 +26,10 @@ export async function GET(request,{params}) {
           if(params.ids[1] == 'U1'){ // get all invoices for a dealer for calculating outstanding
             
             const [rows, fields] = await connection.execute('SELECT * FROM `invoices` where billTo="'+params.ids[2]+'" and status!="Paid"');
+            const [rows1, fields1] = await connection.execute('SELECT * FROM `payments` where id="'+params.ids[2]+'" ORDER BY paymentDate DESC LIMIT 1');
             connection.release();
 
-            return Response.json({status: 200, data: rows, message:'Details found!'}, {status: 200})
+            return Response.json({status: 200, data: rows, balance: rows1[0], message:'Details found!'}, {status: 200})
           }
           // get invoices of a dealer by Id for the dealer
           else if(params.ids[1] == 'U2'){ 
