@@ -92,19 +92,19 @@ export async function GET(request,{params}) {
           else if(params.ids[1] == 'C5'){
                 try {
 
-                    var comment = params.ids[8] == '-' ? NULL : params.ids[8];
-                    var media = params.ids[9] == '-' ? NULL : params.ids[9];
+                    var comment = params.ids[8] == '-' ? null : params.ids[8];
+                    var media = params.ids[9] == '-' ? null : params.ids[9];
 
                     const q = 'INSERT INTO confirmations (eventId, anjaniAmount, confirmationOn, dealer, dealerAmount, response, comment, media) VALUES ( ?, CAST(? AS DECIMAL(10, 2)), ?, ?, CAST(? AS DECIMAL(10, 2)), ?, ?, ?)';
                     const [rows, fields] = await connection.execute(q,[params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], params.ids[7], comment, media]);
                     connection.release();
                     
-                    if(rows.length > 0){
+                    // if(rows.insertId > 0){
                         return Response.json({status: 200, message: 'Updated your response!'}, {status: 200})
-                    }
-                    else {
-                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
-                    }
+                    // }
+                    // else {
+                    //     return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    // }
                 } catch (error) { // error updating
                     return Response.json({status: 404, message:'No users found!'+error.message}, {status: 200})
                 }
