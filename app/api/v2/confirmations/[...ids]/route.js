@@ -34,7 +34,7 @@ export async function GET(request,{params}) {
             // get the list of confirmations done for a given event
             else if(params.ids[1] == 'C2'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * FROM confirmations WHERE eventId = '+params.ids[2]);
+                    const [rows, fields] = await connection.execute('SELECT c.*,u.name,u.id as dealerGST FROM confirmations c JOIN user u ON c.dealer=u.id WHERE c.eventId = '+params.ids[2]);
                     connection.release();
                     
                     if(rows.length > 0){
@@ -50,7 +50,7 @@ export async function GET(request,{params}) {
           // get all the confirmations so far for a given dealer
           else if(params.ids[1] == 'C3'){ 
                 try {
-                    let q = 'SELECT * FROM confirmations WHERE dealer LIKE "%'+params.ids[2]+'%"';
+                    let q = 'SELECT c.*,u.name,u.id as dealerGST FROM confirmations c JOIN user u ON c.dealer = u.id WHERE c.dealer LIKE "%'+params.ids[2]+'%"';
                     const [rows, fields] = await connection.execute(q);
                     connection.release();
                     
@@ -92,11 +92,11 @@ export async function GET(request,{params}) {
           else if(params.ids[1] == 'C5'){
                 try {
 
-                    var comment = params.ids[8] == '-' ? null : params.ids[8];
+                    var responseReason = params.ids[8] == '-' ? null : params.ids[8];
                     var media = params.ids[9] == '-' ? null : params.ids[9];
 
-                    const q = 'INSERT INTO confirmations (eventId, anjaniAmount, confirmationOn, dealer, dealerAmount, response, comment, media) VALUES ( ?, CAST(? AS DECIMAL(10, 2)), ?, ?, CAST(? AS DECIMAL(10, 2)), ?, ?, ?)';
-                    const [rows, fields] = await connection.execute(q,[params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], params.ids[7], comment, media]);
+                    const q = 'INSERT INTO confirmations (eventId, anjaniAmount, confirmationOn, dealer, dealerAmount, response, responseReason, comment, media) VALUES ( ?, CAST(? AS DECIMAL(10, 2)), ?, ?, CAST(? AS DECIMAL(10, 2)), ?, ?, ?, ?)';
+                    const [rows, fields] = await connection.execute(q,[params.ids[2], params.ids[3], params.ids[4], params.ids[5], params.ids[6], params.ids[7], responseReason, null, media]);
                     connection.release();
                     
                     // if(rows.insertId > 0){
@@ -119,6 +119,40 @@ export async function GET(request,{params}) {
                     
                     if(rows.affectedRows > 0){
                         return Response.json({status: 200, message: 'Confirmation event created!', id: rows.insertId}, {status: 200})
+                    }
+                    else {
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No users found!'+error.message}, {status: 200})
+                }
+            }
+            // add comment by admin to a selected confirmation
+          else if(params.ids[1] == 'C7'){
+                try {
+
+                    const [rows, fields] = await connection.execute('UPDATE confirmations SET comment = "'+params.ids[3]+'" where id = '+params.ids[2]);
+                    connection.release();
+                    
+                    if(rows.affectedRows > 0){
+                        return Response.json({status: 200, message: 'Comment updated!'}, {status: 200})
+                    }
+                    else {
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No users found!'+error.message}, {status: 200})
+                }
+            }
+            // update response for second time by dealer after admin responded with comment
+          else if(params.ids[1] == 'C8'){
+                try {
+
+                    const [rows, fields] = await connection.execute('UPDATE confirmations SET response = "Yes" where id = '+params.ids[2]);
+                    connection.release();
+                    
+                    if(rows.affectedRows > 0){
+                        return Response.json({status: 200, message: 'Updated!'}, {status: 200})
                     }
                     else {
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
