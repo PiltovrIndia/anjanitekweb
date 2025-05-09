@@ -147,8 +147,11 @@ export async function GET(request,{params}) {
               // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
               // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
               const [rows, fields] = await connection.execute('SELECT DISTINCT(n.receiver),u.name FROM `notifications` n JOIN user u ON n.receiver=u.id where n.sender="'+params.ids[2]+'"');
+              // const [rows1, fields1] = await connection.execute('SELECT DISTINCT(n.sender) as receiver, u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 6 and n.seen=0');
               connection.release();
-          
+              // const combinedRows = [...rows, ...rows1];
+              // console.log(combinedRows);
+              
               // check if user is found
               if(rows.length > 0){
                   // return the requests data

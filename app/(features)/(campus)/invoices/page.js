@@ -186,9 +186,9 @@ fetch("/api/v2/amount/"+pass+"/U9/"+invoiceNo.replace('/','***'), {
 });
 
 // delete invoices 
-const createSingleInvoiceDataForSelectedAPI = async (pass, invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, pending, expiryDate) => 
+const createSingleInvoiceDataForSelectedAPI = async (adminId, pass, invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, pending, expiryDate, boxes) => 
     
-fetch("/api/v2/amount/"+pass+"/U10/"+invoiceNo.replace('/','***')+"/"+invoiceType+"/"+invoiceDate+"/"+dealerId+"/"+totalAmount+"/"+amountPaid+"/"+pending+"/"+expiryDate, {
+fetch("/api/v2/amount/"+pass+"/U10/"+invoiceNo.replace('/','***')+"/"+invoiceType+"/"+invoiceDate+"/"+dealerId+"/"+totalAmount+"/"+amountPaid+"/"+pending+"/"+expiryDate+"/"+adminId+"/"+boxes, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -208,7 +208,7 @@ export default function Invoices() {
 
     // user state and requests variable
     const [user, setUser] = useState();
-    const [selectedState, setSelectedState] = useState('All');
+    const [selectedStatus, setselectedStatus] = useState('All');
     const [openInvoice, setOpenInvoice] = useState('');
     const [selectedInvoice, setSelectedInvoice] = useState('');
     const [selectedInvoiceForDelete, setSelectedInvoiceForDelete] = useState('');
@@ -247,6 +247,7 @@ export default function Invoices() {
     const [inputInvoiceDealer, setInputInvoiceDealer] = useState('');
     const [inputInvoiceTotalAmount, setInputInvoiceTotalAmount] = useState(0);
     const [inputInvoiceAmountPaid, setInputInvoiceAmountPaid] = useState(0);
+    const [inputInvoiceBoxes, setInputInvoiceBoxes] = useState(0);
     
     
     const [initialDatesValues, setInititalDates] = React.useState({from: dayjs().subtract(0,'day'),to: dayjs(),});
@@ -309,7 +310,7 @@ export default function Invoices() {
         try {    
             const result  = await getAllInvoicesDataAPI(process.env.NEXT_PUBLIC_API_PASS, offset, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role) 
             const queryResult = await result.json() // get data
-console.log(queryResult);
+// console.log(queryResult);
 
             // check for the status
             if(queryResult.status == 200){
@@ -528,13 +529,12 @@ console.log(queryResult);
     // Filter the dealers list by states
     async function filterByStates(e){
         
-        setSelectedState(e);
-
+        setselectedStatus(e);
         if(e == 'All'){
             setAllInvoicesFiltered(allInvoices);
         }
         else {
-            const filteredDealers = allInvoices.filter(dealer => dealer.state === e);
+            const filteredDealers = allInvoices.filter(dealer => dealer.status === e);
             setAllInvoicesFiltered(filteredDealers);
         }
     }
@@ -848,7 +848,7 @@ console.log(queryResult);
 
             try {    
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
-                const result  = await createSingleInvoiceDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, inputInvoiceNo, inputInvoiceType, dayjs(inputInvoiceDate).format("YYYY-MM-DD hh:mm:ss").toString(), inputInvoiceDealer, inputInvoiceTotalAmount, inputInvoiceAmountPaid, dayjs(dayjs(inputInvoiceDate).add(45, 'day')).format("YYYY-MM-DD hh:mm:ss").toString() ); 
+                const result  = await createSingleInvoiceDataForSelectedAPI(JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, process.env.NEXT_PUBLIC_API_PASS, inputInvoiceNo, inputInvoiceType, dayjs(inputInvoiceDate).format("YYYY-MM-DD hh:mm:ss").toString(), inputInvoiceDealer, inputInvoiceTotalAmount, inputInvoiceAmountPaid, dayjs(dayjs(inputInvoiceDate).add(45, 'day')).format("YYYY-MM-DD hh:mm:ss").toString(), inputInvoiceBoxes ); 
                 const queryResult = await result.json() // get data
 
                 console.log(queryResult);
@@ -960,7 +960,10 @@ console.log(queryResult);
     setOpenInvoice(false); // Close the sheet
   };
   
-
+  function navigateToCreate(){
+    // biscuits.set('selectedTab', 'Dashboard', {path: '/', expires: new Date(Date.now() + 10800000)})
+    router.push('/invoices/create')
+  }
 
 
 
@@ -974,7 +977,9 @@ console.log(queryResult);
             
           <div className='flex flex-row gap-2 items-center py-4' >
               <h2 className="text-xl font-semibold mr-4">Invoices</h2>
-
+              
+              
+              {/* <Button className="text-white bg-green-600" onClick={navigateToCreate.bind(this)}><Receipt className='font-bold text-lg'/>&nbsp; Create Now</Button> */}
                 <Sheet>
                     <SheetTrigger asChild>
                         <Button className="text-white bg-green-600"><Receipt className='font-bold text-lg'/>&nbsp; Upload Invoices</Button>
@@ -1081,6 +1086,12 @@ console.log(queryResult);
                                 <Label htmlFor="pendingInput">Pending:</Label>
                                 <Input disabled id="pendingInput" type="number" value={Math.abs(inputInvoiceTotalAmount-inputInvoiceAmountPaid)} placeholder="0" />
                             </div>
+
+                            {/* Boxes included in this invoice */}
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="boxes">Boxes:</Label>
+                                <Input id="boxes" type="number" value={inputInvoiceBoxes} onChange={(e) => setInputInvoiceBoxes(parseFloat(e.target.value) || 0)} placeholder="Total Boxes" />
+                            </div>
                         </div>
                         
                         {/* <div className="grid gap-4 py-4">
@@ -1177,39 +1188,44 @@ console.log(queryResult);
 <div className='flex flex-row justify-between items-center mb-2'>
     <div className='pb-2 text-slate-700 font-semibold'>{totalInvoicesCount} Invoices in total</div>
     
-    {(selectedState == 'All') ?
+    {(selectedStatus == 'All') ?
     <div className='pb-2 text-slate-700 font-semibold'></div>
-    : <div className='pb-2 text-green-700 font-semibold'>{allInvoicesFiltered.length} Dealers in {selectedState.split('-')[1]}</div>
+    : <div className='pb-2 text-green-700 font-semibold text-xs'>{allInvoicesFiltered.length} Invoices with {selectedStatus} status</div>
+    // : <div className='pb-2 text-green-700 font-semibold'>{allInvoicesFiltered.length} Dealers in {selectedStatus.split('-')[1]}</div>
     }
-    {/* {allStates.length == 0 ?
-        <div className="flex flex-row m-12">    
-            <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-            <p className={`${inter.className} ${styles.text3}`}>Loading sales persons...</p> 
-        </div>
-        :
-        <Select defaultValue={selectedState} onValueChange={(e)=>filterByStates(e)} >
-            <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by state" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectGroup>
-                {allStates.map((row) => (
-                <SelectItem key={row} value={row} >{row}</SelectItem>))}
-                </SelectGroup>
-            </SelectContent>
-        </Select>
-    } */}
-</div>
+    </div>
 
-{(allInvoicesFiltered.length > 0) ?
-<div className='flex flex-row justify-between items-center'>
-    <div className='flex flex-row gap-4 items-center'>
-        <Input
-            type="text"
-            placeholder="Search Invoice Number"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="my-4 w-[300px]" // You can adjust width and margin as needed
+    <div className="flex flex-row gap-4 w-full">
+        {Array.from(new Set(allInvoices.map(invoice => invoice.status))).map((status) => (
+            <Card key={status} className="w-full p-2">
+                <CardHeader className="p-2">
+                    <CardTitle className='text-md'>{status}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-2">
+                    <p className="text-2xl font-bold">
+                        {allInvoices.filter(invoice => invoice.status === status).length}
+                    </p>
+                    {(status !='Paid') ?
+                    <p className="text-sm text-red-500 font-semibold">
+                        Total Pending: ₹{formatter.format(allInvoices.filter(invoice => invoice.status === status).reduce((acc, invoice) => acc + invoice.pending, 0))}
+                    </p> :
+                    <p className="text-sm text-blue-500">
+                        {/* Total Pending: ₹{formatter.format(allInvoices.filter(invoice => invoice.status === status).reduce((acc, invoice) => acc + invoice.pending, 0))} */}
+                    </p>}
+                </CardContent>
+            </Card>
+        ))}
+    </div>
+
+    {(allInvoicesFiltered.length > 0) ?
+    <div className='flex flex-row justify-between items-center'>
+        <div className='flex flex-row gap-4 items-center'>
+            <Input
+                type="text"
+                placeholder="Search Invoice Number"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="my-4 w-[300px]" // You can adjust width and margin as needed
         />
 
         {(searchQuery.length > 0) ? <div className='pb-2 text-slate-600'>{allInvoicesFiltered.length} matching invoices</div> : ''}
@@ -1223,8 +1239,49 @@ console.log(queryResult);
     </div>
 
     
-        {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> InOuting Students</Button> */}
+    <div className='flex flex-row gap-4 items-center'>
+
+        {/* {(selectedStatus == 'All') ?
+            <div className='pb-2 text-slate-700 font-semibold'></div>
+            : <div className='pb-2 text-green-700 font-semibold text-xs'>{allInvoicesFiltered.length} Invoices with {selectedStatus} status</div>
+        } */}
+        {allInvoices.length == 0 ?
+            <div className="flex flex-row m-12">    
+                <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+            </div>
+            :
+            <Select defaultValue={selectedStatus} onValueChange={(e)=>filterByStates(e)} >
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectGroup>
+                    <SelectItem key={'All'} value={'All'}>All</SelectItem>
+                    {Array.from(new Set(allInvoices.map(invoice => invoice.status))).map((status) => (
+                    <SelectItem key={status} value={status} >{status}</SelectItem>))}
+                    </SelectGroup>
+                </SelectContent>
+            </Select>
+        }
+            {/* // setSelectedMapToPerson(e.target.value) */}
+            {/* <Select defaultValue={selectedStatus} onValueChange={(e)=>filterByStates(e)} >
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by state" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectGroup>
+                    <SelectLabel>All</SelectLabel>
+                    {allStates.map((row) => (
+                    <SelectItem key={row} value={row} >{row}</SelectItem>))}
+                    </SelectGroup>
+                </SelectContent>
+            </Select> */}
+        {/* } */}
         <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button>
+    </div>
+        {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> InOuting Students</Button> */}
+        {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button> */}
     </div>
 : ''    
 }
@@ -1266,7 +1323,8 @@ console.log(queryResult);
                     </TableCell>
                     <TableCell>
                         <div className="w-fit">
-                            {row.name} <br/><span className='text-muted-foreground text-xs font-normal'>{row.billTo}</span> 
+                            {row.name} 
+                            {/* <br/><span className='text-muted-foreground text-xs font-normal'>{row.billTo}</span>  */}
                         </div>
                     </TableCell>
                     <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY")}</TableCell>
@@ -1460,6 +1518,7 @@ console.log(queryResult);
                     </div>
                     <p className='text-blue-600'>Previous pending: {selectedInvoice.pending}</p>
                 </div>
+                
                 
             </div>
             

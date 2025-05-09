@@ -363,10 +363,11 @@ function verifyOTP(){
         //   <Registration />
           <Dashboard />
           :
-          
-        <div className='flex flex-col h-screen w-screen items-center gap-4 bg-gradient-to-r from-emerald-600 via-emerald-100 to-emerald-600 relative pb-4 '>
+
+        <div className='flex flex-col h-screen w-screen items-center gap-4 bg-gradient-to-r from-emerald-600 via-emerald-100 to-emerald-600 relative pb-4' style={{ backgroundImage: "url('/anjani_bg.png')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
             
-            <div className='flex flex-col h-full w-full justify-center items-center bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.8),transparent)]'>
+            <div className='flex flex-col h-full w-full justify-center items-center '>
+            {/* <div className='flex flex-col h-full w-full justify-center items-center bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.8),transparent)]'> */}
             {/* <div className="min-h-screen w-full bg-gradient-to-r from-pink-50 via-purple-50 to-blue-50 relative">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.8),transparent)] pointer-events-none" />
     </div> */}
@@ -487,7 +488,7 @@ function verifyOTP(){
                       className="underline text-slate-700">Privacy</Link> */}
                 
             </div>
-            <div className='text text-sm text-slate-400 text-muted-foreground'>A Piltovr Product</div>
+            <div className='text text-sm text-slate-400 text-muted-foreground cursor-pointer' onClick={()=>router.push('https://piltovr.com')}>A Piltovr Product</div>
         </div>
      } 
     <br/>

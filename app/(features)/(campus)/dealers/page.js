@@ -281,6 +281,7 @@ export default function Outing() {
     const [updatedInvoices, setUpdatedInvoices] = useState([]);   // get updated invoices list
     const [totalCredit, setTotalCredit] = useState(0);
     const [transactionId, setTransactionId] = useState('');
+    const [paymentType, setPaymentType] = useState('Bank');
     const [remainingCredit, setRemainingCredit] = useState(0);
     const [paymentUpdateDate, setPaymentUpdateDate] = useState(new dayjs());
   
@@ -1258,11 +1259,11 @@ const sendMessageNow = async (e) => {
             const decodedTransactionId = (transactionId.length == 0) ? '-' : encodeURIComponent(transactionId).replace('/', '***');
             
             try {    
-                // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
+                console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+(paymentType+','+selectePendingdPaymentRequest));
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/credit/"+decodedTransactionId+"/"+dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
                 
                 // const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
-                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, decodedTransactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, selectePendingdPaymentRequest); 
+                const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, decodedTransactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, (paymentType+','+selectePendingdPaymentRequest)); 
                 const queryResult = await result.json() // get data
 
                 // console.log(queryResult);
@@ -1283,6 +1284,7 @@ const sendMessageNow = async (e) => {
                     const updatedPendingPayments = sortedPendingPayments.filter(payment => payment.paymentId !== selectePendingdPaymentRequest);
                     setSortedPendingPayments(updatedPendingPayments);
                     setSelectePendingdPaymentRequest('-');
+                    setTransactionId('');
                     
                 }
                 else if(queryResult.status == 401 || queryResult.status == 201 ) {
@@ -1398,6 +1400,11 @@ const sendMessageNow = async (e) => {
     // }
 
   };
+ 
+  // Function to handle transaction Id input
+const handlePaymentTypeChange = (value) => {
+            setPaymentType(value);
+};
   
 
   // Function to handle the "Select" action for each invoice
@@ -1527,7 +1534,10 @@ const sendMessageNow = async (e) => {
                     let remainingAmount = parseFloat(paymentItem.amount).toFixed(2) || 0;
                     setRemainingCredit(remainingAmount);
                     setTotalCredit(remainingAmount);
+                    setPaymentType('Bank');
                     setSelectePendingdPaymentRequest(paymentItem.paymentId);
+                    
+                    setTransactionId(paymentItem.transactionId);
 
                     
                     return {
@@ -1551,6 +1561,8 @@ const sendMessageNow = async (e) => {
                     setRemainingCredit(0);
                     setTotalCredit(0);
                     setSelectePendingdPaymentRequest('-');
+                    setTransactionId('');
+                    setPaymentType('Other');
 
                     return {
                         ...payment,
@@ -1916,8 +1928,8 @@ const sendMessageNow = async (e) => {
                 <TableHead>Name</TableHead>
                 <TableHead>Sales Person</TableHead>
                 {/* <TableHead>State</TableHead> */}
-                <TableHead>ATL</TableHead>
-                <TableHead>VCL</TableHead>
+                <TableHead>Total Pending</TableHead>
+                {/* <TableHead>VCL</TableHead> */}
                 <TableHead></TableHead>
             </TableRow>
         </TableHeader>
@@ -1938,8 +1950,9 @@ const sendMessageNow = async (e) => {
                             <Sheet >
                                 <SheetTrigger asChild>
                                     {/* <Button variant='ghost' className="text-blue-600 font-semibold" onClick={()=>handleRowClick(row)}>{row.accountName} </Button>             */}
-                                    <div className="text-blue-600 tracking-wide font-semibold w-fit cursor-pointer" onClick={()=>handleRowClick(row)}>
-                                        {row.accountName} <br/><span className='text-slate-500 font-normal text-xs'>{row.id}</span> 
+                                    <div className="text-blue-600 tracking-wide font-semibold cursor-pointer" onClick={()=>handleRowClick(row)}>
+                                        {row.accountName} 
+                                        {/* {row.accountName} <br/><span className='text-slate-500 font-normal text-xs'>{row.id}</span>  */}
                                     </div>
                                 </SheetTrigger>
                                 
@@ -2171,6 +2184,22 @@ const sendMessageNow = async (e) => {
                                                     </PopoverContent>
                                                 </Popover>
                                                 <Input type="text" id="transactionId" value={transactionId} onChange={handleTransactionIdChange} className="col-span-3 text-black" placeholder="Transaction ID" />
+                                                
+                                                <Label htmlFor="amount" className="text-left">
+                                                    Payment method:
+                                                </Label>
+                                                <RadioGroup defaultValue={paymentType}  onValueChange={handlePaymentTypeChange} disabled={selectePendingdPaymentRequest !== '-'}>
+                                                    <div className="flex items-center space-x-2">
+                                                        <RadioGroupItem value="Bank" id="bank-receipt" />
+                                                        <Label htmlFor="bank-receipt">Bank receipt</Label>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <RadioGroupItem value="Other" id="other" />
+                                                        <Label htmlFor="other">Other</Label>
+                                                    </div>
+                                                </RadioGroup>
+
+                                                {/* <Input type="text" id="paymentType" value={paymentType} onChange={handlePaymentTypeChange} className="col-span-3 text-black" placeholder="PaymentType" /> */}
                                                 {updatingInvoices ?
                                                     <div className="flex flex-row m-12">    
                                                         <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
@@ -2193,11 +2222,19 @@ const sendMessageNow = async (e) => {
                         </div>
                     </TableCell>
                     <TableCell>
+                        {/* <p className='text-sm text-rose-500 font-semibold tracking-wider'> */}
+                        <p className='text-rose-600 tracking-wide font-semibold w-fit cursor-pointer'>
+                            ₹{formatter.format(row.pendingATL+row.pendingVCL)}
+                            <br/><span className='text-slate-500 font-extralight text-xs'>ATL:₹{formatter.format(row.pendingATL)} VCL:₹{formatter.format(row.pendingVCL)}</span>
+                        </p>
+                    </TableCell>
+
+                    {/* <TableCell>
                         <p className='text-sm text-rose-500 font-semibold tracking-wider'>₹{formatter.format(row.pendingATL)}</p>
-                    </TableCell>
-                    <TableCell>
+                    </TableCell> */}
+                    {/* <TableCell>
                         <p className='text-sm text-red-500 font-semibold tracking-wider'>₹{formatter.format(row.pendingVCL)}</p>
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell className='flex flex-row my-2'>
                     {/* {allSalesPeople.length == 0 ? getSalesPersons() : null}} */}
                     <TooltipProvider delayDuration={100}>

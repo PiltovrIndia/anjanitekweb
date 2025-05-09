@@ -1,7 +1,7 @@
 import pool from '../../../db'
 import { Keyverify } from '../../../secretverify';
 const OneSignal = require('onesignal-node')
-
+import dayjs from 'dayjs'
 const client = new OneSignal.Client(process.env.ONE_SIGNAL_APPID, process.env.ONE_SIGNAL_APIKEY)
 
 // API for updates to users data
@@ -16,7 +16,8 @@ export async function GET(request,{params}) {
     // get the pool connection to db
     const connection = await pool.getConnection();
     
-    
+    // current date time for updating
+    var currentDate =  dayjs(new Date(Date.now())).format('YYYY-MM-DD HH:mm:ss');
 
     try{
 
@@ -25,14 +26,14 @@ export async function GET(request,{params}) {
           
           if(params.ids[1] == 'U1'){ // get all invoices for a dealer for calculating outstanding
             
-            const [rows, fields] = await connection.execute('SELECT * FROM `invoices` where billTo="'+params.ids[2]+'" and status!="Paid"');
-            const [rows1, fields1] = await connection.execute('SELECT * FROM `payments` where id="'+params.ids[2]+'" ORDER BY paymentDate DESC LIMIT 1');
+            const [rows, fields] = await connection.execute('SELECT * FROM `invoices` where billTo="'+params.ids[2]+'" and status!="Paid"'); // pending balance
+            const [rows1, fields1] = await connection.execute('SELECT * FROM `payments` where id="'+params.ids[2]+'" ORDER BY paymentDate DESC LIMIT 1'); // latest payment
             connection.release();
 
             return Response.json({status: 200, data: rows, balance: rows1[0], message:'Details found!'}, {status: 200})
           }
           // get invoices of a dealer by Id for the dealer
-          else if(params.ids[1] == 'U2'){ 
+          else if(params.ids[1] == 'U2'){ // deprecate after the launch 2.0
                 try {
                     // let q = 'SELECT * FROM users WHERE collegeId LIKE "%'+params.ids[2]+'%"';
                     // console.log(q);
@@ -61,6 +62,30 @@ export async function GET(request,{params}) {
                     // let q = 'SELECT * FROM users WHERE collegeId LIKE "%'+params.ids[2]+'%"';
                     // console.log(q);
                     let q = 'SELECT * FROM `invoices` WHERE billTo="'+params.ids[2]+'" ORDER BY invoiceDate ASC';
+                    const [rows, fields] = await connection.execute(q);
+                    connection.release();
+                    // return successful update
+
+                    // check if users is found
+                    if(rows.length > 0){
+                        // return the requests data
+                        return Response.json({status: 200, data: rows, message:'Details found!'}, {status: 200})
+
+                    }
+                    else {
+                        // users doesn't exist in the system
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No users found!'+error}, {status: 200})
+                }
+            }
+          // get invoices of a dealer by Id for the dealer itself
+          else if(params.ids[1] == 'U2.2'){ 
+                try {
+                    // let q = 'SELECT * FROM users WHERE collegeId LIKE "%'+params.ids[2]+'%"';
+                    // console.log(q);
+                    let q = 'SELECT * FROM `invoices` WHERE billTo="'+params.ids[2]+'" ORDER BY invoiceDate DESC LIMIT 50 OFFSET '+params.ids[3];
                     const [rows, fields] = await connection.execute(q);
                     connection.release();
                     // return successful update
@@ -230,8 +255,9 @@ export async function GET(request,{params}) {
               }
               else if(params.ids[1] == 'U4.2'){ // get all invoices for admin in web
                 
-                const [rows, fields] = await connection.execute('SELECT i.*,u.name FROM invoices i JOIN user u ON i.billTo=u.id ORDER BY i.invoiceDate ASC');
-                const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices');
+                const [rows, fields] = await connection.execute('SELECT i.*,u.name FROM invoices i JOIN user u ON i.billTo=u.id ORDER BY i.invoiceDate DESC');
+                const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices i JOIN user u ON i.billTo=u.id ORDER BY i.invoiceDate DESC');
+                // const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices');
                 connection.release();
     
                 
@@ -383,7 +409,7 @@ export async function GET(request,{params}) {
                 
                 items.forEach(async (item, index) => {
                     // console.log(`Item ${index}:`, item);
-                    await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
+                    await applyInvoicesUpload(params.ids[2], item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate, item.boxes);
                 // await applyPayment(item.gst, item.amount, item.type, '', item.transactionId, item.paymentDate, params.ids[3],params.ids[4]);
                 });
 
@@ -438,9 +464,10 @@ export async function GET(request,{params}) {
                 var invoiceAmount = params.ids[6];
                 var amountPaid = params.ids[7];
                 var expiryDate = params.ids[8];
-            
+                var adminId = params.ids[9];
+                var boxes = params.ids[10];
                                 
-                await applyInvoicesUpload(invoiceNo, invoiceType, invoiceDate, dealerId, invoiceAmount, amountPaid, expiryDate);
+                await applyInvoicesUpload(adminId, invoiceNo, invoiceType, invoiceDate, dealerId, invoiceAmount, amountPaid, expiryDate, boxes);
 
                 return Response.json({status: 200, message:'Success!'}, {status: 200})
             }
@@ -477,9 +504,9 @@ export async function POST(request, {params}) {
                 
                 for (const [index, item] of items.entries()){
                     // console.log(`Item ${index}:`, item);
-                    await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
+                    await applyInvoicesUpload(params.ids[2], item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate, item.boxes);
                 }
-                    
+                
                 // items.forEach(async (item, index) => {
                 //     console.log(`Item ${index}:`, item);
                 //     await applyInvoicesUpload(item.invoiceNo.replace('***','/'), item.invoiceType, item.invoiceDate, item.dealerId, item.invoiceAmount, item.amountPaid, item.expiryDate);
@@ -512,7 +539,10 @@ export async function POST(request, {params}) {
   // apply invoices upload one by one
   // provided: invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, expiryDate
   // Needed for insertion: invoiceId, invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales
-  async function applyInvoicesUpload(invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, expiryDate) {
+  async function applyInvoicesUpload(adminId, invoiceNo, invoiceType, invoiceDate, dealerId, totalAmount, amountPaid, expiryDate, boxes) {
+    
+    // current date time for updating
+    var currentDate1 =  dayjs(new Date(Date.now())).format('YYYY-MM-DD HH:mm:ss');
     
     // get the pool connection to db
     const connection = await pool.getConnection(); 
@@ -520,21 +550,75 @@ export async function POST(request, {params}) {
     try {
         await connection.beginTransaction();
         
+        // 0. Need to check if there is any credit balance and add it into the amountPaid section
+            // add the amountPaid section with credit balance
+            // check if the pending is left more and accordingly update the payment status
+            // update the balance if there is any leftover after adding into the invoice
         // 1. verify the totalAmount & amountPaid to estimate pending & status for the given invoice
         // 2. update the invoices table with the transaction of selected invoices
+        // 3. Message/Notify the dealers and sales executives
+
+        var status = '';
+        var pending = 0;
+        // 0
+        // check if there is any dealer's credit that pending with us
+        var [rows12, fields] = await connection.query('SELECT COALESCE( (SELECT ABS(balance) FROM payments WHERE id = "'+dealerId+'" ORDER BY paymentDate DESC LIMIT 1), 0) AS balance');
+        var creditBalance = rows12[0].balance;
+
+        // if there is credit, need to make adjustment to the current invoice that is getting uploaded
+        if(creditBalance > 0){
+            
+            // 1
+            // check if amount being paid is more, accordingly we need to update the status
+            amountPaid = (parseFloat(amountPaid) + parseFloat(creditBalance));
+            pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
+            if(amountPaid >= totalAmount){
+                status = 'Paid';
+                pending = 0;
+                amountPaid = totalAmount;
+            }
+            else {
+                status = (pending > 0) ? 'PartialPaid' : 'Paid';
+            }
+
+            if(pending > 0) {
+                creditBalance = 0;
+            }
+            else {
+                creditBalance = (totalAmount - creditBalance);
+            }
+            
+            // round of the credit balance
+            creditBalance = parseFloat(creditBalance.toFixed(2));
+            
+
+            // update the new balance
+            await connection.query('UPDATE payments SET balance = '+creditBalance+' WHERE id = "'+dealerId+'" ORDER BY paymentDate DESC LIMIT 1');
+
+        }
+        else {
+            // 1
+            // check if amount being paid is more, accordingly we need to update the status
+            status = (amountPaid == 0) ? 'NotPaid' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
+            // var status = (totalAmount == amountPaid) ? 'Pending' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
+            pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
+            console.log(pending);
+        }
 
         // 1
         // check if amount being paid is more, accordingly we need to update the status
-        var status = (amountPaid == 0) ? 'NotPaid' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
-        // var status = (totalAmount == amountPaid) ? 'Pending' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
-        const pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
-        console.log(pending);
+        // status = (amountPaid == 0) ? 'NotPaid' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
+        // // var status = (totalAmount == amountPaid) ? 'Pending' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
+        // pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
+        // console.log(pending);
         
-
+        // 2
         const q = 'INSERT INTO invoices (invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)), ?, ?, ? )';
-        // console.log(q);
-        
-        const [payments] = await connection.query(q,[invoiceNo, invoiceType, invoiceDate, '-','-','-','-',dealerId, dealerId, totalAmount, amountPaid, pending, status, expiryDate, '-']);
+        const [payments] = await connection.query(q,[invoiceNo, invoiceType, invoiceDate, '-','-','-','-',dealerId, dealerId, totalAmount, amountPaid, pending, status, expiryDate, boxes]);
+
+        // 3
+        const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
+        const [rows, fields] = await connection.execute(q1, [ adminId, dealerId, currentDate1, decodeURIComponent('Invoice number '+invoiceNo+' with '+totalAmount+' Amount is added.'), 0, '-' ]);
 
         // send the notification
         var notificationResult = await send_notification("Invoice: "+invoiceNo+" updated!", dealerId, 'Single');

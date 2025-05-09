@@ -17,15 +17,31 @@ export default function TagDialog({ product, tags, isOpen, onClose, onSave }) {
   }, {});
 
   // Handle checkbox selection
-  const handleTagChange = (tagId) => {
-    setSelectedTags((prev) =>
-      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
-    );
-  };
+  // const handleTagChange = (tagId) => {
+  //   setSelectedTags((prev) =>
+  //     prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+  //   );
+  // };
 
   // Handle removing tag from selected list
   const handleRemoveTag = (tagId) => {
     setSelectedTags((prev) => prev.filter((id) => id !== tagId));
+  };
+
+  const handleTagChange = (tagId, type) => {
+    setSelectedTags((prev) => {
+      const newSelectedTags = prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId];
+      const tagsInGroup = groupedTags[type].map(tag => tag.tagId);
+      const selectedTagsInGroup = newSelectedTags.filter(id => tagsInGroup.includes(id));
+      
+      if (selectedTagsInGroup.length === 0) {
+        // Show toast message
+        alert(`You must select at least one tag from the ${type} group.`);
+        return prev; // Prevent unchecking the last tag in the group
+      }
+      
+      return newSelectedTags;
+    });
   };
 
   return (
@@ -34,30 +50,29 @@ export default function TagDialog({ product, tags, isOpen, onClose, onSave }) {
         <DialogHeader>
           <DialogTitle className="text-lg font-bold gap-2 flex items-center">
             {product.name}
-            <span class="bg-gray-100 text-gray-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-700 dark:text-gray-300">{product.design}</span>
+            <span className="bg-gray-100 text-gray-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-700 dark:text-gray-300">{product.design}</span>
           </DialogTitle>
         </DialogHeader>
 
         {/* Selected Tags as Badges */}
         <div>
             <Image
-            src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+product.design+'.jpeg?alt=media'}
+            src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+product.imageUrls.split(',')[0]+'?alt=media'}
             alt={product.name}
             className="w-full h-48 object-cover rounded-lg"
+            // layout="responsive"
+            width={400}
+            height={200}
             />
         </div>
         <div className="mb-4 flex flex-wrap">
           {selectedTags.map((tagId) => {
             const tag = tags.find((t) => t.tagId === tagId);
             return (
-                <span key={tagId} class="flex items-center gap-1 bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-700 dark:text-green-400 border border-green-400">
+                <span key={tagId} className="flex items-center gap-1 bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-700 dark:text-green-400 border border-green-400">
                     {tag?.name}
                     <X size={14} className="cursor-pointer" onClick={() => handleRemoveTag(tagId)} />
                 </span>
-            //   <Badge key={tagId} variant="outline" className="flex items-center gap-1">
-            //     {tag?.name}
-            //     <X size={14} className="cursor-pointer" onClick={() => handleRemoveTag(tagId)} />
-            //   </Badge>
             );
           })}
         </div>
@@ -72,7 +87,7 @@ export default function TagDialog({ product, tags, isOpen, onClose, onSave }) {
                   <label key={tag.tagId} className="flex items-center gap-2">
                     <Checkbox
                       checked={selectedTags.includes(tag.tagId)}
-                      onCheckedChange={() => handleTagChange(tag.tagId)}
+                      onCheckedChange={() => handleTagChange(tag.tagId, type)}
                     />
                     {tag.name}
                   </label>

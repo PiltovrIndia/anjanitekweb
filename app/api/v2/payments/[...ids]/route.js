@@ -271,21 +271,28 @@ export async function POST(request, {params}) {
           // }
         
           // 3. check if the payment update is for the uploaded receipt or manual by admin
-          if(particular == '-'){
+          if(particular.split(',')[1] == '-'){
           
             const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
-            const [payments] = await connection.query(q,[amount, appliedAmounts, type, id,invcs,transactionId,paymentDate,adminId, particular, bal]);
+            const [payments] = await connection.query(q,[amount, appliedAmounts, type, id,invcs,transactionId,paymentDate,adminId, particular.split(',')[1], bal]);
     
           } 
           else {
           
             const q = 'UPDATE payments SET amounts=?,invoiceNo=?, adminId=?, balance=? WHERE paymentId=?';
-            const [payments] = await connection.query(q,[appliedAmounts,invcs,adminId, bal, particular]);
+            const [payments] = await connection.query(q,[appliedAmounts,invcs,adminId, bal, particular.split(',')[1]]);
     
           }
 
         // 4
         // send notification to Dealer(s)
+        var msg = '';
+        if(particular.split(',')[0] == 'Bank'){
+          msg = "Payment of ₹"+amount+" is updated with Transaction ID: "+transactionId;
+        }
+        else {
+          msg = "Payment of ₹"+amount+" is updated due to "+transactionId;
+        }
 
         // get the gcm_regIds of Students to notify
             // Split the branches string into an array
@@ -302,7 +309,7 @@ export async function POST(request, {params}) {
               if(element.length > 3){
                 gcmIds.push(element); 
                 // send notification to the dealer
-                const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+id, element, 'Single');
+                const notificationResult = await send_notification(msg, element, 'Single');
               }
               if(element1.length > 3){
                 gcmIds.push(element1); 
@@ -315,7 +322,7 @@ export async function POST(request, {params}) {
         // Include in the chat history
         // create query for insert
         const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
-        const [rows, fields] = await connection.execute(q1, [ nrows[0].mapTo, id, paymentDate, decodeURIComponent('Payment of ₹'+amount+' is updated'), 0, '-' ]);
+        const [rows, fields] = await connection.execute(q1, [ nrows[0].mapTo, id, paymentDate, decodeURIComponent(msg), 0, '-' ]);
         connection.release();
 
         await connection.commit();

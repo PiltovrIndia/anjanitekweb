@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, XCircle, Plus, CurrencyInr, Receipt } from 'phosphor-react'
+import { Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, XCircle, Plus, CurrencyInr, Receipt, CalendarBlank } from 'phosphor-react'
 import React, { useRef, useEffect, useState } from 'react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
@@ -79,6 +79,9 @@ import * as XLSX from 'xlsx';
 
 
 const xlsx = require('xlsx');
+
+import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
+import { Calendar } from '@/app/components/ui/calendar';
 // Child references can also take paths delimited by '/'
 const spaceRef = ref(storage, '/');
 
@@ -86,6 +89,16 @@ const spaceRef = ref(storage, '/');
 const getStats = async (pass, role, id) => 
   
     fetch("/api/v2/dealerstats/"+pass+"/0/"+role+"/"+id, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+    });
+// get dealer count by location
+const getStatsByDate = async (pass, role, id, selectedDate) => 
+  
+    fetch("/api/v2/dealerstats/"+pass+"/0.1/"+role+"/"+id+"/"+selectedDate, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -190,6 +203,7 @@ export default function Outing() {
     // user state and requests variable
     const [user, setUser] = useState();
     const [id, setUserId] = useState('');
+    const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [role, setRole] = useState('');
     const [offset, setOffset] = useState(0);
     const [days, setDays] = useState(45);
@@ -229,6 +243,8 @@ export default function Outing() {
     const [messaging, setMessaging] = useState(false);
 
     const [regionsList, setRegionsList] = useState([]);
+    const [outstandingListByDate, setOtstandingListByDate] = useState([]);
+    const [searchingStatsByDate, setSearchingStatsByDate] = useState(false);
     const [allRequests, setAllRequests] = useState([]);
     const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
@@ -442,6 +458,92 @@ export default function Outing() {
             else {
                 
                 setSearchingStats(false);
+                setDataFound(false);
+                setCompleted(true);
+            }
+        }
+        catch (e){
+            console.log(e);
+            // show and hide message
+            setResultType('error');
+            setResultMessage('Issue loading. Please refresh or try again later!');
+            setTimeout(function(){
+                setResultType('');
+                setResultMessage('');
+            }, 3000);
+        }
+}
+
+const handleDateChange = (date) => {
+    setSelectedDate(dayjs(date).format('YYYY-MM-DD'));
+    getDealerStatsByDate();
+};
+
+    async function getDealerStatsByDate(){
+        
+        setSearchingStatsByDate(true);
+        setOffset(offset+10); // update the offset for every call
+
+        try {    
+            
+            const result  = await getStatsByDate(process.env.NEXT_PUBLIC_API_PASS, role, id, selectedDate)
+            const queryResult = await result.json() // get data
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                // check if data exits
+                if(queryResult.data.length > 0){
+                    // console.log(queryResult.data);
+                    // set the state
+                    // total students
+                    const result = queryResult.data;
+                    
+                    if (result && result.length > 0) {
+                        
+                        // Calculate total sum of pending amounts
+                        // const totalSum = result.reduce((sum, invoice) => sum + invoice.pending, 0);
+                        // console.log(totalSum);
+                        
+
+                            // Find the earliest expiry date
+                            // const earliestExpiryDate = result
+                            // .map(invoice => dayjs(invoice.expiryDate))  // Convert all expiry dates to dayjs objects
+                            // .reduce((earliest, currentExpiry) => {
+                            //     return earliest.isBefore(currentExpiry) ? earliest : currentExpiry;
+                            // }, dayjs('9999-12-31'));
+               
+                            // // Calculate the difference in days
+                            // const today = dayjs();  // Gets today's date
+                            // const daysBetween = earliestExpiryDate.diff(today, 'day');  // 'day' ensures the difference is calculated in days
+
+                            // // Format the earliest date in a friendly format, e.g., January 1, 2023
+                            // // const formattedDate = formatDate(earliestExpiryDate, 'MMMM d, yyyy');
+                            // const formattedDate = dayjs(earliestExpiryDate).format('MMMM D, YYYY');
+
+                            setOtstandingListByDate(result);
+                            // setTotalOutstanding(totalSum);
+                            // setDueDate(formattedDate);
+                            // setDaysLeft(daysBetween);
+                        
+                      } else {
+                        console.log("No invoices data found.");
+                      }
+                   
+                    setDataFound(true);
+                    setSearchingStatsByDate(false);
+                }
+                else {
+                    
+                    setDataFound(false);
+                }
+
+                setSearchingStatsByDate(false);
+                setCompleted(false);
+            }
+            else {
+                
+                setSearchingStatsByDate(false);
                 setDataFound(false);
                 setCompleted(true);
             }
@@ -1110,7 +1212,7 @@ const sendMessageNow = async (e) => {
 {/* <div>{allRequests.length}</div> */}
     
 <div className={cn("grid gap-2 mb-4")} style={{display:'flex', flexDirection:'column', alignItems:'start'}}>
-
+<p className='font-bold text-black text-xl mb-4'>Total Outstanding</p>
 <Tabs defaultValue={currentState} className="w-[400px]">
     <TabsList>
       {/* <TabsTrigger value="All" onClick={()=>updateStatus('All')}>All States</TabsTrigger> */}
@@ -1121,7 +1223,7 @@ const sendMessageNow = async (e) => {
       ))}
     </TabsList>
   </Tabs>
-</div>
+
 
     {searchingStats ? <Skeleton className="h-4 w-[300px] h-[100px]" /> :
         <div className="flex flex-col gap-2 mb-4" >
@@ -1166,24 +1268,94 @@ const sendMessageNow = async (e) => {
                     </Card> */}
                 </div>
                     : null}
-
-            {/* <div  className="flex flex-row gap-2">
-            {regionsList.map(regionItem => (
-                    <Card className="w-[200px] px-3 py-3" key={regionItem.state}>
-                        <form>
-                            <p className='text-m text-green-700'>{regionItem.state.split('-')[1]}</p>
-                            <Label className='text-l font-semibold'>₹{formatter.format(regionItem.pending)}</Label>
-                        </form>
-                    </Card>
-                
-                ))}
-            </div> */}
         </div>
             }
-        
+</div>
+            <Separator/>
 
-        <Card className="w-fit px-3 py-3 flex flex-row justify-between items-center gap-8">
             <div>
+                <p className='font-bold text-black text-xl my-4'>Outstanding by date <span className='text-slate-600 text-sm font-normal'>(Choose a date)</span></p>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                        variant={"outline"}
+                        className={cn(
+                            "w-[280px] justify-start text-left font-normal",
+                            !selectedDate && "text-muted-foreground"
+                        )}
+                        >
+                        <CalendarBlank className="mr-2 h-4 w-4" />
+                        {selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : <span>Pick a date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-4">
+                        <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={handleDateChange}
+                        initialFocus
+                        />
+                        <Button type="submit" onClick={getDealerStatsByDate}>Submit</Button>
+                    </PopoverContent>
+                    </Popover>
+
+
+
+
+                    {searchingStatsByDate ? <Skeleton className="h-4 w-[300px] h-[100px] mt-2" /> :
+                        <div className="flex flex-col gap-2 mt-2 mb-4" >
+                            
+                            {(outstandingListByDate.length > 0) ?
+                                <div  className="flex flex-row gap-2">
+                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
+                                        <div className="flex flex-row gap-2 items-center">
+                                            <p className='text-s text-gray-600 font-normal'>Total Outstanding</p>
+                                        </div>
+                                        <p className='text-xl text-black font-semibold tracking-wider'>₹{formatter.format(outstandingListByDate.find(item => item.state === currentState).pendingATL + outstandingListByDate.find(item => item.state === currentState).pendingVCL)}</p>
+                                    </Card>
+                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
+                                        <div className="flex flex-row gap-2 items-center">
+                                            <p className='text-s text-gray-600 font-normal'>Outstanding </p>
+                                            <div className="text-sm font-semibold bg-rose-500 text-rose-100 px-1.5 w-fit border border-rose-600 rounded-2xl tracking-wider">
+                                                ATL
+                                            </div>
+                                        </div>
+                                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>₹{formatter.format(outstandingListByDate.find(item => item.state === currentState).pendingATL)}</p>
+                                    </Card>
+                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={1}>
+                                        <div className="flex flex-row gap-2 items-center">
+                                            <p className='text-s text-gray-600 font-normal'>Outstanding </p>
+                                            <div className="text-sm font-semibold bg-red-700 text-red-100 px-1.5 w-fit border border-red-800 rounded-2xl tracking-wider">
+                                                VCL
+                                            </div>
+                                        </div>
+                                        <p className='text-xl text-red-700 font-semibold tracking-wider'>₹{formatter.format(outstandingListByDate.find(item => item.state === currentState).pendingVCL)}</p>
+                                    </Card>
+                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={2}>
+                                        <p className='text-s text-gray-600 font-normal'>Pending Invoices</p>
+                                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{outstandingListByDate.find(item => item.state === currentState).invoices}</p>
+                                    </Card>
+                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={3}>
+                                        <p className='text-s text-gray-600 font-normal'>Dealers Due</p>
+                                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{outstandingListByDate.find(item => item.state === currentState).dealersDue} </p>
+                                    </Card>
+                                    {/* <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={4}>
+                                        <p className='text-s text-gray-600 font-normal'>Total Dealers</p>
+                                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).dealers}</p>
+                                    </Card> */}
+                                </div>
+                                    : null}
+                        </div>
+                            }
+            </div>
+            
+            <Separator/>
+        
+            <p className='font-bold text-black text-xl my-4'>Outstanding Dealers by days</p>
+        <Card className="w-fit px-3 py-3 flex flex-row justify-between items-center gap-8">
+            
+            <div>
+            
                 {/* <p className='text-m text-green-700'>{regionItem.state.split('-')[1]}</p>
                 <Label className='text-l font-semibold'>₹{formatter.format(regionItem.pending)}</Label> */}
                 {days == 0 ?
