@@ -61,7 +61,18 @@ export async function GET(request,{params}) {
                 }
             }
             else if(params.ids[1] == 2){ // fetch all offer events which are active
-                const [rows, fields] = await connection.execute('SELECT * from offer_event where isOpen = 1');
+                const [rows, fields] = await connection.execute('SELECT * from offer_event where isOpen = 1 ORDER BY createdOn DESC');
+                connection.release();
+            
+                if(rows.length > 0){
+                    return Response.json({status: 200, message:'Data found!', data: rows}, {status: 200})
+                }
+                else {
+                    return Response.json({status: 404, message:'No data!'}, {status: 200})
+                }
+            }
+            else if(params.ids[1] == 2.1){ // get previous responses for the dealer
+                const [rows, fields] = await connection.execute('SELECT * from offer_response where dealer = "'+params.ids[2]+'" ORDER BY createdOn DESC');
                 connection.release();
             
                 if(rows.length > 0){
@@ -73,8 +84,8 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 3){ // insert response from dealer for a offer
                 
-                const q = 'INSERT INTO offer_response (offerId, dealer, response, createdOn) VALUES ( ?, ?, ?, ?)';
-                const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], currentDate ]);
+                const q = 'INSERT INTO offer_response (offerId, dealer, createdOn) VALUES ( ?, ?, ?, ?)';
+                const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], currentDate ]);
                 connection.release();
                 
                 if(rows.insertId > 0){
