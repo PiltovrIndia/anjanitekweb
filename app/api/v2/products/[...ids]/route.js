@@ -32,11 +32,11 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
-            // get the list of products
+            // get the list of products1
             if(params.ids[1] == 'U1'){
                 try {
                     
-                    const [rows, fields] = await connection.execute('SELECT * from products LIMIT 20 OFFSET '+params.ids[3]);
+                    const [rows, fields] = await connection.execute('SELECT * from products1 LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
 
                     if(rows.length > 0)
@@ -48,10 +48,10 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
-            // get products by size
+            // get products1 by size
             else if(params.ids[1] == 'U2'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * from products WHERE size="'+params.ids[2]+'" LIMIT 20 OFFSET '+params.ids[3]);
+                    const [rows, fields] = await connection.execute('SELECT * from products1 WHERE size="'+params.ids[2]+'" LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
 
                     if(rows.length > 0){
@@ -64,7 +64,7 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
-            // get products by tags
+            // get products1 by tags
             else if(params.ids[1] == 'U3'){
                 try {
                     var str = '';
@@ -75,8 +75,8 @@ export async function GET(request,{params}) {
                         str = 'FIND_IN_SET("39", tags)';
                     }
                         // const conditions = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');                    
-                        const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
-                        const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products WHERE ${str}`);
+                        const [rows, fields] = await connection.execute(`SELECT * from products1 WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
+                        const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products1 WHERE ${str}`);
                         const totalCount = countRows[0].count;
                         connection.release();
 
@@ -91,12 +91,12 @@ export async function GET(request,{params}) {
                         return Response.json({status: 404, message:'No product found!'}, {status: 200})
                 }
             }
-            // get products by search
+            // get products1 by search
             else if(params.ids[1] == 'U4'){
                 try {
                     var str = `(design LIKE '%${params.ids[2]}%' OR name LIKE '%${params.ids[2]}%')`;
                     
-                    const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
+                    const [rows, fields] = await connection.execute(`SELECT * from products1 WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
                     connection.release();
 
                         // check if user is found
@@ -113,7 +113,7 @@ export async function GET(request,{params}) {
             // update a product
             else if(params.ids[1] == 'U5'){
                 try {
-                    const [rows, fields] = await connection.execute('UPDATE products SET tags="'+params.ids[3]+'", size="'+params.ids[4]+'" WHERE productId="'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('UPDATE products1 SET tags="'+params.ids[3]+'", size="'+params.ids[4]+'" WHERE productId="'+params.ids[2]+'"');
                     connection.release();
 
                     if(rows.affectedRows > 0){
@@ -130,7 +130,7 @@ export async function GET(request,{params}) {
             // update the images for a product
             else if(params.ids[1] == 'U6'){
                 try {
-                    const [rows, fields] = await connection.execute('UPDATE products SET imageUrls="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('UPDATE products1 SET imageUrls="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
                     connection.release();
 
                     if(rows.affectedRows > 0){
@@ -177,10 +177,10 @@ export async function GET(request,{params}) {
                     // console.log(`INSERT INTO user (${productKeys}) VALUES (${productValues})`);
                     // console.log(`INSERT INTO dealer (${userDetailKeys}) VALUES (${userDetailValues})`);
 
-                    let p = `INSERT INTO products (${productKeys}) VALUES (${productValues})`;
+                    let p = `INSERT INTO products1 (${productKeys}) VALUES (${productValues})`;
                     const [rows, fields] = await connection.execute(p);
 
-                    // const [rows, fields] = await connection.execute('INSERT into products (design, name, description, size, tags, imageUrls, createdOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "'+params.ids[5]+'", "'+params.ids[6]+'", "'+params.ids[7]+'", "'+params.ids[8]+'")');
+                    // const [rows, fields] = await connection.execute('INSERT into products1 (design, name, description, size, tags, imageUrls, createdOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "'+params.ids[5]+'", "'+params.ids[6]+'", "'+params.ids[7]+'", "'+params.ids[8]+'")');
                     connection.release();
                     
 
