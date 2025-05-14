@@ -397,7 +397,7 @@ export default function Offers() {
         try {    
             // console.log("/api/v2/offers/"+process.env.NEXT_PUBLIC_API_PASS+"/5/"+offerId);
             
-            const result  = await createOfferEventAPI(process.env.NEXT_PUBLIC_API_PASS, offerId) 
+            const result  = await closeEventAPI(process.env.NEXT_PUBLIC_API_PASS, offerId) 
             const queryResult = await result.json() // get data
             console.log(queryResult);
             
