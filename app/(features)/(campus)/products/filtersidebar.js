@@ -3,7 +3,7 @@ import { useState } from "react";
 
 export default function FilterSidebar({ groupedTags, selectedTags, onTagChange }) {
   return (
-    <Card className="w-[200px] px-4 py-3">
+    <Card className="px-4 py-3">
         {/* <div className="w-64 p-4 border-r bg-gray-100 h-full"> */}
         <h2 className="text-lg font-bold mb-4">Filters</h2>
         {Object.entries(groupedTags).map(([type, tags]) => (

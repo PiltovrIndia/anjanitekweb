@@ -14,6 +14,8 @@ import { useToast } from "@/app/components/ui/use-toast"
 import ProductCard from './product_card';
 import FilterSidebar from './filtersidebar';
 import TagDialog from './product_details';
+import { Button } from '@/app/components/ui/button'
+import NewProductDialog from './newproduct'
 
 
 const xlsx = require('xlsx');
@@ -30,7 +32,7 @@ const getTags = async (pass) =>
         },
     });
 
-// get the dealers for SuperAdmin/Admin
+// get products
 const getProducts = async (pass, role, offset) => 
 fetch("/api/v2/products/"+pass+"/U1/"+role+"/"+offset, {
     method: "GET",
@@ -40,23 +42,26 @@ fetch("/api/v2/products/"+pass+"/U1/"+role+"/"+offset, {
     },
 });
 
+// update product
+const upateProduct = async (pass, productId, tags, size) => 
+fetch("/api/v2/products/"+pass+"/U5/"+productId+"/"+tags+"/"+size, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
 
+// create product
+const createProductAPI = async (pass, productData) => 
+fetch("/api/v2/products/"+pass+"/U7/"+productData, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
 
-// const spaceRef = ref(storage, 'images/space.jpg');
-// upload payments data
-const updateUploadData = async (pass, items1, adminId) => 
-    // userId, paymentAmount, type, transactionId, paymentDate,
-    // userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
-    // fetch("/api/v2/payments/"+pass+"/web/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
-    fetch("/api/v2/payments/"+pass+"/web/"+adminId+"/-", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-        body: JSON.stringify(items1),
-    });
-    
 
 // pass state variable and the method to update state variable
 export default function Products() {
@@ -71,6 +76,8 @@ export default function Products() {
     const [tagsList, setTags] = useState([]);
     const [allProducts, setAllProducts] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState(null);
+    const [newProductOn, setNewProductOn] = useState(false);
+    const [creatingProduct, setCreatingProduct] = useState(false);
 
     // var groupedTags = [];
 
@@ -94,6 +101,7 @@ export default function Products() {
     const [dataFound, setDataFound] = useState(true); 
     const [searchingStats, setSearchingStats] = useState(false);
     const [searching, setSearching] = useState(false);
+    const [updatingTags, setUpdatingTags] = useState(false);
     
 
 
@@ -137,13 +145,39 @@ export default function Products() {
         );
       };
 
+      // on update product
       const handleSaveTags = (productId, updatedTags) => {
         setAllProducts((prevProducts) =>
           prevProducts.map((product) =>
-            product.productId === productId ? { ...product, tags: updatedTags.join(",") } : product
+            product.productId === productId && product.tags !== updatedTags.join(",")
+              ? { ...product, tags: updatedTags.join(",") }
+              : product
           )
         );
-        setSelectedProduct(null); // Close dialog after save
+
+        allProducts.map((product) =>
+            (product.productId === productId && product.tags !== updatedTags.join(",")) ?
+                // Call a method if the product tags are not the same as updatedTags
+                updateProductTags(productId, updatedTags.join(",")) : null
+            );
+      };
+    
+      // on create product
+      const createNewProduct = (productData) => {
+        // setAllProducts((prevProducts) =>
+        //   prevProducts.map((product) =>
+        //     product.productId === productId && product.tags !== updatedTags.join(",")
+        //       ? { ...product, tags: updatedTags.join(",") }
+        //       : product
+        //   )
+        // );
+
+        // allProducts.map((product) =>
+        //     (product.productId === productId && product.tags !== updatedTags.join(",")) ?
+                // Call a method if the product tags are not the same as updatedTags
+                createProduct(productData) 
+                // : null
+            // );
       };
     
       // Filter products based on selected tags
@@ -293,61 +327,186 @@ export default function Products() {
         }
 }
 
-    
-  return (
-    
-    <div  className={inter.className} style={{display:'flex',flexDirection:'row', alignItems:'flex-start',height:'100vh',gap:'8px'}}>
-            
-    <div className={styles.verticalsection} style={{height:'90vh', width:'100%',gap:'8px',overflow: 'auto', scrollBehavior:'smooth'}}>
-
-    <div className='flex flex-row gap-2 items-center py-4' >
-        <h2 className="text-lg font-semibold mr-4">Collections</h2>
-        <Toaster />
-    </div>
-
-        {(viewTypeSelection == 'college') ? 
-            <div className="flex items-center py-2" style={{gap:'10px'}}>       
-            </div>
-        :
-            <div className="flex items-center py-2" style={{gap:'10px'}}>
-            </div>
-        }
-
-<div className="mx-auto" style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',gap:'10px'}}>
-    
-<div className="flex">
-      {/* Sidebar with grouped filters */}
-      <FilterSidebar groupedTags={groupedTags} selectedTags={selectedTags} onTagChange={handleTagChange} />
-
-      {/* Product Listing */}
-      <div className="container mx-auto p-6">
-        {/* <h1 className="text-2xl font-bold mb-4">Our Products</h1> */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-            <div key={product.productId} onClick={() => setSelectedProduct(product)} className="cursor-pointer">
-                <ProductCard product={product} />
-            </div>
-            ))}
-        </div>
-
-        {selectedProduct && (
-            <TagDialog
-            product={selectedProduct}
-            tags={tagsList}
-            isOpen={!!selectedProduct}
-            onClose={() => setSelectedProduct(null)}
-            onSave={handleSaveTags}
-            />
-        )}
-    </div>
-    </div>
+    // update product tags
+    async function updateProductTags(productId, tags){
         
-    </div>
-    </div>
+        
+        setSearching(true);
+        // setOffset(offset+0); // update the offset for every call
+        let sizeTag = '';
+        
+        tagsList.forEach(tag => {
+            if (tag.type === 'Size') {
+                
+            tags.split(',').forEach(tagId => {
+                
+                if (tag.tagId == tagId) {
+                    sizeTag = tag.name;
+                }
+            });
+            }
+        });
+        console.log(sizeTag);
+        
+        try {    
+            const result  = await upateProduct(process.env.NEXT_PUBLIC_API_PASS, productId, tags, sizeTag) 
+            const queryResult = await result.json() // get data
 
-</div>
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                // check if data exits
+                
+
+                        // setAllProducts(queryResult.data);
+                        
+                    setSelectedProduct(null); // Close dialog after save
+                    toast({
+                        description: "Details updated!",
+                      })
+                
+                setUpdatingTags(false);
+            }
+            else if(queryResult.status == 401 || queryResult.status == 201) {
+                
+                setUpdatingTags(false);
+            }
+            else if(queryResult.status == 404) {
+                
+                toast({
+                    description: "Facing issues, try again later!",
+                  })
+                  
+                  setUpdatingTags(false);
+            }
+        }
+        catch (e){
+            
+            toast({
+                description: "Issue loading, try again later!",
+              })
+        }
+}
+    // create product
+    async function createProduct(productData){
+        
+        
+        setSearching(true);
+        setCreatingProduct(true);
+        let sizeTag = '';
+        
+        tagsList.forEach(tag => {
+            if (tag.type === 'Size') {
+                
+            productData.tags.split(',').forEach(tagId => {
+                
+                if (tag.tagId == tagId) {
+                    sizeTag = tag.name;
+                }
+            });
+            }
+        });
+        console.log(sizeTag);
+        
+        try {    
+            // const result  = await createUser(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.stringify(updateDataBasic)+"/"+encodeURIComponent(JSON.stringify(updateDataDealer)))
+            const result  = await createProductAPI(process.env.NEXT_PUBLIC_API_PASS, JSON.stringify(productData)) 
+            const queryResult = await result.json() // get data
+
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                toast({
+                    description: "Product created!",
+                    })
+                    setNewProductOn(false)
+                    setCreatingProduct(false);
+
+                    productData.productId = queryResult.productId;
+                    setAllProducts((prevProducts) => [...prevProducts, productData]);
+                
+            }
+            else if(queryResult.status == 401 || queryResult.status == 201) {
+                setNewProductOn(false)
+                setCreatingProduct(false);
+            }
+            else if(queryResult.status == 404) {
+                
+                toast({
+                    description: "Facing issues, try again later!",
+                  })
+                  setNewProductOn(false)
+                  setCreatingProduct(false);
+            }
+        }
+        catch (e){
+            
+            toast({
+                description: "Issue loading, try again later!",
+              })
+        }
+}
+
     
-    
-  );
+return (
+    <div className={inter.className} style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', height: '100vh', gap: '8px' }}>
+        <div className={styles.verticalsection} style={{ height: '90vh', width: '100%', gap: '8px' }}>
+            <div className='flex flex-row gap-2 items-center py-4'>
+                <h2 className="text-lg font-semibold mr-4">Collections</h2>
+                <Button onClick={() => setNewProductOn(true)}>Add Product</Button>
+                <Toaster />
+            </div>
+
+            {(viewTypeSelection == 'college') ?
+                <div className="flex items-center py-2" style={{ gap: '10px' }}>
+                </div>
+                :
+                <div className="flex items-center py-2" style={{ gap: '10px' }}>
+                </div>
+            }
+
+            <div className="mx-auto" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div className="flex h-full">
+                    {/* Sidebar with grouped filters */}
+                    <div className='h-full overflow-y-auto pb-8 w-[300px]'>
+                        <FilterSidebar groupedTags={groupedTags} selectedTags={selectedTags} onTagChange={handleTagChange} />
+                    </div>
+
+                    {/* Product Listing */}
+                    <div className="mx-auto px-2 overflow-y-auto pb-8">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            {filteredProducts.map((product) => (
+                                <div key={product.productId} onClick={() => setSelectedProduct(product)} className="cursor-pointer">
+                                    <ProductCard product={product} />
+                                </div>
+                            ))}
+                        </div>
+
+                        {selectedProduct && (
+                            <TagDialog
+                                product={selectedProduct}
+                                tags={tagsList}
+                                isOpen={!!selectedProduct}
+                                onClose={() => setSelectedProduct(null)}
+                                onSave={handleSaveTags}
+                            />
+                        )}
+
+                        {newProductOn && (
+                            <NewProductDialog
+                                tags={tagsList}
+                                isOpen={!!newProductOn}
+                                onClose={() => setNewProductOn(false)}
+                                createProduct={createNewProduct}
+                            />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+);
 }
 

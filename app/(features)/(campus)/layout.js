@@ -1,7 +1,7 @@
 'use client'
 import { Inter } from 'next/font/google'
 import styles from '../../../app/page.module.css'
-import { Monitor, UserFocus, Chats, ArrowSquareOut, CaretUp, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files, Rows, Power, Receipt } from 'phosphor-react'
+import { Monitor, UserFocus, Chats, ArrowSquareOut, CaretUp, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files, Rows, Power, Receipt, CheckCircle, Tag } from 'phosphor-react'
 import Image from 'next/image'
 import Biscuits from 'universal-cookie'
 const biscuits = new Biscuits
@@ -123,6 +123,16 @@ const inter = Inter({ subsets: ['latin'] })
       setSelectedTab('Dealers')
       router.push('/dealers')
     }
+    function navigateOffers(){
+      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
+      setSelectedTab('Offers')
+      router.push('/offers')
+    }
+    function navigateConfirmations(){
+      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
+      setSelectedTab('Confirmations')
+      router.push('/confirmations')
+    }
     function navigateInvoices(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
       setSelectedTab('Invoices')
@@ -204,6 +214,8 @@ const inter = Inter({ subsets: ['latin'] })
               {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Invoices' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateInvoices.bind(this)} style={{cursor:'pointer'}}><Receipt className={styles.menuicon}/> Invoices</div> : <div></div>}
               {(role == 'SuperAdmin' || role == 'StockAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Products' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateProducts.bind(this)} style={{cursor:'pointer'}}><Receipt className={styles.menuicon}/> Products</div> : <div></div>}
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealers.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers</div>
+                {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Offers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOffers.bind(this)} style={{cursor:'pointer'}}><Tag className={styles.menuicon}/> Offers</div> : <div></div>}
+                {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Confirmations' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateConfirmations.bind(this)} style={{cursor:'pointer'}}><CheckCircle className={styles.menuicon}/> Confirmations</div> : <div></div>}
                 {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Sales' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSales.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Sales</div> : <div></div>}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers Pending' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealersPending.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers Pending</div> */}
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Messages' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateMessages.bind(this)} style={{cursor:'pointer'}}><Chats className={styles.menuicon}/> Messages</div>

@@ -84,7 +84,7 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 3){ // insert response from dealer for a offer
                 
-                const q = 'INSERT INTO offer_response (offerId, dealer, createdOn) VALUES ( ?, ?, ?, ?)';
+                const q = 'INSERT INTO offer_response (offerId, dealer, createdOn) VALUES ( ?, ?, ?)';
                 const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], currentDate ]);
                 connection.release();
                 
@@ -96,7 +96,7 @@ export async function GET(request,{params}) {
                 }
             }
             else if(params.ids[1] == 4){ // get the details of responses for a given offer event
-              const [rows, fields] = await connection.execute('SELECT r.* from offer_response r JOIN user u ON r.dealer = u.id where r.offerId ="'+params.ids[2]+'"');
+              const [rows, fields] = await connection.execute('SELECT r.*, u.name, u.email, u.mobile from offer_response r JOIN user u ON r.dealer = u.id where r.offerId ="'+params.ids[2]+'"');
               connection.release();
           
               if(rows.length > 0){

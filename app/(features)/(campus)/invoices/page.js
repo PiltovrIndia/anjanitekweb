@@ -1296,6 +1296,7 @@ export default function Invoices() {
                 <TableHead>Expiry Date</TableHead>
                 <TableHead>Pending/Total Amount</TableHead>
                 <TableHead>Payment status</TableHead>
+                <TableHead>Boxes</TableHead>
                 <TableHead></TableHead>
             </TableRow>
         </TableHeader>
@@ -1364,6 +1365,16 @@ export default function Invoices() {
                                 <p className="text-sm font-semibold text-amber-600">
                                     {row.status}
                                 </p>
+                                }
+                            </div>
+                        </TableCell>
+                        <TableCell>
+                            <div className="flex flex-row items-center gap-2">
+                            {(row.sales != '-') ?
+                                <p>
+                                    {row.sales}
+                                    </p>
+                                : '-'
                                 }
                             </div>
                         </TableCell>

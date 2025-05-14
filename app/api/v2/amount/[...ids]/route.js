@@ -618,7 +618,7 @@ export async function POST(request, {params}) {
 
         // 3
         const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
-        const [rows124, fields124] = await connection.execute(q1, [ adminId, dealerId, currentDate1, decodeURIComponent('Invoice number '+invoiceNo+' with '+totalAmount+' Amount is added.'), 0, '-' ]);
+        const [rows124, fields124] = await connection.execute(q1, [ adminId, dealerId, currentDate1, decodeURIComponent('Invoice number '+invoiceNo+' with '+totalAmount+' Amount is raised and due.'), 0, '-' ]);
 
         // send the notification
         var notificationResult = await send_notification("Invoice: "+invoiceNo+" updated!", dealerId, 'Single');

@@ -63,6 +63,15 @@ fetch("/api/v2/messaging/"+pass+"/3/"+sender, {
         Accept: "application/json",
     },
 });
+// get the list of unread messages
+const getUnreadMessages = async (pass, role, sender) => 
+fetch("/api/v2/messaging/"+pass+"/7/"+role+"/"+sender, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
 // get the list of messages sent and received by a person to the admin
 const getSenderMessages = async (pass, sender, receiver) => 
 fetch("/api/v2/messaging/"+pass+"/4/"+sender+"/"+receiver, {
@@ -125,6 +134,7 @@ export default function Messages() {
     const [file, setFile] = useState(null); 
     
     const [selectedReceiver, setSelectedReceiver] = useState({});
+    const [pendingList, setPendingList] = useState([]);
     const [receiversList, setReceiversList] = useState([]);
     const [senderMessagesList, setSenderMessagesList] = useState([]);
     const [searchedList, setSearchedList] = useState([]);
@@ -201,7 +211,9 @@ export default function Messages() {
             console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/3/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id);
             const result  = await getSenders(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id)
             const queryResult = await result.json() // get data
-            console.log(queryResult);
+            // const result1  = await getUnreadMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id)
+            // const queryResult1 = await result1.json() // get data
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -210,9 +222,15 @@ export default function Messages() {
                     // console.log(queryResult.data);
                     // set the state
                     // total students
-                        
+                    
                     setReceiversList(queryResult.data);
                     setSelectedReceiver(queryResult.data[0]) // set the first user from the list to fetch messages.
+
+                    // if(queryResult1.status == 200){
+                    //     if(queryResult1.data.length > 0){
+                    //         setPendingList(queryResult1.data);
+                    //     }
+                    // }
                    
                     setDataFound(true);
                     setSearching(false);
@@ -625,10 +643,7 @@ const processData = (e) => {
                                             : 
                                             <div>
                                                 {searchedList.map((searchItem, index) => (
-                                                // <>
                                                     <li className="flex py-4 first:pt-0 last:pb-0 cursor-pointer" key={index} onClick={()=>{selectTheSearchItem(searchItem)}}>
-                                                    {/* <li className="flex py-4 first:pt-0 last:pb-0" key={index} onClick={()=>{setSelectedReceiver(receiver)}}> */}
-                                                    {/* <img class="h-10 w-10 rounded-full" src="" alt="" /> */}
                                                         <Avatar>
                                                             <AvatarImage src="" alt="dealer_image" />
                                                             <AvatarFallback>{searchItem.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
@@ -638,9 +653,8 @@ const processData = (e) => {
                                                             <p className="text-sm text-slate-500 truncate">{searchItem.id}</p>
                                                         </div>
                                                     </li>
-                                                // </>
-                                                
                                                 ))}
+                                                
                                                 
                                             </div>
                                         }
@@ -654,10 +668,10 @@ const processData = (e) => {
                             </div>
                             {searching ? <Skeleton className="h-4 w-[100px] h-[20px]" /> : 
                             <ul role="list" className="py-2 divide-y divide-slate-200">
+                                
                             {receiversList.map((receiver, index) => (
                             <>  
                                 <li className="flex px-2 py-4 first:pt-0 last:pb-0 cursor-pointer border-l-2 border-blue-600" key={index} onClick={()=>{setSelectedReceiver(receiver)}} style={{borderLeft: (selectedReceiver.receiver == receiver.receiver) ? '2px solid blue': '2px solid white'}}>
-                                {/* <img class="h-10 w-10 rounded-full" src="" alt="" /> */}
                                 <Avatar>
                                     <AvatarImage src="" alt="dealer_image" />
                                     <AvatarFallback>{receiver.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
@@ -673,6 +687,7 @@ const processData = (e) => {
                             </>
                             
                             ))}
+                            
                             </ul>}
                             
                         </div>

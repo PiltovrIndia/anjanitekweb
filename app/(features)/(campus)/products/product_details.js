@@ -57,7 +57,8 @@ export default function TagDialog({ product, tags, isOpen, onClose, onSave }) {
         {/* Selected Tags as Badges */}
         <div>
             <Image
-            src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+product.imageUrls.split(',')[0]+'?alt=media'}
+            src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/tiles%2F'+product.design+'_F1.jpeg?alt=media'}
+            // src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/tiles%2F'+product.imageUrls.split(',')[0]+'?alt=media'}
             alt={product.name}
             className="w-full h-48 object-cover rounded-lg"
             // layout="responsive"
