@@ -625,7 +625,7 @@ export default function Offers() {
                 <SheetHeader>
                 <SheetTitle>Create Offer</SheetTitle>
                 <SheetDescription>
-                    Make sure you enter all details correctly. Click 'Create'.
+                    Make sure you enter all details correctly. Click Create.
                 </SheetDescription>
                 </SheetHeader>
 

@@ -11,6 +11,7 @@ import { toast } from "@/app/components/ui/use-toast";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import imageCompression from 'browser-image-compression';
 import firebase from "@/app/firebase";
+import { Progress } from "@/app/components/ui/progress";
 const storage = getStorage(firebase, "gs://anjanitek-communications.firebasestorage.app");
 const spaceRef = ref(storage, '/');
 
