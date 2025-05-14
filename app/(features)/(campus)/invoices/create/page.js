@@ -1,3 +1,24 @@
+'use client';
+
+// pass state variable and the method to update state variable
+export default function InvoicesCreate() {
+    
+  return (
+    
+        // <div className={styles.verticalsection} style={{height:'100vh',gap:'16px'}}>
+            
+        //   <div style={{height:'8vh',display:'flex',flexDirection:'column',justifyContent:'space-around'}}>
+
+        <div  style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px', overflow:'scroll'}}>
+            
+          Check
+    
+    </div>
+    
+    
+  );
+}
+
 // 'use client';
 
 // import { useState, useEffect } from 'react';
