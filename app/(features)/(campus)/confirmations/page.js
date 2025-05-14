@@ -711,7 +711,7 @@ console.log(queryResult);
             </Select>
         }
         
-        <Button variant="outline" > <ArrowDown className="mr-2 h-4 w-4"/> Download</Button>
+        {/* <Button variant="outline" > <ArrowDown className="mr-2 h-4 w-4"/> Download</Button> */}
         </div>
         
         </div>
