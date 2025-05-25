@@ -24,10 +24,21 @@ export async function GET(request,{params}) {
         // authorize secret key
         if(await Keyverify(params.ids[0])){
 
+            // Log user session
+            if(params.ids[1] == 'U0'){
+                try {
+                    const [rows, fields] = await connection.execute('INSERT INTO user_logs (userId, role) values ("'+params.ids[2]+'", "'+params.ids[3]+'")');
+                    connection.release();
+                    
+                    return Response.json({status: 200, message:'Updated!'}, {status: 200})
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No user found!'}, {status: 200})
+                }
+            }
+
             // update the player Id for the user
             if(params.ids[1] == 'U1'){
                 try {
-                    console.log('UPDATE user SET gcm_regId ="'+params.ids[3]+'" where id = "'+params.ids[2]+'"');
                     const [rows, fields] = await connection.execute('UPDATE user SET gcm_regId ="'+params.ids[3]+'" where id = "'+params.ids[2]+'"');
                     connection.release();
                     // return successful update
