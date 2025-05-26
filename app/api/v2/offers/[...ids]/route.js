@@ -107,7 +107,7 @@ export async function GET(request,{params}) {
               }
             }
             else if(params.ids[1] == 5){ // close the event
-              const [rows, fields] = await connection.execute('UPDATE offer_event SET isOpen=0 where offerId ="'+params.ids[2]+'"');
+              const [rows, fields] = await connection.execute('UPDATE offer_event SET isOpen=0 where id ='+params.ids[2]);
               connection.release();
           
               if(rows.affectedRows > 0){

@@ -237,8 +237,8 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 'U4'){ // get all invoices for admin based on the role
                 
-                const [rows, fields] = await connection.execute('SELECT * FROM invoices ORDER BY invoiceDate ASC LIMIT 400 OFFSET '+params.ids[2]);
-                const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices');
+                const [rows, fields] = await connection.execute('SELECT * FROM invoices where isActive=1 ORDER BY invoiceDate ASC LIMIT 400 OFFSET '+params.ids[2]);
+                const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices where isActive=1');
                 connection.release();
     
                 
@@ -248,15 +248,15 @@ export async function GET(request,{params}) {
               }
             else if(params.ids[1] == 'U4.1'){ // To search invoices for the web listing.
                 
-                const [rows, fields] = await connection.execute('SELECT * FROM invoices where invoiceNo LIKE "%'+params.ids[2]+'%" LIMIT 20');
+                const [rows, fields] = await connection.execute('SELECT * FROM invoices where isActive=1 AND invoiceNo LIKE "%'+params.ids[2]+'%" LIMIT 20');
                 connection.release();
                 
                 return Response.json({status: 200, data: rows, message:'Details found!'}, {status: 200})
               }
               else if(params.ids[1] == 'U4.2'){ // get all invoices for admin in web
                 
-                const [rows, fields] = await connection.execute('SELECT i.*,u.name FROM invoices i JOIN user u ON i.billTo=u.id ORDER BY i.invoiceDate DESC');
-                const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices i JOIN user u ON i.billTo=u.id ORDER BY i.invoiceDate DESC');
+                const [rows, fields] = await connection.execute('SELECT i.*,u.name FROM invoices i JOIN user u ON i.billTo=u.id where i.isActive=1 ORDER BY i.invoiceDate DESC');
+                const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices i JOIN user u ON i.billTo=u.id where i.isActive=1 ORDER BY i.invoiceDate DESC');
                 // const [rows1, fields1] = await connection.execute('SELECT count(*) as count FROM invoices');
                 connection.release();
     
@@ -562,15 +562,16 @@ export async function POST(request, {params}) {
         var pending = 0;
         // 0
         // check if there is any dealer's credit that pending with us
-        var [rows12, fields] = await connection.query('SELECT COALESCE( (SELECT ABS(balance) FROM payments WHERE id = "'+dealerId+'" ORDER BY paymentDate DESC LIMIT 1), 0) AS balance');
+        // var [rows12, fields] = await connection.query('SELECT COALESCE( (SELECT ABS(balance) FROM payments WHERE id = "'+dealerId+'" ORDER BY paymentDate DESC LIMIT 1), 0) AS balance');
+        var [rows12, fields] = await connection.query('SELECT COALESCE( (SELECT balance FROM payments WHERE id = "'+dealerId+'" ORDER BY paymentDate DESC LIMIT 1), 0) AS balance');
         var creditBalance = rows12[0].balance;
 
         // if there is credit, need to make adjustment to the current invoice that is getting uploaded
-        if(creditBalance > 0){
+        if(creditBalance < 0){
             
             // 1
             // check if amount being paid is more, accordingly we need to update the status
-            amountPaid = (parseFloat(amountPaid) + parseFloat(creditBalance));
+            amountPaid = (parseFloat(amountPaid) + Math.abs(parseFloat(creditBalance)));
             pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
             if(amountPaid >= totalAmount){
                 status = 'Paid';
@@ -585,7 +586,7 @@ export async function POST(request, {params}) {
                 creditBalance = 0;
             }
             else {
-                creditBalance = (totalAmount - creditBalance);
+                creditBalance = (totalAmount - Math.abs(parseFloat(creditBalance)));
             }
             
             // round of the credit balance
@@ -602,7 +603,11 @@ export async function POST(request, {params}) {
             status = (amountPaid == 0) ? 'NotPaid' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
             // var status = (totalAmount == amountPaid) ? 'Pending' : (totalAmount - amountPaid) > 0 ? 'PartialPaid' : 'Paid';
             pending = (parseFloat(totalAmount) - parseFloat(amountPaid));
-            console.log(pending);
+            console.log(pending); 
+            // if amountPaid is more than totalAmount, then pending will be negative
+            // if pending is positive, then its a debit note for the dealer
+            // if pending is 0, then its a paid invoice
+            // if pending is negative, then the pending amount is a credit note for the dealer
         }
 
         // 1
@@ -613,8 +618,8 @@ export async function POST(request, {params}) {
         // console.log(pending);
         
         // 2
-        const q = 'INSERT INTO invoices (invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)), ?, ?, ? )';
-        const [payments] = await connection.query(q,[invoiceNo, invoiceType, invoiceDate, '-','-','-','-',dealerId, dealerId, totalAmount, amountPaid, pending, status, expiryDate, boxes]);
+        const q = 'INSERT INTO invoices (invoiceNo, invoiceType, invoiceDate, PoNo, vehicleNo, transport, LRNo, billTo, shipTo, totalAmount, amountPaid, pending, status, expiryDate, sales, isActive) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)),  CAST(? AS DECIMAL(10, 2)), ?, ?, ?, ? )';
+        const [payments] = await connection.query(q,[invoiceNo, invoiceType, invoiceDate, '-','-','-','-',dealerId, dealerId, totalAmount, amountPaid, pending, status, expiryDate, boxes, 1]);
 
         // 3
         const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';

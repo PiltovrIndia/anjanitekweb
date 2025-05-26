@@ -83,26 +83,6 @@ import {
   } from "../../../../app/components/ui/sheet"
 
 
-// create user
-const createUser = async (pass, role, updateDataBasic) =>   
-    fetch("/api/v2/user/"+pass+"/U12/"+role+"/"+updateDataBasic, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-    });
-
-// update user
-const updateUser = async (pass, role, id, updateDataBasic) =>   
-    fetch("/api/v2/user/"+pass+"/U13/"+role+"/"+id+"/"+updateDataBasic, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-    });
-
 // get all invoices for SuperAdmin
 const getAllInvoicesDataAPI = async (pass, offset, role) => 
   
@@ -136,17 +116,6 @@ const getAllSalesPersonsDataAPI = async (pass, role, offset) =>
         },
     });
 
-
-// get message to dealers
-const sendBroadcastMessage = async (pass, sender, receiver, sentAt, message, seen, state) => 
-  
-fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message+"/"+seen+"/"+state, {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
 
 // upload invoices data
 const updateUploadInvoicesData = async (pass, items1, adminId) => 

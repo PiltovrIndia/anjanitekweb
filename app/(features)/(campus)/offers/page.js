@@ -94,9 +94,9 @@ fetch("/api/v2/offers/"+pass+"/0/"+title+"/"+description+"/"+media+"/"+createdBy
 });
 
 // close event
-const closeEventAPI = async (pass, eventId) => 
+const closeEventAPI = async (pass, offerId) => 
   
-fetch("/api/v2/offers/"+pass+"/5/"+eventId, {
+fetch("/api/v2/offers/"+pass+"/5/"+offerId, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",

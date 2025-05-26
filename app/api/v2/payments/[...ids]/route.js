@@ -216,10 +216,14 @@ export async function POST(request, {params}) {
 
         // 1.1 get the pending balance from invoices table
         const [balance] = await connection.query('SELECT CAST(SUM(pending) AS DECIMAL(10, 2)) as bal FROM invoices WHERE billTo = "'+id+'" AND status!="Paid"',[]);
-        console.log(balance);
+        // console.log(balance);
         
           var bal = 0;
           bal = parseFloat(balance.length > 0 ? balance[0].bal : 0) - parseFloat(amount);
+
+          // if bal is negative, then dealer is paying more than pending and add it as credit
+          // if bal is positive, make it zero as dealer is paying less than pending
+          // bal = (bal >= 0) ? 0 : abs(bal);
 
         // 2
         // collect the invoices list for updating in payments table
@@ -279,8 +283,8 @@ export async function POST(request, {params}) {
           } 
           else {
           
-            const q = 'UPDATE payments SET amounts=?,invoiceNo=?, adminId=?, balance=? WHERE paymentId=?';
-            const [payments] = await connection.query(q,[appliedAmounts,invcs,adminId, bal, particular.split(',')[1]]);
+            const q = 'UPDATE payments SET amounts=?,invoiceNo=?, paymentDate=?, adminId=?, balance=? WHERE paymentId=?';
+            const [payments] = await connection.query(q,[appliedAmounts,invcs, paymentDate, adminId, bal, particular.split(',')[1]]);
     
           }
 
