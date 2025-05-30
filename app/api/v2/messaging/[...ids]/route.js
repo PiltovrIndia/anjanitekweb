@@ -147,7 +147,7 @@ export async function GET(request,{params}) {
               // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
               // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
               const [rows, fields] = await connection.execute('SELECT DISTINCT(n.receiver),u.name FROM `notifications` n JOIN user u ON n.receiver=u.id where n.sender="'+params.ids[2]+'"');
-              // const [rows1, fields1] = await connection.execute('SELECT DISTINCT(n.sender) as receiver, u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 6 and n.seen=0');
+              // const [rows1, fields1] = await connection.execute('SELECT DISTINCT(n.sender) as receiver, u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 2 and n.seen=0');
               connection.release();
               // const combinedRows = [...rows, ...rows1];
               // console.log(combinedRows);
@@ -254,7 +254,7 @@ export async function GET(request,{params}) {
             
             var query = '';
             if(params.ids[2]=='SuperAdmin' || params.ids[2]=='GlobalAdmin'){
-              query = 'SELECT DISTINCT(n.sender), u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 6 and n.seen=0';
+              query = 'SELECT DISTINCT(n.sender), u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 2 and n.seen=0';
               const [endList, fields] = await connection.execute(query);
               connection.release();
               // get the dealers
@@ -288,7 +288,7 @@ export async function GET(request,{params}) {
               await Promise.all(promises2); // wait till above finishes
               
               const promises = executives.map(async (row) => {
-                  const [rows1, fields1] = await connection.execute('SELECT DISTINCT(n.sender), u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 6 and n.receiver="'+row+'" and n.seen=0');
+                  const [rows1, fields1] = await connection.execute('SELECT DISTINCT(n.sender), u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 2 and n.receiver="'+row+'" and n.seen=0');
                   if(rows1.length > 0)
                     endList.push(rows1);
               });
@@ -312,7 +312,7 @@ export async function GET(request,{params}) {
               const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+params.ids[3]+'"');
               var rows2 = [];
               const promises = rows.map(async (row) => {
-                  const [rows1, fields1] = await connection.execute('SELECT DISTINCT(n.sender), u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 6 and n.receiver="'+row.id+'" and n.seen=0');
+                  const [rows1, fields1] = await connection.execute('SELECT DISTINCT(n.sender), u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 2 and n.receiver="'+row.id+'" and n.seen=0');
                   if(rows1.length > 0)
                     rows2.push(rows1);
                   // })
@@ -333,7 +333,7 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[2]=='SalesExecutive'){
 
-                  query = 'SELECT DISTINCT(n.sender), u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 6 and n.receiver="'+params.ids[3]+'" and n.seen=0';
+                  query = 'SELECT DISTINCT(n.sender), u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 2 and n.receiver="'+params.ids[3]+'" and n.seen=0';
                   const [rows2, fields2] = await connection.execute(query);
                   connection.release();
                   return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
