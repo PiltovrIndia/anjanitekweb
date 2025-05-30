@@ -23,7 +23,7 @@ export async function GET(request,{params}) {
                 try {
                     var media = (params.ids[4] == '-') ? null: params.ids[4]; // check if media is available
                     const q = 'INSERT INTO offer_event (title, description, media, isOpen, createdBy, createdOn) VALUES ( ?, ?, ?, ?, ?, ?)';
-                    const [rows, fields] = await connection.execute(q, [ params.ids[2], decodeURIComponent(params.ids[3]), media, 1, params.ids[5], currentDate ]);
+                    const [rows, fields] = await connection.execute(q, [ decodeURIComponent(params.ids[2]), decodeURIComponent(params.ids[3]), media, 1, params.ids[5], currentDate ]);
                     connection.release();
                         // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         

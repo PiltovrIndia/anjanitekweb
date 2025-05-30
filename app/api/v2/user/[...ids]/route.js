@@ -27,10 +27,29 @@ export async function GET(request,{params}) {
             // Log user session
             if(params.ids[1] == 'U0'){
                 try {
-                    const [rows, fields] = await connection.execute('INSERT INTO user_logs (userId, role) values ("'+params.ids[2]+'", "'+params.ids[3]+'")');
-                    connection.release();
-                    
-                    return Response.json({status: 200, message:'Updated!'}, {status: 200})
+
+                    // check if the user is logged in or visitor
+                    if(params.ids[4] == 'visitor'){
+                        
+                        const [rows1, fields1] = await connection.execute('INSERT INTO user_logs (userId, role) values ("Visitor", "Visitor")');
+                        connection.release();
+                        return Response.json({status: 200, message:'Updated!'}, {status: 200})
+                    }
+                    else if(params.ids[4] == 'user'){
+                        const [rows, fields] = await connection.execute('SELECT isActive FROM user WHERE id="'+params.ids[2]+'" LIMIT 1');
+
+                        // we record the user log only if the user is active
+                        if(rows.length > 0 && rows[0].isActive == 1){
+                            const [rows1, fields1] = await connection.execute('INSERT INTO user_logs (userId, role) values ("'+params.ids[2]+'", "'+params.ids[3]+'")');
+                            connection.release();
+                            return Response.json({status: 200, message:'Updated!', data:rows[0].isActive}, {status: 200})
+                        }
+                        else {
+                            connection.release();
+                            return Response.json({status: 201, message:'User is not active!',data:0}, {status: 200})
+                        }
+                        
+                    }
                 } catch (error) { // error updating
                     return Response.json({status: 404, message:'No user found!'}, {status: 200})
                 }

@@ -355,7 +355,8 @@ export default function Offers() {
                     offerId: queryResult.data,
                     title: eventTitle,
                     description: eventDescription,
-                    media: '-',
+                    media: eventMedia,
+                    isOpen: 1,
                     createdBy: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id,
                     createdOn: eventInstance,
                     responses: 0,
@@ -889,9 +890,12 @@ export default function Offers() {
                         <span>-</span>
                     )}
                 </TableCell>
+                {row.isOpen == 1 ?
                 <TableCell>
                     <Button variant='ghost' className="mx-1 px-2 text-red-600" onClick={() => closeEvent(row.offerId)}><X size={16} className="text-red-600"/> Close</Button>
                 </TableCell>
+                :
+                ''}
             </TableRow>
             ))}
         </TableBody>
