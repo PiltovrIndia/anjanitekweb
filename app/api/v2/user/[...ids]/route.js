@@ -45,10 +45,8 @@ export async function GET(request,{params}) {
                             return Response.json({status: 200, message:'Updated!', data:rows[0].isActive}, {status: 200})
                         }
                         else {
-                            connection.release();
-                            return Response.json({status: 201, message:'User is not active!',data:0}, {status: 200})
+                            return Response.json({status: 200, message:'User is not active!',data:0}, {status: 200})
                         }
-                        
                     }
                 } catch (error) { // error updating
                     return Response.json({status: 404, message:'No user found!'}, {status: 200})
