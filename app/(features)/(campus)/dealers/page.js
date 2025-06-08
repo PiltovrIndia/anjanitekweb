@@ -146,6 +146,17 @@ fetch("/api/v2/payments/"+pass+"/getpaymentrequest/"+selectedDealerId, {
     },
 });
 
+// add credit to a dealer
+const addCreditAPI = async (pass, selectedDealerId, amount, transactionId, paymentDate, adminId, balance) => 
+    
+fetch("/api/v2/payments/"+pass+"/addcredit/"+amount+"/credit/"+selectedDealerId+"/"+transactionId+"/"+paymentDate+"/"+adminId+"/"+balance, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
 // get the payments of selected dealer
 const getAllPaymentsDataForSelectedAPI = async (pass, selectedDealerId, offset) => 
     
@@ -1002,7 +1013,7 @@ const sendMessageNow = async (e) => {
             const queryResult = await result.json() // get data
 
             // setOffsetPayments(offsetPayments+20); // update the offset for next use
-
+            
             console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
@@ -1023,6 +1034,9 @@ const sendMessageNow = async (e) => {
                     // setDealerPayments(updatedList);
                     setDealerPayments(queryResult.data);
                     // setDealerPending(pendingCount);
+                    
+                    // const firstRowBalance = queryResult.data.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)).length > 0 ? queryResult.data.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))[0].balance : null;
+                    // console.log("Balance from first row with paymentDate DESC:", firstRowBalance);
 
                 }
                 else {
@@ -1259,7 +1273,7 @@ const sendMessageNow = async (e) => {
             const decodedTransactionId = (transactionId.length == 0) ? '-' : encodeURIComponent(transactionId).replace('/', '***');
             
             try {    
-                console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+(paymentType+','+selectePendingdPaymentRequest));
+                // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/"+encodeURIComponent(JSON.stringify(invoicesWithAppliedAmount))+"/-/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+(paymentType+','+selectePendingdPaymentRequest));
                 // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/credit/"+decodedTransactionId+"/"+dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
                 
                 // const result  = await updateInvoicesDataForSelectedAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, invoicesWithAppliedAmount, '-', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, '-'); 
@@ -1310,8 +1324,72 @@ const sendMessageNow = async (e) => {
             }
         }
         else {
-            toast({ description: "Add credit and select invoice", })
+            if(totalCredit > 0){
+                // add credit
+                addCredit(dealerId);
+            }
+            else {
+                toast({ description: "Enter amount to proceed", })
+            }
         }
+    }
+
+    // Add credit to the dealer
+    async function addCredit(dealerId){
+    
+        setUpdatingInvoices(true);
+
+        // check for special characters before passing to api
+        const decodedTransactionId = (transactionId.length == 0) ? '-' : encodeURIComponent(transactionId).replace('/', '***');
+        
+        try {    
+            
+            console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/addcredit/"+totalCredit+"/credit/"+dealerId+"/"+decodedTransactionId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+totalCredit);
+            // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/credit/"+decodedTransactionId+"/"+dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
+            // check for special characters before passing to api
+            
+            const result  = await addCreditAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, decodedTransactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, totalCredit); 
+            const queryResult = await result.json() // get data
+
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+            
+                // reset the numbers to 0
+                setRemainingCredit(0);
+                setTotalCredit(0);
+
+                setTransactionId('');
+                setUpdatingInvoices(false);
+
+                // clear pending request if it is selected
+                const updatedPendingPayments = sortedPendingPayments.filter(payment => payment.paymentId !== selectePendingdPaymentRequest);
+                setSortedPendingPayments(updatedPendingPayments);
+                setSelectePendingdPaymentRequest('-');
+
+                toast({ description: "Added credit balance", })
+                
+            }
+            else if(queryResult.status == 401 || queryResult.status == 201 ) {
+                setTransactionId('');
+                setUpdatingInvoices(false);
+                
+            }
+            else if(queryResult.status == 404) {
+                setTransactionId('');
+                toast({
+                    description: "No more",
+                })
+                
+                setUpdatingInvoices(false);
+                
+            }
+        }
+        catch (e){
+            print(e);
+            toast({ description: "Issue loading. Please refresh or try again later!"+e, })
+        }
+        
     }
 
 
@@ -1997,7 +2075,7 @@ const handlePaymentTypeChange = (value) => {
                                         :
                                         // only one request to be updated at a time
                                         <Card className='flex-1 overflow-auto scroll-smooth'>
-                                            <CardTitle className='m-4 text-md text-pink-600'>Payment requests</CardTitle>
+                                            <CardTitle className='m-4 text-md text-pink-600'>Payment requests / Credits</CardTitle>
                                             {/* <CardHeader>Hello</CardHeader>
                                             <CardDescription>Check</CardDescription> */}
                                             <Table>
@@ -2396,51 +2474,53 @@ const handlePaymentTypeChange = (value) => {
                                 </Sheet>
                             </TooltipProvider>
                     
-                    {/* Payments from Dealer */}
-                    <TooltipProvider delayDuration={100}>
-                        <Sheet>
-                                <Tooltip delayDuration={100}>
-                                    <TooltipTrigger asChild>
-                                    <SheetTrigger asChild>
-                                        <Button variant='ghost' className="mx-1 px-2 text-green-600" onClick={()=>handleDealerPaymentsClick(row)}><CurrencyInr size={24} className="text-blue-600"/></Button>            
-                                    </SheetTrigger>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                    <p>View Payments</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                                
-                                <SheetContent className='flex flex-col min-w-[800px] overflow-scroll'>
-                                    {!selectedDealer ?
-                                    <Skeleton className="h-4 w-[500px] h-[120px]" >
-                                        <div className="flex flex-row m-12">    
-                                            <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-                                            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                        </div>
-                                    </Skeleton> 
-                                    :
-                                    <div>
-                                        <div className="flex-none justify-between items-center mb-2">
-                                        <h2 className="text-lg font-bold">{selectedDealer.accountName}</h2>
-                                        <p className='text-muted-foreground'>{selectedDealer.city}, {selectedDealer.state}</p>
-                                        </div>
-                                        
-                                        <div className="flex flex-row items-end justify-between mb-2">
-                                            <p className='text-black font-medium'>Payments</p>
-                                            {/* <div className="flex flex-row items-end gap-2 mb-2">
-                                                <div className="flex flex-col items-start gap-2">
-                                                    <Label htmlFor="amount" className="text-right">
-                                                    Enter credit amount:
-                                                    </Label>
-                                                    <Input type="number" id="creditAmount" value={totalCredit} onChange={handleCreditAmountChange} className="col-span-3 text-black" placeholder="Enter amount" />
-                                                </div>
-                                                <p className='text-blue-600'>Remaining: {parseFloat(remainingCredit).toFixed(2)}</p>
-                                            </div>
-                                            
-                                            <div className="flex flex-col items-end gap-2 mb-2">
-                                                <p className='text-black'>Total Outstanding: {parseFloat(dealerPending).toFixed(2)}</p>
-                                                {totalCredit > 0 ? <p className='text-blue-600'>New Outstanding: {parseFloat(dealerPending-totalCredit).toFixed(2)}</p> : ''}
-                                            </div> */}
+                    
+                                        <TooltipProvider delayDuration={100}>
+                                            <Sheet>
+                                                    <Tooltip delayDuration={100}>
+                                                        <TooltipTrigger asChild>
+                                                        <SheetTrigger asChild>
+                                                            <Button variant='ghost' className="mx-1 px-2 text-green-600" onClick={()=>handleDealerPaymentsClick(row)}><CurrencyInr size={24} className="text-blue-600"/></Button>            
+                                                        </SheetTrigger>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                        <p>View Payments</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                    
+                                                    <SheetContent className='flex flex-col min-w-[800px] overflow-scroll'>
+                                                        {!selectedDealer ?
+                                                        <Skeleton className="h-4 w-[500px] h-[120px]" >
+                                                            <div className="flex flex-row m-12">    
+                                                                <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                                                                <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                                                            </div>
+                                                        </Skeleton> 
+                                                        :
+                                                        <div>
+                                                            <div className="flex-none justify-between items-center mb-2">
+                                                            <h2 className="text-lg font-bold">{selectedDealer.accountName}</h2>
+                                                            <p className='text-muted-foreground'>{selectedDealer.city}, {selectedDealer.state}</p>
+                                                            </div>
+                                                            <br/>
+                                                            <p className='text-green-600 font-semibold'>Credit Balance: {dealerPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)).length > 0 ? Math.abs(dealerPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))[0].balance) : '0'}</p>
+                                                            <br/>
+                                                            <div className="flex flex-row items-end justify-between mb-2">
+                                                                <p className='text-black font-medium'>Payments</p>
+                                                                {/* <div className="flex flex-row items-end gap-2 mb-2">
+                                                                    <div className="flex flex-col items-start gap-2">
+                                                                        <Label htmlFor="amount" className="text-right">
+                                                                        Enter credit amount:
+                                                                        </Label>
+                                                                        <Input type="number" id="creditAmount" value={totalCredit} onChange={handleCreditAmountChange} className="col-span-3 text-black" placeholder="Enter amount" />
+                                                                    </div>
+                                                                    <p className='text-blue-600'>Remaining: {parseFloat(remainingCredit).toFixed(2)}</p>
+                                                                </div>
+                                                                
+                                                                <div className="flex flex-col items-end gap-2 mb-2">
+                                                                    <p className='text-black'>Total Outstanding: {parseFloat(dealerPending).toFixed(2)}</p>
+                                                                    {totalCredit > 0 ? <p className='text-blue-600'>New Outstanding: {parseFloat(dealerPending-totalCredit).toFixed(2)}</p> : ''}
+                                                                </div> */}
                                         </div>
                                         
                                         {searchingPayments ?

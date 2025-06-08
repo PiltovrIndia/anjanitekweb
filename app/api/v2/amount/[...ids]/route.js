@@ -561,9 +561,9 @@ export async function POST(request, {params}) {
         var status = '';
         var pending = 0;
         // 0
-        // check if there is any dealer's credit that pending with us
+        // check if there is any dealer's credit that pending with us that is approved by admin (adminId != '-')
         // var [rows12, fields] = await connection.query('SELECT COALESCE( (SELECT ABS(balance) FROM payments WHERE id = "'+dealerId+'" ORDER BY paymentDate DESC LIMIT 1), 0) AS balance');
-        var [rows12, fields] = await connection.query('SELECT COALESCE( (SELECT balance FROM payments WHERE id = "'+dealerId+'" ORDER BY paymentDate DESC LIMIT 1), 0) AS balance');
+        var [rows12, fields] = await connection.query('SELECT COALESCE( (SELECT balance FROM payments WHERE id = "'+dealerId+'" AND adminId !="-" ORDER BY paymentDate DESC LIMIT 1), 0) AS balance');
         var creditBalance = rows12[0].balance;
 
         // if there is credit, need to make adjustment to the current invoice that is getting uploaded

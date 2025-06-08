@@ -24,23 +24,22 @@ export async function GET(request,{params}) {
                     var media = (params.ids[4] == '-') ? null: params.ids[4]; // check if media is available
                     const q = 'INSERT INTO offer_event (title, description, media, isOpen, createdBy, createdOn) VALUES ( ?, ?, ?, ?, ?, ?)';
                     const [rows, fields] = await connection.execute(q, [ decodeURIComponent(params.ids[2]), decodeURIComponent(params.ids[3]), media, 1, params.ids[5], currentDate ]);
+                    
+                    // const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where role='Dealer'`);
                     connection.release();
                         // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         
-                        // get the gcm_regIds list from the query result
+                        // // get the gcm_regIds list from the query result
                         // var gcmIds = [];
                         // for (let index = 0; index < nrows.length; index++) {
                         //   const element = nrows[index].gcm_regId;
-                        // //   console.log(element)
+                        
                         //   if(element.length > 3)
                         //     gcmIds.push(element); 
-                        // }
+                        //   }
 
-                        // var gcmIds = 
-                        // console.log(gcmIds);
-
-                        // send the notification
-                        // const notificationResult = gcmIds.length > 0 ? await send_notification(params.ids[5], gcmIds, 'Multiple') : null;
+                        // // send the notification
+                        // const notificationResult = gcmIds.length > 0 ? await send_notification('New offer is available. Grab it now!', gcmIds, 'Multiple') : null;
                             
                         // return successful update
                         return Response.json({status: 200, message:'Offer posted!', data: rows.insertId}, {status: 200})
