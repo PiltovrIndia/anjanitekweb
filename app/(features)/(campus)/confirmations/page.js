@@ -563,7 +563,7 @@ console.log(queryResult);
         <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px', overflow:'scroll'}}>
             
           <div className='flex flex-row gap-2 items-center py-4' >
-              <h2 className="text-xl font-semibold mr-4">Invoices</h2>
+              <h2 className="text-xl font-semibold mr-4">Balance Confirmations</h2>
               
               
                 
@@ -573,7 +573,7 @@ console.log(queryResult);
                     </SheetTrigger>
                     <SheetContent className='overflow-y-scroll'>
                         <SheetHeader>
-                        <SheetTitle>Create Invoice</SheetTitle>
+                        <SheetTitle>Create Confirmation Request</SheetTitle>
                         <SheetDescription>
                             Make sure you enter all details correctly. Click Create now to create.
                         </SheetDescription>

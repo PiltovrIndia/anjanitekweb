@@ -62,21 +62,43 @@ export async function GET(request,{params}) {
           }
           if(params.ids[1] == 'addcredit'){
             
-            // get the previous balance value a given dealer if the balance value is negative
-            const [balanceResult] = await connection.query('SELECT CAST(balance AS DECIMAL(10, 2)) as bal FROM payments WHERE id="'+params.ids[4]+'" AND type="credit" AND balance < 0 ORDER BY paymentDate DESC LIMIT 1');
-            let newbal = parseFloat(-params.ids[8]) + parseFloat(balanceResult[0]?.bal || 0);
-            
-            // Add the credit to the dealer
-            const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
-            const [payments] = await connection.query(q,[params.ids[2], '', params.ids[3], params.ids[4],'-',params.ids[5].replace('***','/'),params.ids[6], params.ids[7],'-', newbal]);
-            connection.release();
-            
-            if(payments.insertId > 0){
+            // check if there is any pending payment request from the dealer that admin is approving
+            if(params.ids[9] == '-'){
+              
+              // get the previous balance value of a dealer if the balance value is negative
+              const [balanceResult] = await connection.query('SELECT CAST(balance AS DECIMAL(10, 2)) as bal FROM payments WHERE id="'+params.ids[4]+'" AND type="credit" AND balance < 0 ORDER BY paymentDate DESC LIMIT 1');
+              let newbal = parseFloat(-params.ids[8]) + parseFloat(balanceResult[0]?.bal || 0);
+              
+              // Add the credit to the dealer
+              const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)) )';
+              const [payments] = await connection.query(q,[params.ids[2], '', params.ids[3], params.ids[4],'-',params.ids[5].replace('***','/'),params.ids[6], params.ids[7],'-', newbal]);
+              connection.release();
+              
+              if(payments.insertId > 0){
                 return Response.json({status: 200, message:'Updated!', id: payments.insertId}, {status: 200})
+              }
+              else {
+                return Response.json({status: 201, message:'No data found!'}, {status: 200})
+              }
+
             }
             else {
+              // update the payment request with the admin approval
+              
+              // Add the credit to the dealer
+              const [payments] = await connection.query('UPDATE payments SET adminId="'+params.ids[7]+'" WHERE paymentId='+params.ids[9]);
+              connection.release();
+              
+              if(payments.affectedRows > 0){
+                return Response.json({status: 200, message:'Updated!', id: payments.insertId}, {status: 200})
+              }
+              else {
                 return Response.json({status: 201, message:'No data found!'}, {status: 200})
+              }
+
             }
+
+            
           }
           if(params.ids[1] == 'paymentrequest'){
             // dealer can place a payment request for approval by admin

@@ -147,9 +147,9 @@ fetch("/api/v2/payments/"+pass+"/getpaymentrequest/"+selectedDealerId, {
 });
 
 // add credit to a dealer
-const addCreditAPI = async (pass, selectedDealerId, amount, transactionId, paymentDate, adminId, balance) => 
+const addCreditAPI = async (pass, selectedDealerId, amount, transactionId, paymentDate, adminId, balance, paymentId) => 
     
-fetch("/api/v2/payments/"+pass+"/addcredit/"+amount+"/credit/"+selectedDealerId+"/"+transactionId+"/"+paymentDate+"/"+adminId+"/"+balance, {
+fetch("/api/v2/payments/"+pass+"/addcredit/"+amount+"/credit/"+selectedDealerId+"/"+transactionId+"/"+paymentDate+"/"+adminId+"/"+balance+"/"+paymentId, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -1323,6 +1323,7 @@ const sendMessageNow = async (e) => {
                 toast({ description: "Issue loading. Please refresh or try again later!"+e, })
             }
         }
+       
         else {
             if(totalCredit > 0){
                 // add credit
@@ -1344,11 +1345,11 @@ const sendMessageNow = async (e) => {
         
         try {    
             
-            console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/addcredit/"+totalCredit+"/credit/"+dealerId+"/"+decodedTransactionId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+totalCredit);
+            console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/addcredit/"+totalCredit+"/credit/"+dealerId+"/"+decodedTransactionId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+totalCredit+"/"+selectePendingdPaymentRequest);
             // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/credit/"+decodedTransactionId+"/"+dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
             // check for special characters before passing to api
             
-            const result  = await addCreditAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, decodedTransactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, totalCredit); 
+            const result  = await addCreditAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, decodedTransactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, totalCredit, selectePendingdPaymentRequest); 
             const queryResult = await result.json() // get data
 
             console.log(queryResult);

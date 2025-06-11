@@ -25,22 +25,22 @@ export async function GET(request,{params}) {
                     const q = 'INSERT INTO offer_event (title, description, media, isOpen, createdBy, createdOn) VALUES ( ?, ?, ?, ?, ?, ?)';
                     const [rows, fields] = await connection.execute(q, [ decodeURIComponent(params.ids[2]), decodeURIComponent(params.ids[3]), media, 1, params.ids[5], currentDate ]);
                     
-                    // const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where role='Dealer'`);
+                    const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where role='Dealer' and isActive=1 and gcm_regId IS NOT NULL and gcm_regId != ''`);
                     connection.release();
                         // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         
-                        // // get the gcm_regIds list from the query result
-                        // var gcmIds = [];
-                        // for (let index = 0; index < nrows.length; index++) {
-                        //   const element = nrows[index].gcm_regId;
+                        // get the gcm_regIds list from the query result
+                        var gcmIds = [];
+                        for (let index = 0; index < nrows.length; index++) {
+                          const element = nrows[index].gcm_regId;
                         
-                        //   if(element.length > 3)
-                        //     gcmIds.push(element); 
-                        //   }
+                          if(element.length > 3)
+                            gcmIds.push(element); 
+                          }
 
-                        // // send the notification
-                        // const notificationResult = gcmIds.length > 0 ? await send_notification('New offer is available. Grab it now!', gcmIds, 'Multiple') : null;
-                            
+                        // send the notification
+                        const notificationResult = gcmIds.length > 0 ? await send_notification('New offer is available. Grab it now!', gcmIds, 'Multiple') : null;
+                        
                         // return successful update
                         return Response.json({status: 200, message:'Offer posted!', data: rows.insertId}, {status: 200})
                 } catch (error) {
@@ -87,6 +87,16 @@ export async function GET(request,{params}) {
                 const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], currentDate ]);
                 connection.release();
                 
+                // send notification to the dealer and his hierarchy
+                const [rowsD, fieldsD] = await connection.execute('SELECT name, relatedTo FROM user WHERE role="Dealer" AND id="'+params.ids[3]+'"');
+
+                var gcm_regIds = [];
+                rowsD[0].relatedTo.split(',').map((item) => {
+                  gcm_regIds.push(item);
+                });
+
+                var notificationResult = await send_notification(rowsD[0].name+" is interested in AnjaniTek offer!", gcm_regIds, 'Multiple');
+                
                 if(rows.insertId > 0){
                     return Response.json({status: 200, message:'Response sent!'}, {status: 200})
                 }
@@ -96,6 +106,17 @@ export async function GET(request,{params}) {
             }
             else if(params.ids[1] == 4){ // get the details of responses for a given offer event
               const [rows, fields] = await connection.execute('SELECT r.*, u.name, u.email, u.mobile from offer_response r JOIN user u ON r.dealer = u.id where r.offerId ="'+params.ids[2]+'"');
+              connection.release();
+          
+              if(rows.length > 0){
+                  return Response.json({status: 200, message:'Data found!', data: rows}, {status: 200})
+              }
+              else {
+                  return Response.json({status: 404, message:'No data!'}, {status: 200})
+              }
+            }
+            else if(params.ids[1] == 4.1){ // get the dealer details of responses for a given offer event under an hierarchy
+              const [rows, fields] = await connection.execute('SELECT r.offerId, r.dealer, r.createdOn, u.name, u.email, u.mobile, u.mapTo from offer_response r JOIN user u ON r.dealer = u.id where r.offerId ="'+params.ids[2]+'" AND u.role="Dealer" AND u.relatedTo LIKE "%'+params.ids[3]+'%"');
               connection.release();
           
               if(rows.length > 0){
@@ -137,50 +158,48 @@ export async function GET(request,{params}) {
   // use the playerIds of the users.
   // check if playerId length > 2
   async function send_notification(message, playerId, type) {
-    // console.log(playerId);
-        return new Promise(async (resolve, reject) => {
-          // send notification only if there is playerId for the user
-          if (playerId.length > 0) {
-            // var playerIds = [];
-            // playerIds.push(playerId);
-      
-            var notification;
-            // notification object
-            if (type == 'Single') {
-              notification = {
-                contents: {
-                  'en': message,
-                },
-                // include_player_ids: ['playerId'],
-                // include_player_ids: ['90323-043'],
-                include_player_ids: [playerId],
-              };
-            } else {
-              notification = {
-                contents: {
-                  'en': message,
-                },
-                include_player_ids: playerId,
-              };
-            }
-      
-            try {
-              // create notification
-              const notificationResult = await client.createNotification(notification);
-              
-              resolve(notificationResult);
-    
-            } catch (error) {
-            //     console.log('ok');
-            //   console.log(error);
-              resolve(null);
-            }
-          } else {
-            // console.log('ok1');console.log(error);
-            resolve(null);
-          }
-        });
+    return new Promise(async (resolve, reject) => {
+      // send notification only if there is playerId for the user
+      if (playerId.length > 0) {
+        var playerIds = [];
+        playerIds.push(playerId);
+  
+        var notification;
+        // notification object
+        if (type == 'Single') {
+          notification = {
+            contents: {
+              'en': message,
+            },
+            // include_player_ids: ['playerId'],
+            // include_player_ids: ['90323-043'],
+            include_external_user_ids: [playerId],
+          };
+        } else {
+          notification = {
+            contents: {
+              'en': message,
+            },
+            include_external_user_ids: playerId,
+          };
+        }
+  
+        try {
+          
+          // create notification
+          const notificationResult = await client.createNotification(notification);
+          
+          resolve(notificationResult);
+
+        } catch (error) {
+          
+          resolve(null);
+        }
+      } else {
+        resolve(null);
       }
+    });
+  }
     
     
     

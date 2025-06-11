@@ -625,8 +625,37 @@ export async function POST(request, {params}) {
         const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
         const [rows124, fields124] = await connection.execute(q1, [ adminId, dealerId, currentDate1, decodeURIComponent('Invoice number '+invoiceNo+' with '+totalAmount+' Amount is raised and due.'), 0, '-' ]);
 
+        
+        // var gcm_regIds = [];
+        // const [rowsD, fieldsD] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND id="'+dealerId+'"');
+        // if(rowsD.length > 0){
+        //     gcm_regIds.push(dealerId);
+        // }
+        // const [rowsS, fieldsS] = await connection.execute('SELECT * FROM user WHERE role IN ("SalesExecutive","SalesManager","StateHead") AND id="'+rowsD[0].mapTo+'"');
+        // if(rowsS.length > 0){
+        //     // console.log('Sales Executive/Manager/StateHead: ', rowsS[0].id);
+        //     gcm_regIds.push(rowsS[0].id);
+        // }
+        // const [rowsH, fieldsH] = await connection.execute('SELECT * FROM user WHERE role IN ("SalesManager","StateHead") AND id="'+rowsS[0].mapTo+'"');
+        // if(rowsH.length > 0){
+        //     // console.log('Sales Manager/StateHead: ', rowsH[0].id);
+        //     gcm_regIds.push(rowsH[0].id);
+        // }
+
+        // send notification to the dealer and his hierarchy
+        const [rowsD, fieldsD] = await connection.execute('SELECT name, relatedTo FROM user WHERE role="Dealer" AND id="'+dealerId+'"');
+
+        var gcm_regIds = [];
+        rowsD[0].relatedTo.split(',').map((item) => {
+          gcm_regIds.push(item);
+        });
+
+            //   console.log('GCM RegIds: ', gcm_regIds);
+
         // send the notification
-        var notificationResult = await send_notification("Invoice: "+invoiceNo+" updated!", dealerId, 'Single');
+        // var notificationResult = await send_notification("Invoice: "+invoiceNo+" updated!", dealerId, 'Single');
+        var notificationResult = await send_notification("Invoice: "+invoiceNo+" added to "+rowsD[0].name, gcm_regIds, 'Multiple');
+
 
         await connection.commit();
     } catch (error) {

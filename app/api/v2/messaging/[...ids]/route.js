@@ -298,7 +298,7 @@ export async function GET(request,{params}) {
               
               // get the dealers
               if(endList.length > 0){
-                  return Response.json({status: 200, data: endList, message:'Details found!'}, {status: 200})
+                  return Response.json({status: 200, data: endList[0], message:'Details found!'}, {status: 200})
               }
               else {
                   return Response.json({status: 404, message:'No Data found!'}, {status: 200})
@@ -311,6 +311,7 @@ export async function GET(request,{params}) {
               // get the list of executives mapped to SalesManager
               const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+params.ids[3]+'"');
               var rows2 = [];
+              
               const promises = rows.map(async (row) => {
                   const [rows1, fields1] = await connection.execute('SELECT DISTINCT(n.sender), u.name FROM `notifications` n JOIN user u ON n.sender=u.id where LENGTH(n.sender) > 2 and n.receiver="'+row.id+'" and n.seen=0');
                   if(rows1.length > 0)
@@ -318,12 +319,13 @@ export async function GET(request,{params}) {
                   // })
               });
               await Promise.all(promises); // wait till above finishes
-
+              // console.log(rows2);
+              // console.log(rows2[0]);
               connection.release();
 
               // get the dealers
               if(rows2.length > 0){
-                  return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                  return Response.json({status: 200, data: rows2[0], message:'Details found!'}, {status: 200})
               }
               else {
                   return Response.json({status: 404, message:'No Data found!'}, {status: 200})
