@@ -496,6 +496,13 @@ export async function POST(request, {params}) {
 
         // 4
         // send notification to Dealer(s)
+        // send notification to the dealer and his hierarchy
+        // const [rowsD, fieldsD] = await connection.execute('SELECT name, relatedTo FROM user WHERE role="Dealer" AND id="'+dealerId+'"');
+
+        // var gcm_regIds = [];
+        // rowsD[0].relatedTo.split(',').map((item) => {
+        //   gcm_regIds.push(item);
+        // });
 
         // get the gcm_regIds of Students to notify
             // Split the branches string into an array

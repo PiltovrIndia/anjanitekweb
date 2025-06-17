@@ -650,7 +650,7 @@ export async function POST(request, {params}) {
           gcm_regIds.push(item);
         });
 
-            //   console.log('GCM RegIds: ', gcm_regIds);
+              console.log('GCM RegIds: ', gcm_regIds);
 
         // send the notification
         // var notificationResult = await send_notification("Invoice: "+invoiceNo+" updated!", dealerId, 'Single');

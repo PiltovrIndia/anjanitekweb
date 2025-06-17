@@ -743,6 +743,8 @@ export default function Outing() {
                         item.address2 = item.address2.replace('/', '***');
                         item.address3 = item.address3.replace('/', '***');
                         
+                        item.relatedTo = allSalesPeople.find(salesperson => salesperson.name?.trim().toLowerCase() === item.mapTo?.trim().toLowerCase())?.id;
+                        
                         item.mapTo = allSalesPeople.find(salesperson => salesperson.name?.trim().toLowerCase() === item.mapTo?.trim().toLowerCase())?.id;
                         
                         
@@ -774,8 +776,8 @@ export default function Outing() {
         setBulkUploading(true);
         
         try {    
-            // console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U33/-");
-            // console.log(items1);
+            console.log("/api/v2/user/"+process.env.NEXT_PUBLIC_API_PASS+"/U33/-");
+            console.log(items1);
             
             const result  = await updateBulkDealersData(process.env.NEXT_PUBLIC_API_PASS, items1)
             const queryResult = await result.json() // get data
@@ -2116,7 +2118,28 @@ const handlePaymentTypeChange = (value) => {
                                                                                 
                                                                             {/* </DialogDescription> */}
                                                                         </DialogHeader>
-                                                                        <Image src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/receipt%2F'+item.particular+'?alt=media'} alt="Receipt" width={850} height={700} className="mt-2 h-full object-cover rounded-lg" />
+                                                                        {item.particular.endsWith('.pdf') ? (
+                                                                            <iframe
+                                                                                src={`https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/receipt%2F${item.particular}?alt=media`}
+                                                                                // width="100%"
+                                                                                // height="600px"
+                                                                                // className="rounded-lg"
+                                                                                width={'100%'} height={'600px'} className="mt-2 h-100% object-cover rounded-lg"
+                                                                            />
+                                                                        ) : item.particular.endsWith('.doc') || item.particular.endsWith('.docx') ? (
+                                                                            <iframe
+                                                                                src={`https://view.officeapps.live.com/op/embed.aspx?src=https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/receipt%2F${item.particular}?alt=media`}
+                                                                                // width="100%"
+                                                                                // height="600px"
+                                                                                // className="rounded-lg"
+                                                                                width={'100%'} height={'600px'} className="mt-2 h-100% object-cover rounded-lg"
+                                                                            />
+                                                                        ) : item.particular.endsWith('.jpg') || item.particular.endsWith('.jpeg') || item.particular.endsWith('.png') || item.particular.endsWith('.webp') ? (
+                                                                            <Image src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/receipt%2F'+item.particular+'?alt=media'} alt="Receipt" width={850} height={700} className="mt-2 h-full object-cover rounded-lg" />
+                                                                        ) : (
+                                                                            <p className="text-red-500">Unsupported file type</p>
+                                                                        )}
+                                                                        {/* <Image src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/receipt%2F'+item.particular+'?alt=media'} alt="Receipt" width={850} height={700} className="mt-2 h-full object-cover rounded-lg" /> */}
                                                                         <DialogFooter>
                                                                             <DialogClose asChild>
                                                                                 <Button variant="secondary">Close</Button>

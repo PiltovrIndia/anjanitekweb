@@ -39,37 +39,36 @@ export async function GET(request,{params}) {
                     
 
                     // send notification to notification specific dealer
+                    // if(params.ids[8] != null){
+                    //   if(params.ids[8] == 'Dealer'){
 
+                    //   }
+                    // }
+                    // else {
                     // get the gcm_regIds of Students to notify
                         // Split the branches string into an array
                         var conditionsString = '';
                         var query = '';
-                        if(params.ids[3]!='All'){ // check for the student type
-                            // conditionsString = conditionsString + ' userId="'+params.ids[3]+'" ';
+                        if(params.ids[3]!='All'){ 
                             query = 'SELECT gcm_regId FROM user where id="'+params.ids[3]+'" AND CHAR_LENGTH(gcm_regId) > 3';
                         }
                         else {
-                            // conditionsString = conditionsString + ' role="dealer" ';
                             // check if state is provided?
                             if(params.ids[7] == '-'){
                               query = 'SELECT gcm_regId from user where role="Dealer" AND CHAR_LENGTH(gcm_regId) > 3'
                             }
                             else {
-                              query = 'SELECT u.gcm_regId from user u JOIN dealer d where d.dealerId=u.id AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
+                              query = 'SELECT u.gcm_regId from user u JOIN dealer d ON d.dealerId=u.id where u.role="Dealer" AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
                             }
                         }
-                        console.log(query);
-                        
-                        // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
                         const [nrows, nfields] = await connection.execute(query);
                         connection.release();
-                        // console.log(`SELECT gcm_regId FROM user where ${conditionsString} `);
                         
                         // get the gcm_regIds list from the query result
                         var gcmIds = [];
                         for (let index = 0; index < nrows.length; index++) {
                           const element = nrows[index].gcm_regId;
-                        //   console.log(element)
+                        
                           if(element.length > 3)
                             gcmIds.push(element); 
                         }
@@ -98,6 +97,55 @@ export async function GET(request,{params}) {
                             
                         // return successful update
                         return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
+
+
+                    // return the user data
+                    // return Response.json({status: 200, message: ' Circular created!'}, {status: 200})
+                } catch (error) {
+                    // user doesn't exist in the system
+                    return Response.json({status: 404, message:'Error creating notification. Please try again later!'+error.message}, {status: 200})
+                }
+            }
+            if(params.ids[1] == 0.1){ // create notification
+                try {
+                    // create query for insert
+                    const q = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
+                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], params.ids[7] ]);
+                    
+
+                    // send notification to notification specific dealer
+                    if(params.ids[8] != null){
+                      if(params.ids[8] == 'Dealer'){
+                        
+                        const [rowsD, fieldsD] = await connection.execute('SELECT name, relatedTo FROM user WHERE role="Dealer" AND id="'+params.ids[2]+'"');
+                        connection.release();
+
+                        var gcm_regIds = [];
+                        rowsD[0].relatedTo.split(',').map((item) => {
+                          gcm_regIds.push(item);
+                        });
+                        var notificationResult = await send_notification("New message from "+rowsD[0].name+": "+decodeURIComponent(params.ids[5])+"", gcm_regIds, 'Multiple');
+
+                        // return successful update
+                        return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
+                      }
+                      else {
+                        const [rowsD, fieldsD] = await connection.execute('SELECT gcm_regId FROM user WHERE role="Dealer" AND id="'+params.ids[3]+'"');
+                        connection.release();
+
+                        var gcm_regIds = [];
+                        rowsD[0].relatedTo.split(',').map((item) => {
+                          gcm_regIds.push(item);
+                        });
+                        var notificationResult = await send_notification("New message: "+decodeURIComponent(params.ids[5])+"", gcm_regIds, 'Single');
+
+                        // return successful update
+                        return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
+                      }
+                    }
+                    
+                    // return successful update
+                    // return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
 
 
                     // return the user data

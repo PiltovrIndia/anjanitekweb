@@ -432,12 +432,9 @@ export async function GET(request,{params}) {
                                 AND DATE(i.expiryDate) <= DATE_ADD(CURDATE(), INTERVAL `+params.ids[4]+` DAY)  -- Invoices expiring within the next 5 days
                                 `+dList+`
                                 ORDER BY i.expiryDate ASC`;
-                            
-console.log(query);
+                   
 
                                 const [rows1, fields1] = await connection.execute(query);
-                                console.log(rows1);
-                                
                                 connection.release();
                                 // return successful update
 
@@ -641,7 +638,6 @@ console.log(query);
 
                     // check if user is found
                     if(rows.length > 0){
-                        console.log(rows.length);
                         
                         // return the requests data
                         return Response.json({status: 200, length: rows.length, data: rows, message:'Data found!'}, {status: 200})
@@ -667,7 +663,6 @@ console.log(query);
 
                     // check if user is found
                     if(rows.length > 0){
-                        console.log(rows.length);
                         
                         // return the requests data
                         return Response.json({status: 200, length: rows.length, data: rows, message:'Data found!'}, {status: 200})
@@ -693,7 +688,6 @@ console.log(query);
 
                     // check if user is found
                     if(rows.length > 0){
-                        console.log(rows.length);
                         
                         // return the requests data
                         return Response.json({status: 200, length: rows.length, data: rows, message:'Data found!'}, {status: 200})
@@ -713,14 +707,12 @@ console.log(query);
             else if(params.ids[1] == 'U10'){
                 try {
                     const [rows, fields] = await connection.execute('UPDATE user SET mapTo="'+params.ids[3]+'" where id = "'+params.ids[4]+'"');
-                    console.log('UPDATE user SET mapTo="'+params.ids[4]+'" where id = "'+params.ids[3]+'"');
                     
                     connection.release();
                     // return successful update
 
                     // check if user is found
                     if(rows.affectedRows > 0){
-                        console.log(rows.length);
                         
                         // return the requests data
                         return Response.json({status: 200, message:'Updated!'}, {status: 200})
@@ -1002,10 +994,10 @@ export async function POST(request, {params}) {
         
         for (const [index, item] of items.entries()){
             
-            let p = 'INSERT INTO user (id, name, email, mobile, role, designation, mapTo, userImage, gcm_regId, isActive) VALUES (?,?,?,?,?,?,?,?,?,?)';
+            let p = 'INSERT INTO user (id, name, email, mobile, role, designation, mapTo, relatedTo, userImage, gcm_regId, isActive) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
             let p1 = 'INSERT INTO dealer (dealerId, accountName, salesId, address1, address2, address3, city, district, state, gst, id) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
 
-            const [pRows] = await connection.query(p,[item.gst, item.accountName, item.email, item.mobile, 'Dealer', 'Dealer', item.mapTo, '-', '-', 1]);
+            const [pRows] = await connection.query(p,[item.gst, item.accountName, item.email, item.mobile, 'Dealer', 'Dealer', item.mapTo, item.relatedTo, '-', '-', 1]);
             const [p1Rows] = await connection.query(p1,[item.gst, item.accountName, item.mapTo, item.address1.replace('***', '/'), item.address2.replace('***', '/'), item.address3.replace('***', '/'), item.city, item.district, item.state, item.gst, item.dealerId]);
         }
 
