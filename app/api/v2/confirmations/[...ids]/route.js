@@ -118,6 +118,16 @@ export async function GET(request,{params}) {
                     connection.release();
                     
                     if(rows.affectedRows > 0){
+                        // send notification to all dealers
+                        const [rowsD, fieldsD] = await connection.execute('SELECT gcm_regId FROM user WHERE role="Dealer" AND isActive=1');
+
+                        var gcm_regIds = [];
+                        rowsD.map((item) => {
+                            gcm_regIds.push(item.gcm_regId);
+                        });
+
+                        await send_notification("Confirm your balance with AnjaniTek as of "+dayjs(new Date(params.ids[2])).format('DD-MMM-YYYY'), gcm_regIds, 'Multiple');
+                        
                         return Response.json({status: 200, message: 'Confirmation event created!', id: rows.insertId}, {status: 200})
                     }
                     else {

@@ -644,17 +644,17 @@ export async function POST(request, {params}) {
 
         // send notification to the dealer and his hierarchy
         const [rowsD, fieldsD] = await connection.execute('SELECT name, relatedTo FROM user WHERE role="Dealer" AND id="'+dealerId+'"');
-
+        
         var gcm_regIds = [];
         rowsD[0].relatedTo.split(',').map((item) => {
           gcm_regIds.push(item);
         });
 
-              console.log('GCM RegIds: ', gcm_regIds);
+        var notificationResult1 = await send_notification("Invoice: "+invoiceNo+" is added!", dealerId, 'Single');
 
         // send the notification
         // var notificationResult = await send_notification("Invoice: "+invoiceNo+" updated!", dealerId, 'Single');
-        var notificationResult = await send_notification("Invoice: "+invoiceNo+" added to "+rowsD[0].name, gcm_regIds, 'Multiple');
+        var notificationResult = await send_notification("Invoice: "+invoiceNo+" added for "+rowsD[0].name, gcm_regIds, 'Multiple');
 
 
         await connection.commit();

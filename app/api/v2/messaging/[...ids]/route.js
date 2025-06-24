@@ -112,7 +112,6 @@ export async function GET(request,{params}) {
                     const q = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
                     const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], params.ids[4], decodeURIComponent(params.ids[5]), params.ids[6], params.ids[7] ]);
                     
-
                     // send notification to notification specific dealer
                     if(params.ids[8] != null){
                       if(params.ids[8] == 'Dealer'){
@@ -130,13 +129,12 @@ export async function GET(request,{params}) {
                         return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
                       }
                       else {
-                        const [rowsD, fieldsD] = await connection.execute('SELECT gcm_regId FROM user WHERE role="Dealer" AND id="'+params.ids[3]+'"');
+                        
                         connection.release();
 
                         var gcm_regIds = [];
-                        rowsD[0].relatedTo.split(',').map((item) => {
-                          gcm_regIds.push(item);
-                        });
+                        gcm_regIds.push(params.ids[3]); // dealer has gcm_regId same as dealerId
+                        
                         var notificationResult = await send_notification("New message: "+decodeURIComponent(params.ids[5])+"", gcm_regIds, 'Single');
 
                         // return successful update
@@ -144,12 +142,6 @@ export async function GET(request,{params}) {
                       }
                     }
                     
-                    // return successful update
-                    // return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
-
-
-                    // return the user data
-                    // return Response.json({status: 200, message: ' Circular created!'}, {status: 200})
                 } catch (error) {
                     // user doesn't exist in the system
                     return Response.json({status: 404, message:'Error creating notification. Please try again later!'+error.message}, {status: 200})

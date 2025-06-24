@@ -87,7 +87,7 @@ export async function GET(request,{params}) {
                 const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], currentDate ]);
                 connection.release();
                 
-                // send notification to the dealer and his hierarchy
+                // send notification to the dealer's hierarchy
                 const [rowsD, fieldsD] = await connection.execute('SELECT name, relatedTo FROM user WHERE role="Dealer" AND id="'+params.ids[3]+'"');
 
                 var gcm_regIds = [];
@@ -95,7 +95,7 @@ export async function GET(request,{params}) {
                   gcm_regIds.push(item);
                 });
 
-                var notificationResult = await send_notification(rowsD[0].name+" is interested in AnjaniTek offer!", gcm_regIds, 'Multiple');
+                await send_notification(rowsD[0].name+" is interested in AnjaniTek offer!", gcm_regIds, 'Multiple');
                 
                 if(rows.insertId > 0){
                     return Response.json({status: 200, message:'Response sent!'}, {status: 200})

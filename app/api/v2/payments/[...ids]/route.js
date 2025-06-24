@@ -337,35 +337,46 @@ export async function POST(request, {params}) {
           msg = "Payment of ₹"+amount+" is updated due to "+transactionId;
         }
 
-        // get the gcm_regIds of Students to notify
-            // Split the branches string into an array
-            var query = 'SELECT u.name, u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo) as mappedTo FROM user u where u.id="'+id+'"';
-            const [nrows, nfields] = await connection.execute(query);
+        // get the gcm_regIds of dealer & hierarchy to notify
+        const [rowsD, fieldsD] = await connection.execute('SELECT name, mapTo, relatedTo FROM user WHERE role="Dealer" AND id="'+id+'"');
+
+        // var gcm_regIds_dealer = [];
+        // gcm_regIds_dealer.push(id);
+        var gcm_regIds = [];
+        rowsD[0].relatedTo.split(',').map((item) => {
+          gcm_regIds.push(item);
+        });
+
+        await send_notification(msg, id, 'Single');
+        await send_notification('Payment of ₹'+amount+' is updated for '+rowsD[0].name, gcm_regIds, 'Multiple');
+
+            // var query = 'SELECT u.name, u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo) as mappedTo FROM user u where u.id="'+id+'"';
+            // const [nrows, nfields] = await connection.execute(query);
             
-            // get the gcm_regIds list from the query result
-            var gcmIds = [];
-            for (let index = 0; index < nrows.length; index++) {
-              const element = nrows[index].gcm_regId;
-              const element1 = nrows[index].mappedTo;
-              const dealer_name = nrows[index].name;
+            // // get the gcm_regIds list from the query result
+            // var gcmIds = [];
+            // for (let index = 0; index < nrows.length; index++) {
+            //   const element = nrows[index].gcm_regId;
+            //   const element1 = nrows[index].mappedTo;
+            //   const dealer_name = nrows[index].name;
               
-              if(element.length > 3){
-                gcmIds.push(element); 
-                // send notification to the dealer
-                const notificationResult = await send_notification(msg, element, 'Single');
-              }
-              if(element1.length > 3){
-                gcmIds.push(element1); 
-                // send notification to the executive
-                const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+dealer_name, element1, 'Single');
-              }
-            }
+            //   if(element.length > 3){
+            //     gcmIds.push(element); 
+            //     // send notification to the dealer
+            //     const notificationResult = await send_notification(msg, element, 'Single');
+            //   }
+            //   if(element1.length > 3){
+            //     gcmIds.push(element1); 
+            //     // send notification to the executive
+            //     const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+dealer_name, element1, 'Single');
+            //   }
+            // }
 
         // 5
         // Include in the chat history
         // create query for insert
         const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
-        const [rows, fields] = await connection.execute(q1, [ nrows[0].mapTo, id, paymentDate, decodeURIComponent(msg), 0, '-' ]);
+        const [rows, fields] = await connection.execute(q1, [ rowsD[0].mapTo, id, paymentDate, decodeURIComponent(msg), 0, '-' ]);
         connection.release();
 
         await connection.commit();
