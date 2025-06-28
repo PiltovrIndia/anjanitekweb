@@ -82,9 +82,19 @@ const xlsx = require('xlsx');
 
 
 // get dealer count by location
-const getStats = async (pass, role, id) => 
+const getStats = async (pass, role) => 
   
-    fetch("/api/v2/dealerstats/"+pass+"/0/"+role+"/"+id, {
+    fetch("/api/v2/appinstalls/"+pass+"/0/"+role, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+    });
+// get anjani installed users
+const getAnjaniInstalledUsers = async (pass, role) => 
+  
+    fetch("/api/v2/appinstalls/"+pass+"/1/"+role, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -229,6 +239,8 @@ export default function AppReports() {
     const [searching, setSearching] = useState(false);
     const [messaging, setMessaging] = useState(false);
 
+    const [usersList, setUsersList] = useState([]);
+    const [anjaniUserCount, setAnjaniUserCount] = useState(0);
     const [regionsList, setRegionsList] = useState([]);
     const [allRequests, setAllRequests] = useState([]);
     const pieColors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
@@ -359,45 +371,24 @@ export default function AppReports() {
 
         try {    
             
-            const result  = await getStats(process.env.NEXT_PUBLIC_API_PASS, role, id)
+            const result  = await getStats(process.env.NEXT_PUBLIC_API_PASS, role)
             const queryResult = await result.json() // get data
-            // console.log(queryResult);
-            // check for the status
+            const result1  = await getAnjaniInstalledUsers(process.env.NEXT_PUBLIC_API_PASS, role)
+            const queryResult1 = await result1.json() // get data
+            console.log(queryResult1);
+            
             if(queryResult.status == 200){
 
                 // check if data exits
                 if(queryResult.data.length > 0){
-                    // console.log(queryResult.data);
-                    // set the state
-                    // total students
+                    
                     const result = queryResult.data;
+                    const result2 = queryResult1.data;
                     
                     if (result && result.length > 0) {
-                        
-                        // Calculate total sum of pending amounts
-                        // const totalSum = result.reduce((sum, invoice) => sum + invoice.pending, 0);
-                        // console.log(totalSum);
-                        
-
-                            // Find the earliest expiry date
-                            // const earliestExpiryDate = result
-                            // .map(invoice => dayjs(invoice.expiryDate))  // Convert all expiry dates to dayjs objects
-                            // .reduce((earliest, currentExpiry) => {
-                            //     return earliest.isBefore(currentExpiry) ? earliest : currentExpiry;
-                            // }, dayjs('9999-12-31'));
-               
-                            // // Calculate the difference in days
-                            // const today = dayjs();  // Gets today's date
-                            // const daysBetween = earliestExpiryDate.diff(today, 'day');  // 'day' ensures the difference is calculated in days
-
-                            // // Format the earliest date in a friendly format, e.g., January 1, 2023
-                            // // const formattedDate = formatDate(earliestExpiryDate, 'MMMM d, yyyy');
-                            // const formattedDate = dayjs(earliestExpiryDate).format('MMMM D, YYYY');
-
-                            setRegionsList(result);
-                            // setTotalOutstanding(totalSum);
-                            // setDueDate(formattedDate);
-                            // setDaysLeft(daysBetween);
+                    
+                            setUsersList(result);
+                            setAnjaniUserCount(result2[0].count);
                         
                       } else {
                         console.log("No invoices data found.");
@@ -948,59 +939,7 @@ const sendMessageNow = async (e) => {
     <div className={styles.verticalsection} style={{height:'90vh', width:'100%',gap:'8px',overflow: 'auto', scrollBehavior:'smooth'}}>
 
     <div className='flex flex-row gap-2 items-center py-4' >
-        <h2 className="text-lg font-semibold mr-4">Dashboard</h2>
-
-            {/* <Sheet>
-                <SheetTrigger asChild>
-                    <Button className="text-white bg-green-600"><Receipt className='font-bold text-lg'/>&nbsp; Upload Invoices Data</Button>
-                </SheetTrigger>
-                <SheetContent>
-                    <SheetHeader>
-                    <SheetTitle>File upload</SheetTitle>
-                    <SheetDescription>
-                        Make sure you use the correct format. Click Upload now when file is selected.
-                    </SheetDescription>
-                    </SheetHeader>
-                    <div className="grid gap-4 py-4">
-                        <br/>
-                        <div className="grid w-full max-w-sm items-center gap-1.5">
-                            <Label htmlFor="picture">Data file</Label>
-                            <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
-                        </div>
-                    </div>
-                    <SheetFooter>
-                    <SheetClose asChild>
-                        <Button type="submit" onClick={processInvoicesData}>Upload now</Button>
-                    </SheetClose>
-                    </SheetFooter>
-                </SheetContent>
-            </Sheet> */}
-            
-            <Sheet>
-                <SheetTrigger asChild>
-                    <Button className="text-white bg-blue-700"><CurrencyInr className='font-bold text-lg'/>&nbsp; Upload Payments Data</Button>
-                </SheetTrigger>
-                <SheetContent>
-                    <SheetHeader>
-                    <SheetTitle>File upload</SheetTitle>
-                    <SheetDescription>
-                        Make sure you use the correct format. Click Upload now when file is selected.
-                    </SheetDescription>
-                    </SheetHeader>
-                    <div className="grid gap-4 py-4">
-                        <br/>
-                        <div className="grid w-full max-w-sm items-center gap-1.5">
-                            <Label htmlFor="picture">Data file</Label>
-                            <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
-                        </div>
-                    </div>
-                    <SheetFooter>
-                    <SheetClose asChild>
-                        <Button type="submit" onClick={processData}>Upload now</Button>
-                    </SheetClose>
-                    </SheetFooter>
-                </SheetContent>
-            </Sheet>
+        <h2 className="text-lg font-semibold mr-4">App Reports</h2>
 
             {uploadProgress ? <Card className="w-[350px]">
                 <CardHeader>
@@ -1068,66 +1007,50 @@ const sendMessageNow = async (e) => {
 
 {/* {(allRequests.length !=0) ? */}
 <div className="mx-auto" style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',gap:'10px'}}>
-{/* <div className="container mx-auto py-10"> */}
-{/* <div>{allRequests.length}</div> */}
-    
-<div className={cn("grid gap-2 mb-4")} style={{display:'flex', flexDirection:'column', alignItems:'start'}}>
-
-<Tabs defaultValue={currentState} className="w-[400px]">
-    <TabsList>
-      {/* <TabsTrigger value="All" onClick={()=>updateStatus('All')}>All States</TabsTrigger> */}
-
-      {regionsList.map(regionItem => (
-        <TabsTrigger key={regionItem.state} value={regionItem.state} onClick={()=>updateStatus(regionItem.state)}>{regionItem.state}</TabsTrigger>
-        // <TabsTrigger value={regionItem.state} onClick={()=>updateStatus(regionItem.state)}>{regionItem.state.split('-')[1]}</TabsTrigger>
-      ))}
-    </TabsList>
-  </Tabs>
-</div>
 
     {searchingStats ? <Skeleton className="h-4 w-[300px] h-[100px]" /> :
         <div className="flex flex-col gap-2 mb-4" >
             
-            {(regionsList.length > 0) ?
+            
                 <div  className="flex flex-row gap-2">
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
                         <div className="flex flex-row gap-2 items-center">
-                            <p className='text-s text-gray-600 font-normal'>Total Outstanding</p>
+                            <p className='text-s text-gray-600 font-bold'>Total Downloads</p>
                         </div>
-                        <p className='text-xl text-black font-semibold tracking-wider'>₹{formatter.format(regionsList.find(item => item.state === currentState).pendingATL + regionsList.find(item => item.state === currentState).pendingVCL)}</p>
+                        <p className='text-xl text-black font-semibold tracking-wider'>701</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
                         <div className="flex flex-row gap-2 items-center">
-                            <p className='text-s text-gray-600 font-normal'>Outstanding </p>
+                            <p className='text-s text-gray-600 font-normal'>Downloads </p>
                             <div className="text-sm font-semibold bg-rose-500 text-rose-100 px-1.5 w-fit border border-rose-600 rounded-2xl tracking-wider">
-                                ATL
+                                Android
                             </div>
                         </div>
-                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>₹{formatter.format(regionsList.find(item => item.state === currentState).pendingATL)}</p>
+                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>491</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={1}>
                         <div className="flex flex-row gap-2 items-center">
-                            <p className='text-s text-gray-600 font-normal'>Outstanding </p>
+                            <p className='text-s text-gray-600 font-normal'>Downloads </p>
                             <div className="text-sm font-semibold bg-red-700 text-red-100 px-1.5 w-fit border border-red-800 rounded-2xl tracking-wider">
-                                VCL
+                                iOS
                             </div>
                         </div>
-                        <p className='text-xl text-red-700 font-semibold tracking-wider'>₹{formatter.format(regionsList.find(item => item.state === currentState).pendingVCL)}</p>
+                        <p className='text-xl text-red-700 font-semibold tracking-wider'>210</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={2}>
-                        <p className='text-s text-gray-600 font-normal'>Pending Invoices</p>
-                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).invoices}</p>
+                        <p className='text-s text-gray-600 font-normal'>AnjaniTek users</p>
+                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{anjaniUserCount}</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={3}>
-                        <p className='text-s text-gray-600 font-normal'>Due / Total Dealers</p>
-                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).dealersDue} / {regionsList.find(item => item.state === currentState).dealers}</p>
+                        <p className='text-s text-gray-600 font-normal'>Visitors</p>
+                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{701 - anjaniUserCount}</p>
                     </Card>
                     {/* <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={4}>
                         <p className='text-s text-gray-600 font-normal'>Total Dealers</p>
                         <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).dealers}</p>
                     </Card> */}
                 </div>
-                    : null}
+                    
 
             {/* <div  className="flex flex-row gap-2">
             {regionsList.map(regionItem => (
@@ -1142,57 +1065,40 @@ const sendMessageNow = async (e) => {
             </div> */}
         </div>
             }
-        
+        <div className='w-full overflow-auto'>
+        <p className='text-s text-black font-semibold py-4'>Latest App updated users: {usersList.length}</p>
+        <table className="table-auto border-collapse border border-gray-300 w-full text-left overflow-auto">
+                                            <thead>
+                                            <tr>
+                                                <th className="bg-gray-100 border border-gray-300 px-4 py-2 text-nowrap text-xs">S.No.</th>
+                                                <th className="bg-gray-100 border border-gray-300 px-4 py-2 text-nowrap text-xs">Name</th>
+                                                <th className="bg-gray-100 border border-gray-300 px-4 py-2 text-nowrap text-xs">Last active at</th>
 
-        <Card className="w-fit px-3 py-3 flex flex-row justify-between items-center gap-8">
-            <div>
-                {/* <p className='text-m text-green-700'>{regionItem.state.split('-')[1]}</p>
-                <Label className='text-l font-semibold'>₹{formatter.format(regionItem.pending)}</Label> */}
-                {days == 0 ?
-                    <p className="text-m font-semibold text-red-600 pb-4">Dealers with due date expired</p>
-                    :
-                    <p className="text-m text-slate-500 pb-4">Dealers with due in:<span className="text-red-600 font-semibold"> {days} days</span></p>
-                }
-                <Slider 
-                    // defaultValue={[45]} 
-                    max={100} 
-                    step={1} 
-                    value={[days]}
-                    onValueChange={updateDays}
-                    className="relative z-10"
-                    aria-label="Counter from 0 to 100"
-                    />
-            </div>
-            <Button variant="outline" className="bg-black text-white" size="sm" onClick={() => getAllRequests(days, currentState)} >Apply</Button>
-            {searching ? 
-            <div className="flex flex-row px-4">    
-                <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-                <p className='text-black '>Loading...</p> 
-            </div>
-            :
-            ''}
-            
-        </Card>
+                                                <th className="bg-orange-100 border border-orange-300 px-4 py-2 text-nowrap text-xs">Role</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {usersList.length > 0 ? (
+                                                usersList.map((user, index) => (
+                                                    <tr key={user.userId} className="hover:bg-gray-50">
+                                                        <td className="border border-gray-300 px-4 py-2 text-nowrap text-sm">{index + 1}</td>
+                                                        <td className="border border-gray-300 px-4 py-2 text-nowrap text-sm">{user.name || '-'}</td>
+                                                        <td className="border border-gray-300 px-4 py-2 text-nowrap text-slate-600 text-xs">{user.latestTimestamp ? dayjs(user.latestTimestamp).format('DD-MMM-YYYY hh:mm A') : '-'}</td>
 
-        {/* <p className="text-m text-slate-500">Due in {days} days</p>
-            <Slider 
-                // defaultValue={[45]} 
-                max={100} 
-                step={1} 
-                value={[days]}
-                onValueChange={updateDays}
-                className="relative z-10"
-                aria-label="Counter from 0 to 100"
-                /> */}
-        
-        {/* <div className="flex flex-row">
-
-            <DataTable data={allRequests} dataOffset={offset} status={currentState} changeSelectedDealer={selectDealer} showPaymentView={selectPaymentView} downloadNow={downloadRequestsNow} requestAgain={updateOffset} loadingIds={loadingIds} handleMessageSendClick={handleMessageSendClick}/>
-        
-        
-      </div> */}
-      {/* <DataTable columns={columns} data={allRequests} status={currentState} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset}/> */}
-      
+                                                        <td className="border border-gray-300 px-4 py-2 text-nowrap text-sm">{user.role || '-'}</td>
+                                                        
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="9" className="border border-gray-300 px-4 py-2 text-nowrap text-center">
+                                                        No data available
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                    </div>
     </div>
     {/* : null} */}
 

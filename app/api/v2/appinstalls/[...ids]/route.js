@@ -1,3 +1,63 @@
+import pool from '../../../db'
+// const OneSignal = require('onesignal-node')
+import { Keyverify } from '../../../secretverify';
+
+// const client = new OneSignal.Client(process.env.ONE_SIGNAL_APPID, process.env.ONE_SIGNAL_APIKEY)
+// if 0, get all campuses list
+// else, get campus record of specifc campusId
+export async function GET(request,{params}) {
+
+    const connection = await pool.getConnection();
+    
+        try{
+
+          // authorize secret key
+        if(await Keyverify(params.ids[0])){
+            // authorize secret key
+            if(params.ids[1] == '0'){
+
+              var query = '';
+              
+              if(params.ids[2]=='SuperAdmin' || params.ids[2]=='GlobalAdmin'){
+                    const [rows2, fields2] = await connection.execute(`SELECT DISTINCT(l.userId), u.name, COUNT(*) AS logCount, u.role, MAX(l.timestamp) AS latestTimestamp FROM user_logs l JOIN user u ON l.userId = u.id GROUP BY l.userId, u.name, u.role ORDER BY FIELD(u.role, 'Dealer', 'SalesExecutive', 'SalesManager', 'StateHead', 'SuperAdmin', 'GlobalAdmin')`);
+                    connection.release();
+                    return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                }
+                else {
+                    connection.release();
+                    return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                }
+            }
+            if(params.ids[1] == '1'){
+
+              var query = '';
+              
+              if(params.ids[2]=='SuperAdmin' || params.ids[2]=='GlobalAdmin'){
+                    const [rows2, fields2] = await connection.execute(`SELECT count(*) as count FROM user where LENGTH(gcm_regId) > 1;`);
+                    connection.release();
+                    return Response.json({status: 200, data: rows2, message:'Details found!'}, {status: 200})
+                }
+                else {
+                    connection.release();
+                    return Response.json({status: 404, message:'No Data found!'}, {status: 200})
+                }
+            }
+            
+          }
+          else {
+            // wrong secret key
+            return Response.json({status: 401, message:'Unauthorized'}, {status: 200})
+          }
+        }
+        catch (err){
+            // some error occured
+            return Response.json({status: 500, message:'Facing issues. Please try again!'+err.message}, {status: 200})
+        }
+        
+    
+  }
+  
+
 // // import jwt from 'jsonwebtoken';
 // // import path from 'path';
 // // import fs from 'fs';
