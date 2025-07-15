@@ -1017,7 +1017,7 @@ const sendMessageNow = async (e) => {
                         <div className="flex flex-row gap-2 items-center">
                             <p className='text-s text-gray-600 font-bold'>Total Downloads</p>
                         </div>
-                        <p className='text-xl text-black font-semibold tracking-wider'>701</p>
+                        <p className='text-xl text-black font-semibold tracking-wider'>723</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
                         <div className="flex flex-row gap-2 items-center">
@@ -1026,7 +1026,7 @@ const sendMessageNow = async (e) => {
                                 Android
                             </div>
                         </div>
-                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>491</p>
+                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>501</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={1}>
                         <div className="flex flex-row gap-2 items-center">
@@ -1035,7 +1035,7 @@ const sendMessageNow = async (e) => {
                                 iOS
                             </div>
                         </div>
-                        <p className='text-xl text-red-700 font-semibold tracking-wider'>210</p>
+                        <p className='text-xl text-red-700 font-semibold tracking-wider'>222</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={2}>
                         <p className='text-s text-gray-600 font-normal'>AnjaniTek users</p>
