@@ -546,11 +546,14 @@ export async function GET(request,{params}) {
               // get the pending amount of each sales executive
               var q3 = "SELECT SUM(p.total_pending) as total, u.mapTo as id FROM user u JOIN (SELECT billTo, SUM(pending) AS total_pending FROM invoices WHERE status != 'Paid' GROUP BY billTo) AS p ON u.id = p.billTo GROUP BY u.mapTo;"
 
+              var q4 = 'SELECT total_pending as total, u.id as id FROM user u JOIN (SELECT billTo, SUM(pending) AS total_pending FROM invoices WHERE status != "Paid" GROUP BY billTo) AS p ON u.id = p.billTo';
+
               const [r1, f1] = await connection.execute(q1);
               const [r2, f2] = await connection.execute(q2);
               const [r3, f3] = await connection.execute(q3);
+              const [r4, f4] = await connection.execute(q4);
 
-              const combinedResults = [...r1, ...r2, ...r3];
+              const combinedResults = [...r1, ...r2, ...r3, ...r4];
               return Response.json({status: 200, message:'Data found!', data: combinedResults}, {status: 200})
 
             }

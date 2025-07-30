@@ -1,9 +1,8 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, XCircle, Plus, CurrencyInr, Receipt } from 'phosphor-react'
+import { Check, Checks, PaperPlaneRight, X } from 'phosphor-react'
 import React, { useRef, useEffect, useState } from 'react'
-import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
 import Biscuits from 'universal-cookie'
@@ -11,70 +10,34 @@ const biscuits = new Biscuits
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 // import ImageWithShimmer from '../../components/imagewithshimmer'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel} from '@/app/components/ui/select'
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/app/components/ui/dropdown-menu"
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,} from "@/app/components/ui/dialog"
-import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger,} from "@/app/components/ui/drawer"
-import { Separator } from "@/app/components/ui/separator"
-import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group"
 import { Label } from "@/app/components/ui/label"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import { 
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle, } from "@/app/components/ui/card"
-import { Checkbox } from "@/app/components/ui/checkbox"
 
-import Image from 'next/image'
 
-import path from 'path'
 
 
 
 
 // import { EnvelopeOpenIcon } from "@radix-ui/react-icons"
 import { Toaster } from "../../../components/ui/sonner"
-import { toast, ToastAction } from "sonner"
-import Toast from '../../../components/myui/toast'
 import { useToast } from "@/app/components/ui/use-toast"
 import { Textarea } from "@/app/components/ui/textarea"
 import { Button } from "@/app/components/ui/button"
-import { Slider } from "@/app/components/ui/slider"
-import { cn } from "@/app/lib/utils"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs"
 
-import {
-    Table,
-    TableBody,
-    TableCaption,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from "@/app/components/ui/table"
   
 // import {columns} from "./columns"
 // import {DataTable} from "./data-table"
-import {
-    Sheet,
-    SheetClose,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-  } from "../../../components/ui/sheet"
 
 // import { columns } from "@/app/components/columns"
 // import { DataTable } from "@/app/components/data-table"
-import { UserNav } from "@/app/components/user-nav"
 import { Input } from '@/app/components/ui/input';
 import * as XLSX from 'xlsx';
-import { get } from 'http';
 
 
 const xlsx = require('xlsx');
@@ -106,28 +69,6 @@ const getAnjaniInstalledUsers = async (pass, role) =>
 const getAllDealersDataAPI = async (pass, role, offset, days, state, id) => 
   
 fetch("/api/v2/user/"+pass+"/U5/"+role+"/"+offset+"/"+days+"/"+state+"/"+id, {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-
-  // get the list of messages sent and received by a person to the admin
-  const getSenderMessages = async (pass, sender, receiver) => 
-    fetch("/api/v2/messaging/"+pass+"/4/"+sender+"/"+receiver, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-    });
-
-// get message to dealers
-const sendBroadcastMessage = async (pass, sender, receiver, sentAt, message, seen, state) => 
-  
-fetch("/api/v2/messaging/"+pass+"/0/"+sender+"/"+receiver+"/"+sentAt+"/"+message+"/"+seen+"/"+state, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -266,49 +207,6 @@ export default function AppReports() {
     ///////////////////////////////
     
 
-  // get messages of a specific receiver
-  async function getSenderMessagesData(receiver){
-        
-    // console.log(receiver);
-    
-    setSearchingMessages(true);
-    setSenderMessagesList([]);
-    // setOffset(offset+10); // update the offset for every call
-
-    try {    
-        const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, receiver)
-        const queryResult = await result.json() // get data
-        // console.log(queryResult);
-        // check for the status
-        if(queryResult.status == 200){
-
-            // check if data exits
-            if(queryResult.data.length > 0){
-                
-                // get the messages list of the receiver
-                setSenderMessagesList(queryResult.data);
-                
-                setDataFound(true);
-                setSearchingMessages(false);
-            }
-            else {
-                
-                setDataFound(false);
-            }
-            setCompleted(false);
-        }
-        else {
-            
-            setSearchingMessages(false);
-            setDataFound(false);
-            setCompleted(true);
-        }
-    }
-    catch (e){
-        // show and hide message
-        
-    }
-}
 
 
     // get the user and fire the data fetch
@@ -424,12 +322,7 @@ export default function AppReports() {
         }
 }
 
-    function updateDays(updatedDaysCount) {
-        
-        // getAllRequests(updatedDaysCount[0], currentState);
-        setDays(updatedDaysCount[0]);
-        
-    }
+
 
     // Get requests for a particular role
     // role – SuperAdmin
@@ -504,97 +397,7 @@ export default function AppReports() {
         }
 }
 
-function downloadRequestsNow() {
-    const result = allRequests;
-
-    const worksheet = xlsx.utils.json_to_sheet(result);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook,worksheet,'Sheet 123');
-    xlsx.writeFile(workbook, selectedCampus+'_'+currentState+'_'+dayjs(from).format("YYYY-MM-DD") + "," + dayjs(to).format("YYYY-MM-DD")+'.xlsx');
-}
-
-// Show Message View for selected user
-function selectDealer(value) {
     
-    // getAllRequests(days,value);
-    setSelectedDealer(value);
-    setShowMessageView(true);
-    setShowPaymentView(false); // hide other view
-    getSenderMessagesData(value);
-    
-}
-// Show Payment View for selected user
-function selectPaymentView(value) {
-    
-    // getAllRequests(days,value);
-    setSelectedDealer(value);
-    setShowPaymentView(true);
-    setShowMessageView(false); // hide other view
-    // getSenderMessagesData(value);
-    
-}
-// update the currentState variable
-function updateStatus(value) {
-    
-    getAllRequests(days,value);
-    setCurrentState(value);
-    
-}
-// update the currentState variable
-function updateOffset(value) {
-    
-    console.log(value);
-    getAllRequests(days,value);
-    setOffset(value+10);
-    
-}
-
-    
-
-
-const sendMessageNow = async (e) => {
-    
-    setMessaging(true);
-    
-    try {    
-        
-
-        const result  = await sendBroadcastMessage(process.env.NEXT_PUBLIC_API_PASS, 
-            JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, 'All', dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), document.getElementById('message').value,0,'-') 
-        const queryResult = await result.json() // get data
-
-        // console.log(queryResult);
-        // check for the status
-        if(queryResult.status == 200){
-
-            setMessaging(false);
-            toast("Message sent!", {
-                description: "Message sent to all dealers",
-                action: {
-                  label: "Okay",
-                  onClick: () => console.log("Okay"),
-                },
-              });
-
-        }
-        else if(queryResult.status != 200) {
-            
-            setMessaging(false);
-        }
-    }
-    catch (e){
-        
-        // show and hide message
-        setMessaging(false);
-        setResultType('error');
-        setResultMessage('Issue loading. Please refresh or try again later!');
-        setTimeout(function(){
-            setResultType('');
-            setResultMessage('');
-        }, 3000);
-    }
-    
-}
 
 
     // send message to a specific receiver
@@ -1017,7 +820,7 @@ const sendMessageNow = async (e) => {
                         <div className="flex flex-row gap-2 items-center">
                             <p className='text-s text-gray-600 font-bold'>Total Downloads</p>
                         </div>
-                        <p className='text-xl text-black font-semibold tracking-wider'>723</p>
+                        <p className='text-xl text-black font-semibold tracking-wider'>742</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
                         <div className="flex flex-row gap-2 items-center">
@@ -1026,7 +829,7 @@ const sendMessageNow = async (e) => {
                                 Android
                             </div>
                         </div>
-                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>501</p>
+                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>509</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={1}>
                         <div className="flex flex-row gap-2 items-center">
@@ -1035,7 +838,7 @@ const sendMessageNow = async (e) => {
                                 iOS
                             </div>
                         </div>
-                        <p className='text-xl text-red-700 font-semibold tracking-wider'>222</p>
+                        <p className='text-xl text-red-700 font-semibold tracking-wider'>233</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={2}>
                         <p className='text-s text-gray-600 font-normal'>AnjaniTek users</p>
@@ -1073,8 +876,9 @@ const sendMessageNow = async (e) => {
                                                 <th className="bg-gray-100 border border-gray-300 px-4 py-2 text-nowrap text-xs">S.No.</th>
                                                 <th className="bg-gray-100 border border-gray-300 px-4 py-2 text-nowrap text-xs">Name</th>
                                                 <th className="bg-gray-100 border border-gray-300 px-4 py-2 text-nowrap text-xs">Last active at</th>
+                                                <th className="bg-gray-100 border border-gray-300 px-4 py-2 text-nowrap text-xs">App opened</th>
 
-                                                <th className="bg-orange-100 border border-orange-300 px-4 py-2 text-nowrap text-xs">Role</th>
+                                                <th className="bg-gray-100 border border-gray-300 px-4 py-2 text-nowrap text-xs">Role</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1085,6 +889,7 @@ const sendMessageNow = async (e) => {
                                                         <td className="border border-gray-300 px-4 py-2 text-nowrap text-sm">{user.name || '-'}</td>
                                                         <td className="border border-gray-300 px-4 py-2 text-nowrap text-slate-600 text-xs">{user.latestTimestamp ? dayjs(user.latestTimestamp).format('DD-MMM-YYYY hh:mm A') : '-'}</td>
 
+                                                        <td className="border border-gray-300 px-4 py-2 text-nowrap text-sm">{user.logCount || '-'}</td>
                                                         <td className="border border-gray-300 px-4 py-2 text-nowrap text-sm">{user.role || '-'}</td>
                                                         
                                                     </tr>
