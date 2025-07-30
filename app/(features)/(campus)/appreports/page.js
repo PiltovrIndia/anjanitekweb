@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { Check, Checks, FileXls, PaperPlaneRight, X } from 'phosphor-react'
+import { Check, Checks, FileXls, PaperPlaneRight, SpinnerGap, X } from 'phosphor-react'
 import React, { useRef, useEffect, useState } from 'react'
 const inter = Inter({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
