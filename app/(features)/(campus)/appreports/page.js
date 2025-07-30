@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { Check, Checks, PaperPlaneRight, X } from 'phosphor-react'
+import { Check, Checks, FileXls, PaperPlaneRight, X } from 'phosphor-react'
 import React, { useRef, useEffect, useState } from 'react'
 const inter = Inter({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
@@ -168,7 +168,7 @@ export default function AppReports() {
     // branch type selection whether all branches and years or specific ones
     const [branchTypeSelection, setBranchTypeSelection] = useState('all');
     
-    const [selectedBranchYears, setSelectedBranchYears] = useState([]);
+    const [downloading, setDownloading] = useState(false);
     const [resultType, setResultType] = useState('');
     const [resultMessage, setResultMessage] = useState('');
 
@@ -323,6 +323,80 @@ export default function AppReports() {
 }
 
 
+    function downloadReportsDataNowExcel() {
+    
+        setDownloading(true);
+        
+        console.log("Downloading...");
+        // Create a new workbook and worksheets
+        const workbook = xlsx.utils.book_new();
+        const worksheet1 = xlsx.utils.aoa_to_sheet([["ANJNAITEK APP REPORTS"]]);
+        worksheet1['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+    
+        // Manually add header row to the worksheets
+        xlsx.utils.sheet_add_aoa(worksheet1, [["REPORT ON : "+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()]], { origin: "A2" });
+        
+        // Manually add header row to the worksheets
+        // xlsx.utils.sheet_add_aoa(worksheet1, [Object.keys(outingRequestsListing[0])], { origin: "A3" });
+    
+        // // Now add the data starting from the next row
+        // xlsx.utils.sheet_add_json(worksheet1, outingRequestsListing, { origin: "A4", skipHeader: true });
+    
+
+        xlsx.utils.sheet_add_aoa(
+            worksheet1, 
+            usersList.length > 0 
+                ? [["Name", "Last active at", "App opened", "Role"]] // Replace with the desired column names
+                : [], 
+            { origin: "A3" }
+        );
+          
+        const selectedColumns = usersList.map(({
+            name, latestTimestamp, logCount, role
+        }) => ([
+            name,
+            latestTimestamp ? dayjs(latestTimestamp).format('DD-MMM-YYYY hh:mm A') : '-',
+            logCount,
+            role
+        ]));
+        
+        
+        xlsx.utils.sheet_add_json(worksheet1, selectedColumns, { origin: "A4", skipHeader: true });
+        
+        
+        // Apply bold style to the first two rows
+        const boldStyle = { font: { bold: true } };
+    
+        // Apply the bold style to the first row
+        worksheet1['A1'].s = boldStyle;
+        worksheet1['A2'].s = boldStyle;
+        
+        for (let col = 0; col < 8; col++) {
+            const cellRef1 = xlsx.utils.encode_cell({ r: 0, c: col });
+            const cellRef2 = xlsx.utils.encode_cell({ r: 1, c: col });
+    
+            if (!worksheet1[cellRef1]) worksheet1[cellRef1] = {};
+            if (!worksheet1[cellRef2]) worksheet1[cellRef2] = {};
+    
+            worksheet1[cellRef1].s = boldStyle;
+            worksheet1[cellRef2].s = boldStyle;
+    
+        }
+    
+        // Apply autofilter to the data range (excluding the fixed header rows)
+        // worksheet2['!autofilter'] = { ref: 'A3:H' + (expandedStrengths.length + 1) };
+    
+        // // workbook
+        // const workbook = xlsx.utils.book_new();
+    
+        xlsx.utils.book_append_sheet(workbook,worksheet1,'Outings');
+    
+        // worksheet1['!freeze'] = {xSplit: 0, ySplit: 2};
+        // worksheet1['!autofilter']={ref: v }
+        xlsx.writeFile(workbook, 'App_Report_'+dayjs(today.toDate()).format("DD-MM-YYYY hh:mm A").toString()+'.xlsx');
+    
+        setDownloading(false);
+    }
 
     // Get requests for a particular role
     // role – SuperAdmin
@@ -743,7 +817,22 @@ export default function AppReports() {
 
     <div className='flex flex-row gap-2 items-center py-4' >
         <h2 className="text-lg font-semibold mr-4">App Reports</h2>
-
+ 
+                                        {(usersList.length > 0) && (
+                                            <div className="flex flex-row justify-end mb-4 gap-2">
+                                                
+                                                {downloading ? <div className={styles.horizontalsection}>
+                                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
+                                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                                                </div> : 
+                                                <Button variant="outline" onClick={() => downloadReportsDataNowExcel()} className='border-green-600 bg-green-50'>
+                                                    <FileXls className="mr-2 h-6 w-6 text-green-600"/>
+                                                    Download Report in Excel
+                                                </Button>
+                                                }
+                                            </div>
+                                        )}
+                                        
             {uploadProgress ? <Card className="w-[350px]">
                 <CardHeader>
                     <CardTitle>Uploading ...</CardTitle>
