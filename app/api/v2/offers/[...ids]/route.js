@@ -116,7 +116,15 @@ export async function GET(request,{params}) {
               }
             }
             else if(params.ids[1] == 4.1){ // get the dealer details of responses for a given offer event under an hierarchy
-              const [rows, fields] = await connection.execute('SELECT r.offerId, r.dealer, r.createdOn, u.name, u.email, u.mobile, u.mapTo from offer_response r JOIN user u ON r.dealer = u.id where r.offerId ="'+params.ids[2]+'" AND u.role="Dealer" AND u.relatedTo LIKE "%'+params.ids[3]+'%"');
+
+              var q = '';
+              if(params.ids[4] == 'GlobalAdmin' || params.ids[4] == 'SuperAdmin'){
+                q = 'SELECT r.offerId, r.dealer, r.createdOn, u.name, u.email, u.mobile, u.mapTo from offer_response r JOIN user u ON r.dealer = u.id where r.offerId ="'+params.ids[2]+'" AND u.role="Dealer"';
+              }
+              else {
+                q = 'SELECT r.offerId, r.dealer, r.createdOn, u.name, u.email, u.mobile, u.mapTo from offer_response r JOIN user u ON r.dealer = u.id where r.offerId ="'+params.ids[2]+'" AND u.role="Dealer" AND u.relatedTo LIKE "%'+params.ids[3]+'%"';
+              }
+              const [rows, fields] = await connection.execute(q);
               connection.release();
           
               if(rows.length > 0){
