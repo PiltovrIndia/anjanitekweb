@@ -548,7 +548,7 @@ export default function Forecasting() {
                                 <TableHead className="border-r border-gray-200 text-xs text-nowrap">Design</TableHead>
                                 {skusList.length > 0 ? (
                                                     skusList[0]["dates"].map((saleDate, index) => (
-                                                        <TableHead className="border-r border-gray-200 text-xs text-nowrap">{saleDate}</TableHead>
+                                                        <TableHead key={index} className="border-r border-gray-200 text-xs text-nowrap">{saleDate}</TableHead>
                                                     ))
                                                 ) : ''}
                                 {(skusList.length > 0 && skusList[0]["forecast"] != null) ?
