@@ -213,6 +213,17 @@ export async function POST(request, {params}) {
 
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
+          else if(params.ids[1] == 'delete_receipt'){
+            
+            const paymentItem = await request.json();
+            
+            // items.forEach(async (item, index) => {
+              console.log(`Item :`, paymentItem.invoiceNo);
+              await deletePaymentReceipt(paymentItem);
+            // });
+
+            return Response.json({status: 200, message:'Success!'}, {status: 200})
+          }
           else {
               return Response.json({status: 404, message:'Not found!'}, {status: 200})
           }
@@ -607,6 +618,64 @@ export async function POST(request, {params}) {
         // Delete in the chat history
         // create query for delete
         const q11 = await connection.query('DELETE FROM notifications WHERE receiver = "'+paymentItem.id+'" and sentAt = "'+dayjs(new Date(paymentItem.paymentDate)).format('YYYY-MM-DD HH:mm:ss')+'"',[]);
+        // const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
+        // const [rows, fields] = await connection.execute(q11, [ paymentItem.id, dayjs(new Date(paymentItem.paymentDate)).format('YYYY-MM-DD HH:mm:ss')]);
+        connection.release();
+
+        await connection.commit();
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+  }
+  async function deletePaymentReceipt(paymentItem) {
+    
+    // get the pool connection to db
+    const connection = await pool.getConnection();
+    
+    try {
+        await connection.beginTransaction();
+        
+        // // 1. get the pending invoices and amounts to each invoice for the given payment
+        // // 2. update (add) the invoices table with pending amount for the selected invoices
+        // // 3. delete the payment from payments table
+        // // 4. Delete the notification in the chat history and SENT BY will be the respective executive.
+
+        // // 1
+        // const invoices = paymentItem.invoiceNo.split(','); // await connection.query(query1,[]);
+        // const amounts = paymentItem.amounts.split(','); // await connection.query(query1,[]);
+
+
+        // // 2
+        // // collect the invoices list for updating in payments table
+        // for (let index = 0; index < invoices.length; index++) {
+        //   const invoice = invoices[index];
+        //   const amount = parseFloat(amounts[index]);
+
+        //   const [selectedInvoice] = await connection.query('SELECT * FROM invoices WHERE invoiceNo = "'+invoice+'" ORDER BY invoiceDate DESC LIMIT 1',[]);
+          
+        //     if (amount <= 0) break;
+
+        //     // check if amount being paid is more, accordingly we need to update the status
+        //     const updatedPending = selectedInvoice[0].pending + amount;
+            
+        //     // get the updated status
+        //     let newStatus = (updatedPending == selectedInvoice[0].totalAmount) ? 'NotPaid' : 'PartialPaid';
+
+        //     await connection.query(`UPDATE invoices SET amountPaid = amountPaid - `+amount+`, pending = pending + `+amount+`, status = "`+newStatus+`" WHERE invoiceNo = "`+invoice+`"`, []);
+            
+        // }
+
+        // 3
+        // delete from payments list
+        const del = await connection.query('DELETE FROM payments WHERE paymentId = '+paymentItem.paymentId,[]);
+
+        // 4
+        // Delete in the chat history
+        // create query for delete
+        // const q11 = await connection.query('DELETE FROM notifications WHERE receiver = "'+paymentItem.id+'" and sentAt = "'+dayjs(new Date(paymentItem.paymentDate)).format('YYYY-MM-DD HH:mm:ss')+'"',[]);
         // const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
         // const [rows, fields] = await connection.execute(q11, [ paymentItem.id, dayjs(new Date(paymentItem.paymentDate)).format('YYYY-MM-DD HH:mm:ss')]);
         connection.release();

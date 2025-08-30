@@ -203,6 +203,18 @@ fetch("/api/v2/payments/"+pass+"/delete", {
     body: JSON.stringify(paymentItem),
 });
 
+// delete payment receipt of selected dealer
+const deleteSelectedPaymentReceiptOfSelectedDealerAPI = async (pass, paymentItem) => 
+    // id, paymentAmount, invoiceList, transactionId, paymentDate, adminId, particular
+fetch("/api/v2/payments/"+pass+"/delete_receipt", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+    body: JSON.stringify(paymentItem),
+});
+
 
 // get the SalesManagers for SalesExecutives
 const getAllSalesPersonsDataAPI = async (pass, role, offset) => 
@@ -1034,7 +1046,14 @@ const sendMessageNow = async (e) => {
                     //     return { ...invoice, appliedAmount: 0, remaining: invoice.pending };
                     // });
                     // setDealerPayments(updatedList);
+                    // Use dayjs for date comparison
+                    // const sortedPayments12 = queryResult.data.sort((a, b) => b.balance - a.balance);
+                    // setDealerPayments(sortedPayments12);
+                    // console.log("Sorted Payments:", sortedPayments12);
+                    
+
                     setDealerPayments(queryResult.data);
+                    
                     // setDealerPending(pendingCount);
                     
                     // const firstRowBalance = queryResult.data.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)).length > 0 ? queryResult.data.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))[0].balance : null;
@@ -1078,7 +1097,8 @@ const sendMessageNow = async (e) => {
 
         try {    
             
-            const result  = await deleteSelectedPaymentOfSelectedDealerAPI(process.env.NEXT_PUBLIC_API_PASS, payment) 
+            
+            const result  = payment.invoiceNo.length > 2 ? await deleteSelectedPaymentOfSelectedDealerAPI(process.env.NEXT_PUBLIC_API_PASS, payment) : await deleteSelectedPaymentReceiptOfSelectedDealerAPI(process.env.NEXT_PUBLIC_API_PASS, payment) 
             const queryResult = await result.json() // get data
 
             // setOffsetPayments(offsetPayments+20); // update the offset for next use
@@ -2089,6 +2109,7 @@ const handlePaymentTypeChange = (value) => {
                                                     <TableHead>Payment date</TableHead>
                                                     <TableHead>Amount</TableHead>
                                                     <TableHead>Receipt</TableHead>
+                                                    {/* <TableHead> </TableHead> */}
                                                     {/* <TableHead>Pending</TableHead>
                                                     <TableHead>Balance</TableHead> */}
                                                     
@@ -2149,6 +2170,9 @@ const handlePaymentTypeChange = (value) => {
 
                                                             </Dialog>
                                                         </TableCell>
+
+                                                        {/* <TableCell><Button variant='ghost' className="text-red-600">Delete</Button></TableCell> */}
+
                                                         {/* <TableCell className='flex flex-row items-center py-2'> 
                                                             <div>{parseFloat(item.pending).toFixed(2)}</div> 
                                                             {(item.appliedAmount > 0) ? <div className='text-red-600'> - {item.appliedAmount}</div> : ''}
@@ -2527,7 +2551,14 @@ const handlePaymentTypeChange = (value) => {
                                                             <p className='text-muted-foreground'>{selectedDealer.city}, {selectedDealer.state}</p>
                                                             </div>
                                                             <br/>
-                                                            <p className='text-green-600 font-semibold'>Credit Balance: {dealerPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)).length > 0 ? Math.abs(dealerPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))[0].balance) : '0'}</p>
+                                                            <p className='text-green-600 font-semibold'>Credit Balance: {dealerPayments.some(p => p.balance < 0) ? 
+                                                                                                                Math.abs(dealerPayments.find(p => p.balance < 0).balance) : '0'
+                                                                                                                
+                                                                                                            }
+                                                                                                            </p>
+
+                                                                {/* {dealerPayments.sort((a, b) => b.balance - a.balance).length > 0 ? (dealerPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))[0].balance > 0 ? '0' : Math.abs((dealerPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))[0].balance))) : '0' }</p> */}
+                                                            {/* <p className='text-green-600 font-semibold'>Credit Balance: {dealerPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)).length > 0 ? '0' : Math.abs(dealerPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))[0].balance)}</p> */}
                                                             <br/>
                                                             <div className="flex flex-row items-end justify-between mb-2">
                                                                 <p className='text-black font-medium'>Payments</p>
