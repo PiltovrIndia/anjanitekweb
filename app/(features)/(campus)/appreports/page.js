@@ -904,12 +904,12 @@ export default function AppReports() {
         <div className="flex flex-col gap-2 mb-4" >
             
             
-                <div  className="flex flex-row gap-2">
+                <div  className="flex flex-wrap gap-2">
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
                         <div className="flex flex-row gap-2 items-center">
                             <p className='text-s text-gray-600 font-bold'>Total Downloads</p>
                         </div>
-                        <p className='text-xl text-black font-semibold tracking-wider'>742</p>
+                        <p className='text-xl text-black font-semibold tracking-wider'>825</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
                         <div className="flex flex-row gap-2 items-center">
@@ -918,7 +918,7 @@ export default function AppReports() {
                                 Android
                             </div>
                         </div>
-                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>509</p>
+                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>534</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={1}>
                         <div className="flex flex-row gap-2 items-center">
@@ -927,7 +927,7 @@ export default function AppReports() {
                                 iOS
                             </div>
                         </div>
-                        <p className='text-xl text-red-700 font-semibold tracking-wider'>233</p>
+                        <p className='text-xl text-red-700 font-semibold tracking-wider'>291</p>
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={2}>
                         <p className='text-s text-gray-600 font-normal'>AnjaniTek users</p>
@@ -935,7 +935,7 @@ export default function AppReports() {
                     </Card>
                     <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={3}>
                         <p className='text-s text-gray-600 font-normal'>Visitors</p>
-                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{701 - anjaniUserCount}</p>
+                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{742 - anjaniUserCount}</p>
                     </Card>
                     {/* <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={4}>
                         <p className='text-s text-gray-600 font-normal'>Total Dealers</p>

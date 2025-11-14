@@ -146,7 +146,7 @@ const inter = Inter({ subsets: ['latin'] })
     function navigateProducts(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
       setSelectedTab('Products')
-      router.push('/products')
+      router.push('/productsv2')
     }
     function navigateDealersPending(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
