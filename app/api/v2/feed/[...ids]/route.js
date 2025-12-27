@@ -32,9 +32,9 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 0){ // create notification
                 try {
                     // create query for insert
-                    const q = 'INSERT INTO feed (sender, sentAt, message, media) VALUES ( ?, ?, ?, ?)';
+                    const q = 'INSERT INTO feed (sender, sentAt, message, media, category,reactions) VALUES ( ?, ?, ?, ?, ?, ?)';
                     // create new notification
-                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], decodeURIComponent(params.ids[4]), params.ids[5] ]);
+                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], decodeURIComponent(params.ids[4]), params.ids[5], params.ids[6], 0 ]);
                     
 
                     // send notification to notification specific dealers
@@ -73,7 +73,7 @@ export async function GET(request,{params}) {
                         // const notificationResult = gcmIds.length > 0 ? await send_notification(params.ids[5], gcmIds, 'Multiple') : null;
                             
                         // return successful update
-                        return Response.json({status: 200, message:'Posted to feed!'}, {status: 200})
+                        return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId}, {status: 200})
                         // return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
 
 
@@ -87,7 +87,7 @@ export async function GET(request,{params}) {
             else if(params.ids[1] == 1){ // fetch data for all notifications – Super admin 
                 // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
                 // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
-                const [rows, fields] = await connection.execute('SELECT f.*,u.* from feed f JOIN users u ON f.sender=u.userId ORDER BY sentAt DESC LIMIT 20 OFFSET '+params.ids[2]);
+                const [rows, fields] = await connection.execute('SELECT f.*,u.* from feed f JOIN user u ON f.sender=u.id ORDER BY sentAt DESC LIMIT 10 OFFSET '+params.ids[2]);
                 connection.release();
             
                 // check if user is found
@@ -99,6 +99,21 @@ export async function GET(request,{params}) {
                 else {
                     // user doesn't exist in the system
                     return Response.json({status: 404, message:'No data!'}, {status: 200})
+                }
+            }
+            else if(params.ids[1] == 1.5){ // update the reactions count for a feed item
+                try {
+                    // need to increment the reactions count
+                    const q = 'UPDATE feed SET reactions = reactions + 1 WHERE id = ?';
+                    // create new notification
+                    const [rows, fields] = await connection.execute(q, [ params.ids[2] ]);
+                    connection.release();
+                    
+                    // return successful update
+                    return Response.json({status: 200, message:'Updated!'}, {status: 200})
+                } catch (error) {
+                    // user doesn't exist in the system
+                    return Response.json({status: 404, message:'Error updating reactions. Please try again later!'+error.message}, {status: 200})
                 }
             }
             else if(params.ids[1] == 2){ // fetch data for specific dealer

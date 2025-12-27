@@ -16,9 +16,10 @@ export async function GET(request,{params}) {
             // get the list of reservations ordered by createdOn and by selected status
             if(params.ids[1] == 'U0'){
                 try {
-                    var query = 'SELECT r.*, p.* from reservations r LEFT JOIN products1 p ON r.design = p.design ORDER BY r.createdOn DESC';
+                    // lets update the query to add user table as well to get user details
+                    var query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id ORDER BY r.createdOn DESC';
                     if(params.ids[2] != 'All'){
-                        query = 'SELECT r.*, p.* from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC';
+                        query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC';
                     }
                     const [rows, fields] = await connection.execute(query);
                     connection.release();

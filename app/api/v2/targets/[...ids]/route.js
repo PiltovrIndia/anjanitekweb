@@ -18,15 +18,26 @@ export async function GET(request, { params }) {
             const month = params.ids[1];
             const userIds = params.ids[2].split(',');
             
-            var conditionsString = `(${userIds.map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
+            // Build conditions string for SQL IN clause
+            var conditionsString = `(${userIds.map((userId) => `'${userId}'`).join(', ')})`;
+
+            // get the list of userIds from mapTo values
+            const [rows, fields] = await db.query(`SELECT id from user where mapTo IN ${conditionsString} ORDER BY role ASC`);
+            // add the ids to userIds array
+            rows.forEach((row) => {
+                if(!userIds.includes(row.id)){
+                    userIds.push(row.id);
+                }
+            });
             
+            var conditionsString1 = `(${userIds.map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
 
             const query = `
                 SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
                     st.createdAt, st.updatedAt, u.name
                 FROM targets st
                 JOIN user u ON st.userId = u.id
-                WHERE st.monthDate = '${month}' AND ${conditionsString}
+                WHERE st.monthDate = '${month}' AND ${conditionsString1}
             `;
             
             const [targets] = await db.query(query);
