@@ -34,7 +34,7 @@ export async function GET(request, { params }) {
 
             const query = `
                 SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
-                    st.createdAt, st.updatedAt, u.name
+                    st.createdAt, st.updatedAt, u.name, u.mapTo
                 FROM targets st
                 JOIN user u ON st.userId = u.id
                 WHERE st.monthDate = '${month}' AND ${conditionsString1}

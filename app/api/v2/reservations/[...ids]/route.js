@@ -17,9 +17,9 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 'U0'){
                 try {
                     // lets update the query to add user table as well to get user details
-                    var query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id ORDER BY r.createdOn DESC';
+                    var query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                     if(params.ids[2] != 'All'){
-                        query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC';
+                        query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                     }
                     const [rows, fields] = await connection.execute(query);
                     connection.release();

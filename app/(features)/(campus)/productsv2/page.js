@@ -1,7 +1,7 @@
 'use client'
 
 import { Inter } from 'next/font/google'
-import { Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, XCircle, Plus, CurrencyInr, Receipt, CirclesFour, CircleDashed, CheckCircle, CheckSquare, CalendarBlank, Calendar, FileXls, FilePdf, Tag } from 'phosphor-react'
+import { Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, XCircle, Plus, CurrencyInr, Receipt, CirclesFour, CircleDashed, CheckCircle, CheckSquare, CalendarBlank, Calendar, FileXls, FilePdf, Tag, GridFour } from 'phosphor-react'
 import React, { useRef, useEffect, useState } from 'react'
 const inter = Inter({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
@@ -26,6 +26,7 @@ import { Checkbox } from '@/app/components/ui/checkbox'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/app/components/ui/sheet'
 import { Label } from '@/app/components/ui/label'
 import * as XLSX from 'xlsx';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs'
 
 const xlsx = require('xlsx');
 // Child references can also take paths delimited by '/'
@@ -95,6 +96,26 @@ const updateUploadStockData = async (pass, items1, adminId) =>
     });
 
 
+// get reservations
+const getReservationsAPI = async (pass, type, offset) => 
+fetch("/api/v2/reservations/"+pass+"/U0/"+type+"/"+offset, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// update reservation status
+const updateReservationStatusAPI = async (pass, reservationId, status, qty) => 
+fetch("/api/v2/reservations/"+pass+"/U3/"+reservationId+"/"+status+"/"+qty, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
 // pass state variable and the method to update state variable
 export default function Products() {
     
@@ -116,6 +137,17 @@ export default function Products() {
     const [creatingProduct, setCreatingProduct] = useState(false);
     const [offerCreationLoading, setOfferCreationLoading] = useState(false);
 
+    // Reservations State
+    const [reservations, setReservations] = useState([]);
+    const [resLoading, setResLoading] = useState(false);
+    const [resOffset, setResOffset] = useState(0);
+    const [resStatus, setResStatus] = useState('All');
+
+    // Approval Dialog State
+    const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+    const [selectedRes, setSelectedRes] = useState(null);
+    const [approvalQty, setApprovalQty] = useState('');
+
     // var groupedTags = [];
     const [imgSrc, setImgSrc] = useState(``);
     // const [imgSrc, setImgSrc] = useState(`https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/${product.imageUrls.split(',')[0]}?alt=media`);
@@ -131,6 +163,7 @@ export default function Products() {
     // user state and requests variable
     const [user, setUser] = useState();
     const [offset, setOffset] = useState(0);
+    const [offsetReservations, setOffsetReservations] = useState(0);
     const [searching, setSearching] = useState(false);
     const [searchingTags, setSearchingTags] = useState(false);
 
@@ -158,13 +191,13 @@ export default function Products() {
 
     useEffect(() => {
             if (user && user.id) {
-                
                 getProductTags();
                 getAllProducts();
+                getReservations(); // Fetch reservations on load
             }
         }, [user]);
 
-        async function getProductTags(){
+    async function getProductTags(){
         
         setSearchingTags(true);
         setOffset(offset+10); // update the offset for every call
@@ -265,6 +298,55 @@ export default function Products() {
             else if(queryResult.status == 404 || queryResult.status == 201) {
                 setAllProducts([]);
                 setSearching(false);
+            }
+        }
+        catch (e){
+            
+            toast({
+                description: "Issue loading, try again later!",
+              })
+        }
+    }
+    
+    // fetch the reservations
+    async function getReservations(val, offsetR){
+        
+        
+        setResLoading(true);
+        // setOffset(offset+0); // update the offset for every call
+
+        try {    
+            const result  = await getReservationsAPI(process.env.NEXT_PUBLIC_API_PASS,val, offsetR) 
+            const queryResult = await result.json() // get data
+
+            console.log("RESERVATIONS::::");
+            
+            console.log(queryResult);
+            // check for the status
+            if(queryResult.status == 200){
+
+                // check if data exits
+                if(queryResult.data.length > 0){
+                    
+                    setReservations(queryResult.data);
+                        
+                        setResLoading(false);
+                    // }
+                    
+                }
+                else {
+                    setReservations([]);
+                }
+
+                setResLoading(false);
+            }
+            else if(queryResult.status == 401) {
+                
+                setResLoading(false);
+            }
+            else if(queryResult.status == 404 || queryResult.status == 201) {
+                setReservations([]);
+                setResLoading(false);
             }
         }
         catch (e){
@@ -504,6 +586,41 @@ export default function Products() {
             toast({description: "Issue loading. Please refresh or try again later!"});
         }
     }
+
+    async function handleUpdateStatus(res) {
+        setSelectedRes(res);
+        setApprovalQty(res.requestedQty); // Default to requested quantity
+        setIsApprovalDialogOpen(true);
+    }
+
+    async function submitApproval() {
+        if (!approvalQty || isNaN(approvalQty)) {
+            toast({ description: "Please enter a valid quantity" });
+            return;
+        }
+
+        setResLoading(true);
+        try {
+            const result = await updateReservationStatusAPI(
+                process.env.NEXT_PUBLIC_API_PASS, 
+                selectedRes.id, 
+                'Approved', 
+                approvalQty
+            );
+            const queryResult = await result.json();
+            if (queryResult.status === 200) {
+                toast({ description: "Reservation approved successfully" });
+                setIsApprovalDialogOpen(false);
+                getReservations(resStatus, resOffset); // Refresh list
+            } else {
+                toast({ description: queryResult.message || "Failed to approve" });
+            }
+        } catch (e) {
+            toast({ description: "Error submitting approval" });
+        } finally {
+            setResLoading(false);
+        }
+    }
     
     
 return (
@@ -516,11 +633,11 @@ return (
              
     <div className={`${inter.className} flex flex-col min-h-screen w-full overflow-auto`} style={{ gap: '8px' }}>
         <div className='flex flex-row gap-2 items-center py-4' >
-              <h2 className="text-xl font-semibold mr-4">Invoices</h2>
+              <h2 className="text-xl font-semibold mr-4">Designs</h2>
               
               <Sheet>
                     <SheetTrigger asChild>
-                        <Button className="text-white bg-green-600"><Receipt className='font-bold text-lg'/>&nbsp; Upload Stock</Button>
+                        <Button className="text-white bg-green-600"><GridFour className='font-bold text-lg'/>&nbsp; Upload Stock</Button>
                     </SheetTrigger>
                     <SheetContent>
                         <SheetHeader>
@@ -564,82 +681,90 @@ return (
 
               <Toaster />
           </div>
+
           
-        <span className='text-sm text-slate-500'>{allProducts.length} Designs in total</span>
+          <Tabs defaultValue="allProducts" className="w-fit">
+            <TabsList className="w-fit bg-slate-100 p-1 border border-slate-300">
+              <TabsTrigger value="allProducts" className="w-1/2">All Designs</TabsTrigger>
+              <TabsTrigger value="reservations" className="w-1/2" onClick={()=>getReservations('All', 0)}>Reservations</TabsTrigger>
+            </TabsList>
+            <TabsContent value="allProducts" className="w-full">
+              {/* Content for all products */}
+              <span className='text-sm text-slate-500'>{allProducts.length} Designs in total</span>
 
-        <div className={`${styles.verticalsection} flex-1 flex flex-col`} style={{ width: '100%', gap: '8px', padding: '0px 0px 0px 0px' }}> 
-            {/* <div className='flex items-center justify-between py-4 px-2'>
-                <div className='flex items-center gap-4'></div>
-                    <h2 className="text-lg font-semibold items-center">Collections - <span className='text-sm text-slate-500'>{allProducts.length} Designs in total</span></h2>
+                <div className={`${styles.verticalsection} flex-1 flex flex-col`} style={{ width: '100%', gap: '8px', padding: '0px 0px 0px 0px' }}> 
+                    {/* <div className='flex items-center justify-between py-4 px-2'>
+                        <div className='flex items-center gap-4'></div>
+                            <h2 className="text-lg font-semibold items-center">Collections - <span className='text-sm text-slate-500'>{allProducts.length} Designs in total</span></h2>
+                        </div>
+                        <div className='flex items-center gap-2'></div> */}
+
+                    {!searching ?
+                    <div className="mx-auto" style={{width:'100%',height:'100%'}}>
+                    {/* <div className="container mx-auto py-10"> */}
+                    
+
+            {(filteredProducts.length > 0) ?
+            <div className='flex flex-row justify-between items-center'>
+                <div className='flex flex-row gap-4 items-center'>
+                    <Input
+                        type="text"
+                        placeholder="Search Designs..."
+                        value={searchQuery}
+                        onChange={handleSearchChange}
+                        className="my-2 w-[300px]" // You can adjust width and margin as needed
+                    />
+
+                    {(searchQuery.length > 0) ? <div className='pb-2 text-green-700 font-semibold text-xs'>{filteredProducts.length} matching designs</div> 
+                    : (selectedSize != 'All') ?
+                        <div className='pb-2 text-green-700 font-semibold text-xs'>{filteredProducts.length} {selectedSize} Designs</div>
+                        // : <div className='pb-2 text-green-700 font-semibold'>{allInvoicesFiltered.length} Dealers in {selectedSize.split('-')[1]}</div>
+                        // }
+                    : ''}
+
+
+                    {searching ?
+                    <div className="flex flex-row m-12">    
+                        <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                        <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                    </div>
+                    : ''}
                 </div>
-                <div className='flex items-center gap-2'></div> */}
 
-            {!searching ?
-            <div className="mx-auto" style={{width:'100%',height:'100%'}}>
-            {/* <div className="container mx-auto py-10"> */}
-            
+                
+                <div className='flex flex-row gap-4 items-center'>
 
-    {(filteredProducts.length > 0) ?
-    <div className='flex flex-row justify-between items-center'>
-        <div className='flex flex-row gap-4 items-center'>
-            <Input
-                type="text"
-                placeholder="Search Designs..."
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="my-2 w-[300px]" // You can adjust width and margin as needed
-            />
-
-            {(searchQuery.length > 0) ? <div className='pb-2 text-green-700 font-semibold text-xs'>{filteredProducts.length} matching designs</div> 
-            : (selectedSize != 'All') ?
-                <div className='pb-2 text-green-700 font-semibold text-xs'>{filteredProducts.length} {selectedSize} Designs</div>
-                // : <div className='pb-2 text-green-700 font-semibold'>{allInvoicesFiltered.length} Dealers in {selectedSize.split('-')[1]}</div>
-                // }
-            : ''}
-
-
-            {searching ?
-            <div className="flex flex-row m-12">    
-                <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-                <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                    {/* {(selectedSize == 'All') ?
+                        <div className='pb-2 text-slate-700 font-semibold'></div>
+                        : <div className='pb-2 text-green-700 font-semibold text-xs'>{allInvoicesFiltered.length} Invoices with {selectedSize} status</div>
+                    } */}
+                    {filteredProducts.length == 0 ?
+                        <div className="flex flex-row m-12">    
+                            <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                        </div>
+                        :
+                        <Select defaultValue={selectedSize} onValueChange={(e)=>filterBySize(e)} >
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Filter by status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectGroup>
+                                <SelectItem key={'All'} value={'All'}>All sizes</SelectItem>
+                                {Array.from(new Set(filteredProducts.map(product => product.size))).map((size) => (
+                                <SelectItem key={size} value={size} >{size}</SelectItem>))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                    }
+                    
+                    <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button>
+                </div>
+                {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> InOuting Students</Button> */}
+                {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button> */}
             </div>
-            : ''}
-        </div>
-
-        
-        <div className='flex flex-row gap-4 items-center'>
-
-            {/* {(selectedSize == 'All') ?
-                <div className='pb-2 text-slate-700 font-semibold'></div>
-                : <div className='pb-2 text-green-700 font-semibold text-xs'>{allInvoicesFiltered.length} Invoices with {selectedSize} status</div>
-            } */}
-            {filteredProducts.length == 0 ?
-                <div className="flex flex-row m-12">    
-                    <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                </div>
-                :
-                <Select defaultValue={selectedSize} onValueChange={(e)=>filterBySize(e)} >
-                    <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectGroup>
-                        <SelectItem key={'All'} value={'All'}>All sizes</SelectItem>
-                        {Array.from(new Set(filteredProducts.map(product => product.size))).map((size) => (
-                        <SelectItem key={size} value={size} >{size}</SelectItem>))}
-                        </SelectGroup>
-                    </SelectContent>
-                </Select>
+            : ''    
             }
-            
-            <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button>
-        </div>
-        {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> InOuting Students</Button> */}
-        {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button> */}
-    </div>
-    : ''    
-    }
 
         <Card>
             {/* <div> */}
@@ -674,7 +799,10 @@ return (
                                                         showHostelRooms(hostel);
                                                     } catch (e) {}
 
-                                                }} className='text-nowrap text-sm text-blue-600 hover:text-blue-800 cursor-pointer w-full py-4'>{product.name}</span>
+                                                }} className='text-nowrap text-sm text-blue-600 hover:text-blue-800 cursor-pointer w-full py-4'>{product.name} 
+                                                
+                                                <span>{(product.favorite == product.design) ? <HeartIcon className='inline-block ml-2 text-red-500' size={14} /> : ''}</span>
+                                                </span>
                                                         </DialogTrigger>
                                                         <DialogContent className="sm:max-w-[825px] max-h-[90vh] overflow-auto">
                                                         <DialogHeader>
@@ -1172,40 +1300,120 @@ return (
             {/* </div> */}
         </Card>
 
-        {/* <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Confirm Deletion</DialogTitle>
-                <DialogDescription>
-                Are you sure you want to delete this invoice? This action cannot be undone.
-                </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-                <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-                </Button>
-                <Button variant="destructive" onClick={()=>deleteSelectedInvoice()}>
-                Delete
-                </Button>
-            </DialogFooter>
-            </DialogContent>
-</Dialog> */}
-
-    </div>
-:
-<Skeleton className="h-4 w-[500px] h-[120px]" >
-    <div className="flex flex-row m-12">    
-        <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-        <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-    </div>
-</Skeleton> 
-    
+                </div>
+            :
+            <Skeleton className="h-4 w-[500px] h-[120px]" >
+                <div className="flex flex-row m-12">    
+                    <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+                </div>
+            </Skeleton> 
+                
 
 
-}
+            }
 
         
         </div>
+            </TabsContent>
+            <TabsContent value="reservations" className="w-full">
+                <div className="flex flex-row justify-between items-center py-4">
+                    <span className='text-sm text-slate-500'>{reservations.length} Reservations found</span>
+                    <Select value={resStatus} onValueChange={(val) => { setResStatus(val); getReservations(val, 0); }}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Status</SelectItem>
+                            <SelectItem value="Submitted">Pending</SelectItem>
+                            <SelectItem value="Approved">Approved</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <Card>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>User ID</TableHead>
+                                <TableHead>Design</TableHead>
+                                <TableHead>Quantity</TableHead>
+                                <TableHead>Approved Quantity</TableHead>
+                                <TableHead>Stock Type</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Created On</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {resLoading ? (
+                                <TableRow><TableCell colSpan={7} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
+                            ) : reservations.length === 0 ? (
+                                <TableRow><TableCell colSpan={7} className="text-center py-10">No reservations found</TableCell></TableRow>
+                            ) : reservations.map((res) => (
+                                <TableRow key={res.id} className="hover:bg-gray-50 text-sm">
+                                    <TableCell className="font-medium  py-4">{res.userId}</TableCell>
+                                    <TableCell>{res.design}</TableCell>
+                                    <TableCell>{res.requestedQty}</TableCell>
+                                    <TableCell>{res.approvedQty}</TableCell>
+                                    <TableCell>{res.stockType}</TableCell>
+                                    <TableCell>
+                                        <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                            {res.status}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>{dayjs(res.createdOn).format('DD/MM/YYYY')}</TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-2">
+                                            {res.status === 'Submitted' && (
+                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => handleUpdateStatus(res)}>Approve</Button>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </Card>
+                
+                <div className="flex items-center justify-end space-x-2 py-4">
+                    <Button variant="outline" size="sm" onClick={() => { const next = Math.max(0, resOffset - 10); setResOffset(next); getReservations(resStatus, next); }} disabled={resOffset === 0}>Previous</Button>
+                    <Button variant="outline" size="sm" onClick={() => { const next = resOffset + 10; setResOffset(next); getReservations(resStatus, next); }} disabled={reservations.length < 10}>Next</Button>
+                </div>
+            </TabsContent>
+          </Tabs>
+          
+          {/* Approval Confirmation Dialog */}
+          <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Approve Reservation</DialogTitle>
+                    <DialogDescription>
+                        Confirm the quantity to approve for <b>{selectedRes?.design}</b> requested by <b>{selectedRes?.userId}</b>.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="qty" className="text-right">Quantity</Label>
+                        <Input
+                            id="qty"
+                            type="number"
+                            value={approvalQty}
+                            onChange={(e) => setApprovalQty(e.target.value)}
+                            className="col-span-3"
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setIsApprovalDialogOpen(false)}>Cancel</Button>
+                    <Button className="bg-green-600 text-white" onClick={submitApproval} disabled={resLoading}>
+                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                        Confirm Approval
+                    </Button>
+                </div>
+            </DialogContent>
+          </Dialog>
+          
     </div>
 );
 }
