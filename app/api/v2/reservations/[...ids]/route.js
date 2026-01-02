@@ -37,7 +37,7 @@ export async function GET(request,{params}) {
             // get the list of reservations by userId
             else if(params.ids[1] == 'U1'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT r.*, p.* from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.userId="'+params.ids[2]+'" ORDER BY r.createdOn DESC');
+                    const [rows, fields] = await connection.execute('SELECT r.*, p.* from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.userId="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
 
                     if(rows.length > 0)
