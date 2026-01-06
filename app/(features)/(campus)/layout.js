@@ -1,7 +1,7 @@
 'use client'
 import { Inter } from 'next/font/google'
 import styles from '../../../app/page.module.css'
-import { Monitor, UserFocus, Chats, ArrowSquareOut, CaretUp, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files, Rows, Power, Receipt, CheckCircle, Tag, ChartLine } from 'phosphor-react'
+import { Monitor, UserFocus, Chats, ArrowSquareOut, CaretUp, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files, Rows, Power, Receipt, CheckCircle, Tag, ChartLine, GridFour, Target } from 'phosphor-react'
 import Image from 'next/image'
 import Biscuits from 'universal-cookie'
 const biscuits = new Biscuits
@@ -11,6 +11,7 @@ import Registration from './registration/form/page'
 
 import { Toaster } from "@/app/components/ui/toaster"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuContent } from "@/app/components/ui/dropdown-menu"
+
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -153,6 +154,11 @@ const inter = Inter({ subsets: ['latin'] })
       setSelectedTab('Dashboard2')
       router.push('/dashboard2')
     }
+    function navigateSaleTargets(){
+      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
+      setSelectedTab('SaleTargets')
+      router.push('/saletargets')
+    }
     function navigateMessages(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
       setSelectedTab('Messages')
@@ -217,12 +223,13 @@ const inter = Inter({ subsets: ['latin'] })
               <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
               {(role == 'SuperAdmin' || role == 'SalesManager' ) ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dashboard' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDashboard.bind(this)} style={{cursor:'pointer'}}><Monitor className={styles.menuicon}/> Dashboard</div> : <div></div>}
               {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Invoices' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateInvoices.bind(this)} style={{cursor:'pointer'}}><Receipt className={styles.menuicon}/> Invoices</div> : <div></div>}
-              {(role == 'SuperAdmin' || role == 'StockAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Products' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateProducts.bind(this)} style={{cursor:'pointer'}}><Receipt className={styles.menuicon}/> Designs</div> : <div></div>}
+              {(role == 'SuperAdmin' || role == 'StockAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Products' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateProducts.bind(this)} style={{cursor:'pointer'}}><GridFour className={styles.menuicon}/> Designs</div> : <div></div>}
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealers.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers</div>
                 {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Offers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOffers.bind(this)} style={{cursor:'pointer'}}><Tag className={styles.menuicon}/> Offers</div> : <div></div>}
                 {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Confirmations' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateConfirmations.bind(this)} style={{cursor:'pointer'}}><CheckCircle className={styles.menuicon}/> Confirmations</div> : <div></div>}
                 {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Sales' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSales.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Sales</div> : <div></div>}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers Pending' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealersPending.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers Pending</div> */}
+                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'SaleTargets' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSaleTargets.bind(this)} style={{cursor:'pointer'}}><Target className={styles.menuicon}/> Sale Targets</div>
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Messages' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateMessages.bind(this)} style={{cursor:'pointer'}}><Chats className={styles.menuicon}/> Messages</div>
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Feed' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateFeed.bind(this)} style={{cursor:'pointer'}}><Rows className={styles.menuicon}/> Feed</div>
                 {(role == 'SuperAdmin' || role == 'StockAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'App Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateAppReports.bind(this)} style={{cursor:'pointer'}}><PresentationChart className={styles.menuicon}/> App Reports</div> : <div></div>}

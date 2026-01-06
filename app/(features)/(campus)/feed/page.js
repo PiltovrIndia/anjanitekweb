@@ -663,7 +663,11 @@ const handleFileSelect = (e) => {
                                                     <AvatarImage src="" alt="dealer_image" />
                                                     <AvatarFallback>{message.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
                                                 </Avatar>
-                                                <Image src="/gvt.jpg" alt="Anjani Tek" width={280} height={150} priority style={{height:'auto'}}/>
+                                                {message.media == '-' ? null :
+                                                <Image
+                                                src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+message.media+'.webp?alt=media'}
+                                                alt={message.name} className="w-full h-48 object-cover rounded-lg" width={400} height={200} />
+                                                }
                                                 <p className="text-l p-1">{message.message}</p>
                                                 {/* <Label className="text-gray-500 p-1">{message.sender}</Label> */}
                                                 <p className="text-xs text-gray-500 p-1">{dayjs(message.sentAt).format('MMMM D, YYYY h:mm A')}</p>
