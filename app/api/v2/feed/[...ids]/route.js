@@ -32,9 +32,9 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 0){ // create notification
                 try {
                     // create query for insert
-                    const q = 'INSERT INTO feed (sender, sentAt, message, media, category,reactions) VALUES ( ?, ?, ?, ?, ?, ?)';
+                    const q = 'INSERT INTO feed (sender, message, media, category,reactions) VALUES ( ?, ?, ?, ?, ?)';
                     // create new notification
-                    const [rows, fields] = await connection.execute(q, [ params.ids[2], params.ids[3], decodeURIComponent(params.ids[4]), params.ids[5], params.ids[6], 0 ]);
+                    const [rows, fields] = await connection.execute(q, [ params.ids[2], decodeURIComponent(params.ids[3]), params.ids[4], params.ids[5], 0 ]);
                     
 
                     // send notification to notification specific dealers
@@ -49,32 +49,32 @@ export async function GET(request,{params}) {
                         // }
                         // else {
                         //     // conditionsString = conditionsString + ' role="dealer" ';
-                        //     query = 'SELECT u.gcm_regId from users u JOIN dealers d where d.userId=u.userId AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
+                        //     query = 'SELECT u.gcm_regId from users u JOIN dealers d where d.userId=u.userId AND d.state="'+params.ids[6]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
                         // }
                         
                         // // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
-                        // const [nrows, nfields] = await connection.execute(query);
+                        const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where isActive = 1`);
                         connection.release();
                         // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         
                         // get the gcm_regIds list from the query result
-                        // var gcmIds = [];
-                        // for (let index = 0; index < nrows.length; index++) {
-                        //   const element = nrows[index].gcm_regId;
-                        // //   console.log(element)
-                        //   if(element.length > 3)
-                        //     gcmIds.push(element); 
-                        // }
+                        var gcmIds = [];
+                        for (let index = 0; index < nrows.length; index++) {
+                          const element = nrows[index].gcm_regId;
+                        //   console.log(element)
+                          if(element.length > 3)
+                            gcmIds.push(element); 
+                        }
 
                         // var gcmIds = 
                         // console.log(gcmIds);
 
                         // send the notification
-                        // const notificationResult = gcmIds.length > 0 ? await send_notification(params.ids[5], gcmIds, 'Multiple') : null;
+                        const notificationResult = gcmIds.length > 0 ? await send_notification(decodeURIComponent(params.ids[3]), gcmIds, 'Multiple') : null;
                             
                         // return successful update
-                        return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId}, {status: 200})
-                        // return Response.json({status: 200, message:'Message sent!', notification: notificationResult}, {status: 200})
+                        // return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId}, {status: 200})
+                        return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId, notification: notificationResult}, {status: 200})
 
 
                     // return the user data
@@ -88,12 +88,14 @@ export async function GET(request,{params}) {
                 // console.log('SELECT * from officialrequest WHERE (DATE(oFrom) >= DATE("'+currentDate+'") OR DATE(oTo) >= DATE("'+currentDate+'")) ORDER BY createdOn DESC');
                 // const [rows, fields] = await connection.execute('SELECT * from notification WHERE universityId="'+params.ids[2]+'" AND campusId="'+params.ids[3]+'" ORDER BY createdOn DESC');
                 const [rows, fields] = await connection.execute('SELECT f.*,u.name,u.email,u.mobile,u.role from feed f JOIN user u ON f.sender=u.id ORDER BY sentAt DESC LIMIT 10 OFFSET '+params.ids[2]);
+                // get the reactions for each feed item from feed_reactions table
+                const [reactionRows, reactionFields] = await connection.execute('SELECT * from feed_reactions where feedId IN ('+rows.map(r => r.id).join(',')+')');
                 connection.release();
             
                 // check if user is found
                 if(rows.length > 0){
                     // return the requests data
-                    return Response.json({status: 200, message:'Data found!', data: rows}, {status: 200})
+                    return Response.json({status: 200, message:'Data found!', data: rows, reactions: reactionRows}, {status: 200})
 
                 }
                 else {
@@ -105,8 +107,12 @@ export async function GET(request,{params}) {
                 try {
                     // need to increment the reactions count
                     const q = 'UPDATE feed SET reactions = reactions + 1 WHERE id = ?';
-                    // create new notification
                     const [rows, fields] = await connection.execute(q, [ params.ids[2] ]);
+                    
+                    // update the feed_reactions table to add a new reaction by the user
+                    const q1 = 'INSERT INTO feed_reactions (feedId, sender, message, type) VALUES ( ?, ?, ?, ?)';
+                    const [rows1, fields1] = await connection.execute(q1, [ params.ids[2], params.ids[3], params.ids[4], params.ids[5] ]);
+                    
                     connection.release();
                     
                     // return successful update
