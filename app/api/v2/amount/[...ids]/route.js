@@ -1,3 +1,4 @@
+import { send_notification } from '@/app/api/send_notification';
 import pool from '../../../db'
 import { Keyverify } from '../../../secretverify';
 const OneSignal = require('onesignal-node')
@@ -668,51 +669,3 @@ export async function POST(request, {params}) {
 }
   
 
-
-
-  // send the notification using onesignal.
-  // use the playerIds of the user.
-  // check if playerId length > 2
-  async function send_notification(message, playerId, type) {
-    return new Promise(async (resolve, reject) => {
-      // send notification only if there is playerId for the user
-      if (playerId.length > 0) {
-        var playerIds = [];
-        playerIds.push(playerId);
-  
-        var notification;
-        // notification object
-        if (type == 'Single') {
-          notification = {
-            contents: {
-              'en': message,
-            },
-            // include_player_ids: ['playerId'],
-            // include_player_ids: ['90323-043'],
-            include_external_user_ids: [playerId],
-          };
-        } else {
-          notification = {
-            contents: {
-              'en': message,
-            },
-            include_external_user_ids: playerId,
-          };
-        }
-  
-        try {
-          
-          // create notification
-          const notificationResult = await client.createNotification(notification);
-          
-          resolve(notificationResult);
-
-        } catch (error) {
-          
-          resolve(null);
-        }
-      } else {
-        resolve(null);
-      }
-    });
-  }

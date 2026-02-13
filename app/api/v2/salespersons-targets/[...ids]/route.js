@@ -80,19 +80,7 @@ console.log(params);
               filteredUserIds: userIds,
               users: result,
             }, message:'Data fetched!'}, {status: 200});
-
-            // return new Response(JSON.stringify({
-            //   monthDate: month,
-            //   monthStartDate: monthStart,
-            //   monthEndDate: monthEnd,
-            //   filteredUserIds: userIds,
-            //   users: result,
-            // }), {
-            //   status: 200,
-            //   headers: {
-            //     'Content-Type': 'application/json'
-            //   }
-            // });
+            
           } finally {
             conn.release();
           }

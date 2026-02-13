@@ -21,16 +21,30 @@ export async function GET(request, { params }) {
             // Build conditions string for SQL IN clause
             var conditionsString = `(${userIds.map((userId) => `'${userId}'`).join(', ')})`;
 
-            // get the list of userIds from mapTo values
-            const [rows, fields] = await db.query(`SELECT id from user where mapTo IN ${conditionsString} ORDER BY role ASC`);
-            // add the ids to userIds array
-            rows.forEach((row) => {
-                if(!userIds.includes(row.id)){
-                    userIds.push(row.id);
-                }
-            });
+            const [rows, fields] = [];
+            // Recursively get userIds until we reach Dealer role
+            let currentIds = userIds;
+            const allUserIds = new Set(userIds);
             
-            var conditionsString1 = `(${userIds.map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
+            while (currentIds.length > 0) {
+                const conditionStr = `(${currentIds.map((id) => `'${id}'`).join(', ')})`;
+                const [rows] = await db.query(`SELECT id, role FROM user WHERE mapTo IN ${conditionStr}`);
+                
+                if (rows.length === 0) break;
+                
+                const nextIds = [];
+                rows.forEach((row) => {
+                    allUserIds.add(row.id);
+                    if (row.role !== 'Dealer') {
+                        nextIds.push(row.id);
+                    }
+                });
+                
+                currentIds = nextIds;
+            }
+            
+            
+            var conditionsString1 = `(${Array.from(allUserIds).map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
 
             const query = `
                 SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 

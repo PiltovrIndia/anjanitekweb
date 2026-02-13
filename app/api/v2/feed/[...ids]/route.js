@@ -1,9 +1,7 @@
 import pool from '../../../db'
 import { Keyverify } from '../../../secretverify';
+import { send_notification } from '../../../send_notification';
 import dayjs from 'dayjs'
-const OneSignal = require('onesignal-node')
-
-const client = new OneSignal.Client(process.env.ONE_SIGNAL_APPID, process.env.ONE_SIGNAL_APIKEY)
 
 // create new officialrequest for outing by the Admins
 // key, what, oRequestId, type, duration, from, to, by, description, branch, year – Super admin
@@ -108,7 +106,7 @@ export async function GET(request,{params}) {
                     // need to increment the reactions count
                     const q = 'UPDATE feed SET reactions = reactions + 1 WHERE id = ?';
                     const [rows, fields] = await connection.execute(q, [ params.ids[2] ]);
-                    
+
                     // update the feed_reactions table to add a new reaction by the user
                     const q1 = 'INSERT INTO feed_reactions (feedId, sender, message, type) VALUES ( ?, ?, ?, ?)';
                     const [rows1, fields1] = await connection.execute(q1, [ params.ids[2], params.ids[3], params.ids[4], params.ids[5] ]);
@@ -116,7 +114,7 @@ export async function GET(request,{params}) {
                     connection.release();
                     
                     // return successful update
-                    return Response.json({status: 200, message:'Updated!'}, {status: 200})
+                    return Response.json({status: 200, message:'Updated!', reactionId: rows1.insertId}, {status: 200})
                 } catch (error) {
                     // user doesn't exist in the system
                     return Response.json({status: 404, message:'Error updating reactions. Please try again later!'+error.message}, {status: 200})
@@ -233,57 +231,3 @@ export async function GET(request,{params}) {
     
     
   }
-  
-
-
-  // send the notification using onesignal.
-  // use the playerIds of the users.
-  // check if playerId length > 2
-  async function send_notification(message, playerId, type) {
-    // console.log(playerId);
-        return new Promise(async (resolve, reject) => {
-          // send notification only if there is playerId for the user
-          if (playerId.length > 0) {
-            // var playerIds = [];
-            // playerIds.push(playerId);
-      
-            var notification;
-            // notification object
-            if (type == 'Single') {
-              notification = {
-                contents: {
-                  'en': message,
-                },
-                // include_player_ids: ['playerId'],
-                // include_player_ids: ['90323-043'],
-                include_player_ids: [playerId],
-              };
-            } else {
-              notification = {
-                contents: {
-                  'en': message,
-                },
-                include_player_ids: playerId,
-              };
-            }
-      
-            try {
-              // create notification
-              const notificationResult = await client.createNotification(notification);
-              
-              resolve(notificationResult);
-    
-            } catch (error) {
-            //     console.log('ok');
-            //   console.log(error);
-              resolve(null);
-            }
-          } else {
-            // console.log('ok1');console.log(error);
-            resolve(null);
-          }
-        });
-      }
-    
-    
-    
