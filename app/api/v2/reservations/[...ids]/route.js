@@ -21,10 +21,10 @@ export async function GET(request,{params}) {
                     if(params.ids[2] != 'All'){
 
                         // expiryDate field is used to store the modified timestamp for the reservation. So we can filter the reservations modified after a particular timestamp using this field.
-                        if(params.ids[2] == 'Modified'){
-                            query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
-                        }
-                        else
+                        // if(params.ids[2] == 'Modified'){
+                        //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                        // }
+                        // else
                         query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                     }
                     const [rows, fields] = await connection.execute(query);
@@ -74,8 +74,31 @@ export async function GET(request,{params}) {
             // update a reservation status
             else if(params.ids[1] == 'U3'){
                 try {
-                    // We shall use expiryDate field as modified timestamp 
-                    const [rows, fields] = await connection.execute('UPDATE reservations SET approvedQty='+params.ids[4]+', expiryDate = "'+params.ids[6]+'", status="'+params.ids[3]+'" WHERE id="'+params.ids[2]+'"');
+                    // We shall use approvedOn field as modified timestamp 
+                    const [rows, fields] = await connection.execute('UPDATE reservations SET approvedQty='+params.ids[4]+', approvedOn = "'+params.ids[6]+'", status="'+params.ids[3]+'" WHERE id="'+params.ids[2]+'"');
+                    connection.release();
+                    
+                    // send the notification
+                    const notificationResult = await send_notification('Your stock request is '+params.ids[3], params.ids[5], 'Single');
+                    
+                    if(rows.affectedRows > 0){
+                        // return successful update
+                        // return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId}, {status: 200})
+                        return Response.json({status: 200, message:'Updated!', notification: notificationResult}, {status: 200})
+                    }
+                    else {
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) {
+                    return Response.json({status: 404, message:'No reservation found!'+error}, {status: 200})
+                }
+            }
+            
+            // modify a reservation status & quantity
+            else if(params.ids[1] == 'U3.1'){
+                try {
+                    // We shall use approvedOn field as modified timestamp 
+                    const [rows, fields] = await connection.execute('UPDATE reservations SET approvedQty='+params.ids[4]+', modifiedOn = "'+params.ids[6]+'", status="'+params.ids[3]+'" WHERE id="'+params.ids[2]+'"');
                     connection.release();
                     
                     // send the notification
@@ -97,7 +120,7 @@ export async function GET(request,{params}) {
             // create a reservation
             else if(params.ids[1] == 'U4'){
                 try {
-                    const [rows, fields] = await connection.execute('INSERT into reservations (userId, design, requestedQty, status, approvedQty, stockType, expiryDate, createdOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "Submitted", 0, "'+params.ids[5]+'", "'+params.ids[6]+'", "'+params.ids[7]+'")');
+                    const [rows, fields] = await connection.execute('INSERT into reservations (userId, design, requestedQty, status, approvedQty, stockType, expiryDate, createdOn, approvedOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "Submitted", 0, "'+params.ids[5]+'", "'+params.ids[6]+'", "'+params.ids[7]+'", NULL)');
                     
                     // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
                     const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where role='SuperAdmin'`);
@@ -113,7 +136,7 @@ export async function GET(request,{params}) {
                     }
 
                     // var gcmIds = 
-                    console.log(gcmIds);
+                    // console.log(gcmIds);
 
                     // send the notification
                     const notificationResult = gcmIds.length > 0 ? await send_notification('New stock request received!', gcmIds, 'Multiple') : null;
