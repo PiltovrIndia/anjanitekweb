@@ -120,7 +120,7 @@ export async function GET(request,{params}) {
             // create a reservation
             else if(params.ids[1] == 'U4'){
                 try {
-                    const [rows, fields] = await connection.execute('INSERT into reservations (userId, design, requestedQty, status, approvedQty, stockType, expiryDate, createdOn, approvedOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "Submitted", 0, "'+params.ids[5]+'", "'+params.ids[6]+'", "'+params.ids[7]+'", NULL)');
+                    const [rows, fields] = await connection.execute('INSERT into reservations (userId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "Submitted", 0, "'+params.ids[5]+'", "'+params.ids[6]+'", NULL, NULL)');
                     
                     // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
                     const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where role='SuperAdmin'`);
