@@ -113,7 +113,7 @@ export async function GET(request,{params}) {
                     }
 
                     // var gcmIds = 
-                    // console.log(gcmIds);
+                    console.log(gcmIds);
 
                     // send the notification
                     const notificationResult = gcmIds.length > 0 ? await send_notification('New stock request received!', gcmIds, 'Multiple') : null;
@@ -121,7 +121,7 @@ export async function GET(request,{params}) {
                     if(rows.insertId > 0){
                         // return successful update
                         // return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId}, {status: 200})
-                        return Response.json({status: 200, message:'Created!', id: rows.insertId, notification: notificationResult}, {status: 200})
+                        return Response.json({status: 200, message:'Created!', data: rows.insertId, notification: notificationResult}, {status: 200})
                     }
                     else {
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
