@@ -44,10 +44,11 @@ export async function GET(request,{params}) {
             else if(params.ids[1] == 'U1'){
                 try {
                     const [rows, fields] = await connection.execute('SELECT r.*, p.* from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.userId="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
+                    const [countRows, countFields] = await connection.execute('SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.userId="'+params.ids[2]+'"');
                     connection.release();
 
                     if(rows.length > 0)
-                        return Response.json({status: 200, data: rows}, {status: 200})
+                        return Response.json({status: 200, data: rows, count: countRows[0].count}, {status: 200})
                     else 
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
                     
