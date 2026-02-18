@@ -17,7 +17,10 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 'U0'){
                 try {
                     // lets update the query to add user table as well to get user details
-                    var query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                    var query = 'SELECT r.*, p.name, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                    var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id';
+
+                    // if status is provided then filter by status as well
                     if(params.ids[2] != 'All'){
 
                         // expiryDate field is used to store the modified timestamp for the reservation. So we can filter the reservations modified after a particular timestamp using this field.
@@ -25,13 +28,17 @@ export async function GET(request,{params}) {
                         //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                         // }
                         // else
-                        query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                        query = 'SELECT r.*, p.name, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                        queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.status="'+params.ids[2]+'"';
                     }
+
+                    
                     const [rows, fields] = await connection.execute(query);
+                    const [countRows, countFields] = await connection.execute(queryCount);
                     connection.release();
 
                     if(rows.length > 0){
-                        return Response.json({status: 200, data: rows, message:'Updated!'}, {status: 200})
+                        return Response.json({status: 200, data: rows, count: countRows[0].count, message:'Updated!'}, {status: 200})
                     }
                     else {
                         return Response.json({status: 201, message:'No data found!'}, {status: 200})
@@ -43,7 +50,7 @@ export async function GET(request,{params}) {
             // get the list of reservations by userId
             else if(params.ids[1] == 'U1'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT r.*, p.* from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.userId="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
+                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.userId="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
                     const [countRows, countFields] = await connection.execute('SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.userId="'+params.ids[2]+'"');
                     connection.release();
 
@@ -59,7 +66,7 @@ export async function GET(request,{params}) {
             // get the list of reservations by design
             else if(params.ids[1] == 'U2'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT r.*, p.* from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.design="'+params.ids[2]+'" ORDER BY r.createdOn DESC');
+                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.design="'+params.ids[2]+'" ORDER BY r.createdOn DESC');
                     connection.release();
 
                     if(rows.length > 0)
@@ -75,6 +82,7 @@ export async function GET(request,{params}) {
             // update a reservation status
             else if(params.ids[1] == 'U3'){
                 try {
+                    
                     // We shall use approvedOn field as modified timestamp 
                     const [rows, fields] = await connection.execute('UPDATE reservations SET approvedQty='+params.ids[4]+', approvedOn = "'+params.ids[6]+'", status="'+params.ids[3]+'" WHERE id="'+params.ids[2]+'"');
                     connection.release();

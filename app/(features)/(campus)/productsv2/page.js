@@ -15,7 +15,7 @@ import { Button } from '@/app/components/ui/button'
 import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
-import { ArrowDown, HeartIcon, Search, Trash } from 'lucide-react'
+import { ArrowDown, CheckIcon, HeartIcon, Pencil, Search, Trash } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
@@ -107,8 +107,8 @@ fetch("/api/v2/reservations/"+pass+"/U0/"+type+"/"+offset, {
 });
 
 // update reservation status
-const updateReservationStatusAPI = async (pass, reservationId, status, qty) => 
-fetch("/api/v2/reservations/"+pass+"/U3/"+reservationId+"/"+status+"/"+qty, {
+const updateReservationStatusAPI = async (pass, path, reservationId, status, qty, userId, actionDate) => 
+fetch("/api/v2/reservations/"+pass+"/"+path+"/"+reservationId+"/"+status+"/"+qty+"/"+userId+"/"+actionDate, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -138,13 +138,14 @@ export default function Products() {
     const [offerCreationLoading, setOfferCreationLoading] = useState(false);
 
     // Reservations State
+    const [totalReservations, setTotalReservations] = useState([]);
     const [reservations, setReservations] = useState([]);
     const [resLoading, setResLoading] = useState(false);
     const [resOffset, setResOffset] = useState(0);
     const [resStatus, setResStatus] = useState('All');
 
     // Approval Dialog State
-    const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+    const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
     const [selectedRes, setSelectedRes] = useState(null);
     const [approvalQty, setApprovalQty] = useState('');
 
@@ -319,9 +320,6 @@ export default function Products() {
             const result  = await getReservationsAPI(process.env.NEXT_PUBLIC_API_PASS,val, offsetR) 
             const queryResult = await result.json() // get data
 
-            console.log("RESERVATIONS::::");
-            
-            console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -329,6 +327,7 @@ export default function Products() {
                 if(queryResult.data.length > 0){
                     
                     setReservations(queryResult.data);
+                    setTotalReservations(queryResult.count);
                         
                         setResLoading(false);
                     // }
@@ -336,6 +335,7 @@ export default function Products() {
                 }
                 else {
                     setReservations([]);
+                    setTotalReservations(0);
                 }
 
                 setResLoading(false);
@@ -590,10 +590,12 @@ export default function Products() {
     async function handleUpdateStatus(res) {
         setSelectedRes(res);
         setApprovalQty(res.requestedQty); // Default to requested quantity
-        setIsApprovalDialogOpen(true);
+        
+            setIsActionDialogOpen(true);
+        
     }
 
-    async function submitApproval() {
+    async function submitApproval(status) {
         if (!approvalQty || isNaN(approvalQty)) {
             toast({ description: "Please enter a valid quantity" });
             return;
@@ -601,19 +603,26 @@ export default function Products() {
 
         setResLoading(true);
         try {
+            var path = 'U3';
+            // check if the status is already approved, modified or rejected, if yes then update the record with modified status with modifiedOn value
+            if(selectedRes.status.toLowerCase() == 'approved' || selectedRes.status.toLowerCase() == 'modified' || selectedRes.status.toLowerCase() == 'rejected'){
+                path = 'U3.1';
+            }
             const result = await updateReservationStatusAPI(
-                process.env.NEXT_PUBLIC_API_PASS, 
+                process.env.NEXT_PUBLIC_API_PASS, path,
                 selectedRes.id, 
-                'Approved', 
-                approvalQty
+                status, 
+                approvalQty,
+                selectedRes.userId,
+                dayjs().format('YYYY-MM-DD HH:mm:ss') // Set expiry to 7 days from now
             );
             const queryResult = await result.json();
             if (queryResult.status === 200) {
-                toast({ description: "Reservation approved successfully" });
-                setIsApprovalDialogOpen(false);
+                toast({ description: `Reservation ${status.toLowerCase()} successfully` });
+                setIsActionDialogOpen(false);
                 getReservations(resStatus, resOffset); // Refresh list
             } else {
-                toast({ description: queryResult.message || "Failed to approve" });
+                toast({ description: queryResult.message || `Failed to ${status.toLowerCase()}` });
             }
         } catch (e) {
             toast({ description: "Error submitting approval" });
@@ -1318,7 +1327,7 @@ return (
             </TabsContent>
             <TabsContent value="reservations" className="w-full">
                 <div className="flex flex-row justify-between items-center py-4">
-                    <span className='text-sm text-slate-500'>{reservations.length} Reservations found</span>
+                    <span className='text-sm text-slate-500'>{totalReservations} Reservations found</span>
                     <Select value={resStatus} onValueChange={(val) => { setResStatus(val); getReservations(val, 0); }}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Filter by status" />
@@ -1327,6 +1336,8 @@ return (
                             <SelectItem value="All">All Status</SelectItem>
                             <SelectItem value="Submitted">Pending</SelectItem>
                             <SelectItem value="Approved">Approved</SelectItem>
+                            <SelectItem value="Rejected">Rejected</SelectItem>
+                            <SelectItem value="Modified">Modified</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -1341,7 +1352,7 @@ return (
                                 <TableHead>Approved Quantity</TableHead>
                                 <TableHead>Stock Type</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Created On</TableHead>
+                                <TableHead>Submitted On</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -1352,21 +1363,30 @@ return (
                                 <TableRow><TableCell colSpan={7} className="text-center py-10">No reservations found</TableCell></TableRow>
                             ) : reservations.map((res) => (
                                 <TableRow key={res.id} className="hover:bg-gray-50 text-sm">
-                                    <TableCell className="font-medium  py-4">{res.userId}</TableCell>
+                                    <TableCell className="font-medium  py-4">{res.userId} - {res.username}</TableCell>
                                     <TableCell>{res.design}</TableCell>
                                     <TableCell>{res.requestedQty}</TableCell>
                                     <TableCell>{res.approvedQty}</TableCell>
                                     <TableCell>{res.stockType}</TableCell>
                                     <TableCell>
-                                        <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                            {res.status}
+                                        <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                            {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
                                         </span>
                                     </TableCell>
                                     <TableCell>{dayjs(res.createdOn).format('DD/MM/YYYY')}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
                                             {res.status === 'Submitted' && (
-                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => handleUpdateStatus(res)}>Approve</Button>
+                                                <div className='flex flex-row items-center gap-2'>
+                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
+                                                {/* <Button size="sm" variant="outline" className="text-red-600 border-red-600" onClick={() => handleUpdateStatus(res)}>Reject</Button> */}
+                                                </div>
+                                            )}
+                                            {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected') && (
+                                                <div className='flex flex-row items-center gap-2'>
+                                                <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(res)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
+                                                {/* <Button size="sm" variant="outline" className="text-red-600 border-red-600" onClick={() => handleUpdateStatus(res)}>Reject</Button> */}
+                                                </div>
                                             )}
                                         </div>
                                     </TableCell>
@@ -1384,7 +1404,7 @@ return (
           </Tabs>
           
           {/* Approval Confirmation Dialog */}
-          <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+          <Dialog open={isActionDialogOpen} onOpenChange={setIsActionDialogOpen}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Approve Reservation</DialogTitle>
@@ -1395,20 +1415,28 @@ return (
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="qty" className="text-right">Quantity</Label>
-                        <Input
-                            id="qty"
-                            type="number"
-                            value={approvalQty}
-                            onChange={(e) => setApprovalQty(e.target.value)}
-                            className="col-span-3"
-                        />
+                        {/* {(selectedRes?.status === 'Submitted' || selectedRes?.status === 'Approved') ? */}
+                            <Input
+                                id="qty"
+                                type="number"
+                                value={approvalQty}
+                                onChange={(e) => setApprovalQty(e.target.value)}
+                                className="col-span-3"
+                            />
+                            {/* :
+                            <Label htmlFor="qty" className="text-right">{approvalQty}</Label>    
+                        } */}
                     </div>
                 </div>
                 <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={() => setIsApprovalDialogOpen(false)}>Cancel</Button>
-                    <Button className="bg-green-600 text-white" onClick={submitApproval} disabled={resLoading}>
+                    <Button variant="outline" onClick={() => setIsActionDialogOpen(false)}>Cancel</Button>
+                    <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
                         {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                        Confirm Approval
+                        Approve
+                    </Button>
+                    <Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={resLoading}>
+                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                        Reject
                     </Button>
                 </div>
             </DialogContent>
