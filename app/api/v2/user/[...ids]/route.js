@@ -359,11 +359,12 @@ export async function GET(request,{params}) {
                         var dealers = [];
                         const promises = rows.map(async (row) => {
                             const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row.id+'"');
+                            
                             rows1.map((row1) => {
                                 dealers.push(row1.id);
-                                
                             })
                         });
+                        
                         
                         await Promise.all(promises); // wait till above finishes
 
