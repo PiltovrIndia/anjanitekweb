@@ -62,16 +62,6 @@ fetch("/api/v2/products/"+pass+"/U5/"+productId+"/"+tags+"/"+size, {
     },
 });
 
-// update product name
-const updateProductName = async (pass, productId, name) => 
-fetch("/api/v2/products/"+pass+"/U10/"+productId+"/"+encodeURIComponent(name), {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
 // design of the day
 const designOfTheDay = async (pass, productData) => 
 fetch("/api/v2/products/"+pass+"/U8/"+productData, {
@@ -127,7 +117,7 @@ fetch("/api/v2/reservations/"+pass+"/"+path+"/"+reservationId+"/"+status+"/"+qty
 });
 
 // pass state variable and the method to update state variable
-export default function Products() {
+export default function ProductsV2_Old() {
     
     const { toast } = useToast();
     const router = useRouter();
@@ -146,7 +136,6 @@ export default function Products() {
     const [newProductOn, setNewProductOn] = useState(false);
     const [creatingProduct, setCreatingProduct] = useState(false);
     const [offerCreationLoading, setOfferCreationLoading] = useState(false);
-    const [tagUpdateKey, setTagUpdateKey] = useState(0);
 
     // Reservations State
     const [totalReservations, setTotalReservations] = useState([]);
@@ -809,9 +798,9 @@ return (
                                 {/* <div className='flex flex-row gap-2 items-center text-blue-600 font-semibold py-4 w-max cursor-pointer' onClick={() => handleRowClick(product)}> {product.name} </div> */}
 
 
-                                <Sheet>
+                                <Dialog  modal={false}>
                                                     <form>
-                                                        <SheetTrigger asChild>
+                                                        <DialogTrigger asChild>
                                                         <span onClick={() => {
                                                     // pass the full hostel object to the details page via sessionStorage
                                                     try { 
@@ -823,28 +812,25 @@ return (
                                                 
                                                 <span>{(product.favorite == product.design) ? <HeartIcon className='inline-block ml-2 text-red-500' size={14} /> : ''}</span>
                                                 </span>
-                                                        </SheetTrigger>
-                                                        <SheetContent side="right" className="sm:max-w-[825px] overflow-y-auto flex flex-col">
-                                                        <SheetHeader>
-                                                            <SheetTitle>{product.name}</SheetTitle>
-                                                            <SheetDescription>
+                                                        </DialogTrigger>
+                                                        <DialogContent className="sm:max-w-[825px] max-h-[90vh] overflow-auto">
+                                                        <DialogHeader>
+                                                            <DialogTitle>{product.name}</DialogTitle>
+                                                            <DialogDescription>
                                                                 <p>
                                                                 {/* <span className='text-black font-medium'>{product.design.split(',').length}</span> Rooms • <span className='text-black font-medium'>{hostel.studentCount}</span> Students • <span className='text-black font-medium'>{hostel.admin.split(',').length}</span> Admins */}
                                                                 <span className='text-gray-800 font-medium font-mono'>{product.design}</span>
                                                                 </p>
-                                                            </SheetDescription>
-                                                        </SheetHeader>
+                                                            </DialogDescription>
+                                                        </DialogHeader>
 
                                                         {(() => {
                                                             
                                                             // const [selectedTags, setSelectedTags] = useState(product.tags.split(",").map(Number));
                                                             var selectedTags = product.tags.split(",").map(Number);
-                                                            var editedName = product.name;
 
                                                             const handleRemoveTag = (tagId) => {
                                                                 selectedTags = selectedTags.filter((id) => id !== tagId);
-                                                                product.tags = selectedTags.join(",");
-                                                                setTagUpdateKey(prev => prev + 1);
                                                             };
 
                                                             const handleTagChange = (tagId, type) => {
@@ -852,11 +838,16 @@ return (
                                                                 const tagsInGroup = groupedTags[type].map(tag => tag.tagId);
                                                                 const selectedTagsInGroup = selectedTags.filter(id => tagsInGroup.includes(id));
                                                                 
-                                                                product.tags = selectedTags.join(",");
-                                                                setTagUpdateKey(prev => prev + 1);
+                                                                // if (selectedTagsInGroup.length === 0) {
+                                                                //     // Show toast message
+                                                                //     alert(`You must select at least one tag from the ${type} group.`);
+                                                                //     return prev; // Prevent unchecking the last tag in the group
+                                                                //     }
+                                                                    
+                                                                // return selectedTags;
                                                             };
 
-                                                            // a function to send an API to save product tags and name
+                                                            // a function to send an API to make the product as design of the day
                                                             async function onSave(productId, selectedTags){
                                                                 
                                                                 setSearching(true);
@@ -866,18 +857,6 @@ return (
                                                                     const queryResult = await result.json() // get data
 
                                                                     console.log(queryResult);
-
-                                                                    // check if name was changed and update it
-                                                                    if(editedName && editedName !== product.name){
-                                                                        const nameResult = await updateProductName(process.env.NEXT_PUBLIC_API_PASS, productId, editedName);
-                                                                        const nameQueryResult = await nameResult.json();
-                                                                        console.log('Name update:', nameQueryResult);
-                                                                        if(nameQueryResult.status == 200){
-                                                                            // update the product name in the local list
-                                                                            product.name = editedName;
-                                                                        }
-                                                                    }
-
                                                                     // check for the status
                                                                     if(queryResult.status == 200){
 
@@ -1122,15 +1101,6 @@ return (
                                                                         :
                                                                     <div className="flex flex-col flex-wrap md:grid-cols-2 gap-2 ">
 
-                                                                        {/* Editable Product Name */}
-                                                                                <div className="mb-2">
-                                                                                    <Input
-                                                                                        defaultValue={product.name}
-                                                                                        onChange={(e) => { editedName = e.target.value; }}
-                                                                                        className="text-lg font-semibold border-dashed"
-                                                                                        placeholder="Product name"
-                                                                                    />
-                                                                                </div>
                                                                         {/* Selected Tags as Badges */}
                                                                                 <div>
                                                                                     <Image
@@ -1156,8 +1126,7 @@ return (
                                                                                 </div>
                                                                         
                                                                                 {/* Scrollable Horizontal Grid of Tags */}
-                                                                                {/* <div className="max-h-64 max-w-4xl overflow-x-auto border p-2 rounded-md flex gap-4"> */}
-                                                                                <div className="flex-1 flex flex-wrap overflow-y-auto border p-2 rounded-md gap-8">
+                                                                                <div className="max-h-64 max-w-4xl overflow-x-auto border p-2 rounded-md flex gap-4">
                                                                                   {Object.entries(groupedTags).map(([type, groupTags]) => (
                                                                                     <div key={type} className="flex-1 min-w-[200px]">
                                                                                       <h3 className="text-md font-semibold mb-2">{type}</h3>
@@ -1176,7 +1145,7 @@ return (
                                                                                   ))}
                                                                                 </div>
                                                                         
-                                                                                <div className="sticky bottom-0 bg-white pt-4 pb-2 mt-4 flex flex-row gap-2 justify-end border-t">
+                                                                                <div className="mt-4 flex flex-row gap-2 justify-end">
                                                                                   
                                                                                   <Sheet>
                                                                                     <SheetTrigger asChild>
@@ -1296,15 +1265,15 @@ return (
                                                             <Input id="username-1" name="username" defaultValue="@peduarte" />
                                                             </div>
                                                         </div> */}
-                                                        {/* <SheetFooter>
-                                                            <SheetClose asChild>
+                                                        {/* <DialogFooter>
+                                                            <DialogClose asChild>
                                                             <Button variant="outline">Cancel</Button>
-                                                            </SheetClose>
+                                                            </DialogClose>
                                                             <Button type="submit">Save changes</Button>
-                                                        </SheetFooter> */}
-                                                        </SheetContent>
+                                                        </DialogFooter> */}
+                                                        </DialogContent>
                                                     </form>
-                                                    </Sheet>
+                                                    </Dialog>
                             </TableCell>
                             <TableCell>
                                 <div className="w-fit">

@@ -90,7 +90,8 @@ export async function GET(request,{params}) {
                     }
                     else {
                         str = 'FIND_IN_SET("39", tags)';
-                    }
+                    }console.log(`SELECT * from products1 WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);;
+                    
                         // const conditions = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');                    
                         const [rows, fields] = await connection.execute(`SELECT * from products1 WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
                         const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products1 WHERE ${str}`);
@@ -281,6 +282,24 @@ export async function GET(request,{params}) {
                 }
             }
             
+            // update product name
+            else if(params.ids[1] == 'U10'){
+                try {
+                    console.log('UPDATE products1 SET name="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
+                    
+                    const [rows, fields] = await connection.execute('UPDATE products1 SET name="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
+                    connection.release();
+
+                    if(rows.affectedRows > 0){
+                        return Response.json({status: 200, data: rows, message:'Name updated!'}, {status: 200})
+                    }
+                    else {
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) {
+                    return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
+                }
+            }
             
             else {
                 return Response.json({status: 404, message:'No product found!'}, {status: 200})
