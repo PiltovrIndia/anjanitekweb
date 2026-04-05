@@ -339,6 +339,34 @@ export async function POST(request, {params}) {
     
           }
 
+          ////////////////////////
+          // 3.1 when payment is done, update the amount to collection
+          ////////////////////////
+          // check if invoice date target is available in targets table and update the achieved value for that target category as well for the respective month
+          for(const invoice of invoicesList){
+            var category = 0;
+
+              // get the value of first of the month
+              // value of invoiceDate = 2026-03-22T18:30:00.000Z, lets get the first of the month value in 'YYYY-MM-DD' format
+              const invoiceDate = dayjs(new Date(invoice.invoiceDate));
+              const firstOfMonth = invoiceDate.startOf('month');
+              const firstOfMonthStr = firstOfMonth.format('YYYY-MM-DD');
+              
+            if (invoice.invoiceType == 'VCL') {
+              
+              category = 1;
+              // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 1]);
+              const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
+            } else if (invoice.invoiceType == 'ATL') {
+              
+              category = 2;
+              
+              // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 2]);
+              const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
+            } 
+
+          }
+
         // 4
         // send notification to Dealer(s)
         var msg = '';
@@ -517,6 +545,34 @@ export async function POST(request, {params}) {
   
         }
 
+        ////////////////////////
+        // 3.1 when payment is done, update the amount to collection
+        ////////////////////////
+        // check if invoice date target is available in targets table and update the achieved value for that target category as well for the respective month
+        for(const invoice of invoices){
+          var category = 0;
+
+            // get the value of first of the month
+            // value of invoiceDate = 2026-03-22T18:30:00.000Z, lets get the first of the month value in 'YYYY-MM-DD' format
+            const invoiceDate = dayjs(new Date(invoice.invoiceDate));
+            const firstOfMonth = invoiceDate.startOf('month');
+            const firstOfMonthStr = firstOfMonth.format('YYYY-MM-DD');
+            
+          if (invoice.invoiceType == 'VCL') {
+            
+            category = 1;
+            // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 1]);
+            const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
+          } else if (invoice.invoiceType == 'ATL') {
+            
+            category = 2;
+            
+            // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 2]);
+            const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
+          } 
+
+        }
+
         // 4
         // send notification to Dealer(s)
         // send notification to the dealer and his hierarchy
@@ -608,6 +664,21 @@ export async function POST(request, {params}) {
             let newStatus = (updatedPending == selectedInvoice[0].totalAmount) ? 'NotPaid' : 'PartialPaid';
 
             await connection.query(`UPDATE invoices SET amountPaid = amountPaid - `+amount+`, pending = pending + `+amount+`, status = "`+newStatus+`" WHERE invoiceNo = "`+invoice+`"`, []);
+
+            // we need to update the targets
+            ////////////////////////
+            // 3.1 when payment is done, update the amount to collection
+            ////////////////////////
+            // check if invoice date target is available in targets table and update the achieved value for that target category as well for the respective month
+            if(selectedInvoice[0].status == 'Paid' || selectedInvoice[0].status == 'PartialPaid'){
+                
+                // need to only update the current month related target, not the past month even if the invoice date is in the past, because we are updating the current payment status of the invoice, not changing the invoice date. So we will consider the current month for updating the target achieved value.
+                // get the invoiceDate's month first date
+                const invoiceDateFirstDate = dayjs(selectedInvoice[0].invoiceDate).startOf('month').format('YYYY-MM-DD');
+                
+                const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+invoiceDateFirstDate+'"', [boxes, 3]);
+                
+            }
             
         }
 

@@ -433,6 +433,25 @@ export async function GET(request,{params}) {
                 
 
                 const q = "UPDATE invoices SET totalAmount= CONVERT("+totalAmount+", DECIMAL(10, 2)), amountPaid=  CONVERT("+amountPaid+", DECIMAL(10, 2)), pending=  CONVERT("+pending+", DECIMAL(10, 2)), status='"+status+"' WHERE invoiceId = "+invoiceId;
+
+                ////////////////////////
+                // 3.1 when payment is done, update the amount to collection
+                ////////////////////////
+                // check if invoice date target is available in targets table and update the achieved value for that target category as well for the respective month
+                if(status == 'Paid' || status == 'PartialPaid'){
+                    const [invoicesList, fields1] = await connection.execute('SELECT * FROM invoices where invoiceId="'+invoiceId+'"');
+
+                    for(const invoice of invoicesList){
+                    var category = 0;
+        
+                        // need to only update the current month related target, not the past month even if the invoice date is in the past, because we are updating the current payment status of the invoice, not changing the invoice date. So we will consider the current month for updating the target achieved value.
+                        // get the current's month first date
+                        const currentMonthFirstDate = dayjs(new Date()).startOf('month').format('YYYY-MM-DD');
+                        
+                        const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+currentMonthFirstDate+'"', [amountPaid, 3]);
+                        
+                    }
+                }
                 
                 const [rows2, fields2] = await connection.execute(q);
                 connection.release();
@@ -626,6 +645,25 @@ export async function POST(request, {params}) {
         const q1 = 'INSERT INTO notifications (sender, receiver, sentAt, message, seen, state) VALUES ( ?, ?, ?, ?, ?, ?)';
         const [rows124, fields124] = await connection.execute(q1, [ adminId, dealerId, currentDate1, decodeURIComponent('Invoice number '+invoiceNo+' with '+totalAmount+' Amount is raised and due.'), 0, '-' ]);
 
+        // we need to update the targets
+        ////////////////////////
+        // 3.1 when payment is done, update the amount to collection
+        ////////////////////////
+        // check if invoice date target is available in targets table and update the achieved value for that target category as well for the respective month
+        if(status == 'Paid' || status == 'PartialPaid'){
+            
+            // need to only update the current month related target, not the past month even if the invoice date is in the past, because we are updating the current payment status of the invoice, not changing the invoice date. So we will consider the current month for updating the target achieved value.
+            // get the invoiceDate's month first date
+            const invoiceDateFirstDate = dayjs(invoiceDate).startOf('month').format('YYYY-MM-DD');
+            
+            if(invoiceType == 'ATL'){
+                const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+invoiceDateFirstDate+'"', [boxes, 2]);
+            }
+            else {
+                const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+invoiceDateFirstDate+'"', [boxes, 1]);
+            }
+            
+        }
         
         // var gcm_regIds = [];
         // const [rowsD, fieldsD] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND id="'+dealerId+'"');

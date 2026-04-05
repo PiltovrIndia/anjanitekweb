@@ -79,7 +79,7 @@ export async function GET(request, { params }) {
                         name: target.name,
                         monthDate: 'To be decided',
                         targets: []
-                    };
+                        };
                     }
                     acc[userId].targets.push(target);
                     return acc;
