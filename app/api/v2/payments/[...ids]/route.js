@@ -250,6 +250,17 @@ export async function POST(request, {params}) {
     
     var amount = paymentAmount;
     var appliedAmounts = invoicesList.map(invoice => invoice.appliedAmount).join(',');
+    var remainingAmount = paymentAmount - invoicesList.reduce((sum, invoice) => sum + parseFloat(invoice.appliedAmount), 0);
+
+      ////////////////////////
+      // 3.1 when payment is done, update the amount to collection
+      ////////////////////////
+      // check if invoice date target is available in targets table and update the achieved value for that target category as well for the respective month
+      // get the value of first of the month
+      // value of paymentDate = 2026-03-22T18:30:00.000Z, lets get the first of the month value in 'YYYY-MM-DD' format
+      const invoicePaymentDate = dayjs(new Date(paymentDate));
+      const firstOfMonth = invoicePaymentDate.startOf('month');
+      const firstOfMonthOfPaymentDate = firstOfMonth.format('YYYY-MM-DD');
 
     // get the pool connection to db
     const connection = await pool.getConnection(); 
@@ -300,6 +311,10 @@ export async function POST(request, {params}) {
                     WHERE invoiceNo = ?`,
                 [invoice.appliedAmount, invoice.appliedAmount, invoice.status, invoice.invoiceNo.replace('***','/')]
             );
+
+            // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 1]);
+            const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthOfPaymentDate+'"', [invoice.appliedAmount, 3]);
+            console.log(invoice.appliedAmount);
             
             // add applied amounts for each invoice in sequence
             // if(appliedAmounts.length > 0){
@@ -339,33 +354,36 @@ export async function POST(request, {params}) {
     
           }
 
-          ////////////////////////
-          // 3.1 when payment is done, update the amount to collection
-          ////////////////////////
-          // check if invoice date target is available in targets table and update the achieved value for that target category as well for the respective month
-          for(const invoice of invoicesList){
-            var category = 0;
-
-              // get the value of first of the month
-              // value of invoiceDate = 2026-03-22T18:30:00.000Z, lets get the first of the month value in 'YYYY-MM-DD' format
-              const invoiceDate = dayjs(new Date(invoice.invoiceDate));
-              const firstOfMonth = invoiceDate.startOf('month');
-              const firstOfMonthStr = firstOfMonth.format('YYYY-MM-DD');
-              
-            if (invoice.invoiceType == 'VCL') {
-              
-              category = 1;
-              // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 1]);
-              const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
-            } else if (invoice.invoiceType == 'ATL') {
-              
-              category = 2;
-              
-              // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 2]);
-              const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
-            } 
-
+          if(remainingAmount > 0){
+            // update target collection
+              const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthOfPaymentDate+'"', [remainingAmount, 3]);
+              console.log(remainingAmount);
           }
+
+          
+          // for(const invoice of invoicesList){
+          //   var category = 0;
+
+          //     // get the value of first of the month
+          //     // value of invoiceDate = 2026-03-22T18:30:00.000Z, lets get the first of the month value in 'YYYY-MM-DD' format
+          //     const invoiceDate = dayjs(new Date(invoice.invoiceDate));
+          //     const firstOfMonth = invoiceDate.startOf('month');
+          //     const firstOfMonthStr = firstOfMonth.format('YYYY-MM-DD');
+              
+          //   if (invoice.invoiceType == 'VCL') {
+              
+          //     category = 1;
+          //     // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 1]);
+          //     const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
+          //   } else if (invoice.invoiceType == 'ATL') {
+              
+          //     category = 2;
+              
+          //     // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 2]);
+          //     const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
+          //   } 
+
+          // }
 
         // 4
         // send notification to Dealer(s)

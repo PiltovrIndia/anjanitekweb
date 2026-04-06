@@ -15,98 +15,223 @@ export async function GET(request, { params }) {
 
         if(await Keyverify(params.ids[0])){
 
-            const month = params.ids[1];
-            const userIds = params.ids[2].split(',');
-            
-            // Build conditions string for SQL IN clause
-            var conditionsString = `(${userIds.map((userId) => `'${userId}'`).join(', ')})`;
+            // OLD VERSION TO BE DELETED LATER
+            if(params.ids[1] === 'T0'){
 
-
-            const [rows, fields] = [];
-            // Recursively get userIds until we reach Dealer role
-            let currentIds = userIds;
-            const allUserIds = new Set(userIds);
-            
-            // Loop until there are no more userIds to process
-            while (currentIds.length > 0) {
-                const conditionStr = `(${currentIds.map((id) => `'${id}'`).join(', ')})`;
-                const [rows] = await db.query(`SELECT id, role FROM user WHERE mapTo IN ${conditionStr}`);
+                // check if month value is All, if so we need to get the targets for all months for the given userIds
+                var monthCondition = '';
+                if(params.ids[2] === 'All'){
+                    monthCondition = '';
+                }
+                else {
+                    monthCondition = `AND st.monthDate = '${params.ids[2]}'`;
+                }
+                const userIds = params.ids[3].split(',');
                 
-                if (rows.length === 0) break;
-                
-                const nextIds = [];
-                rows.forEach((row) => {
-                    allUserIds.add(row.id);
-                    if (row.role !== 'Dealer') {
-                        nextIds.push(row.id);
-                    }
-                });
-                
-                currentIds = nextIds;
-            }
-            
-            // Build conditions string for SQL IN clause with all userIds
-            var conditionsString1 = `(${Array.from(allUserIds).map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
+                // Build conditions string for SQL IN clause
+                var conditionsString = `(${userIds.map((userId) => `'${userId}'`).join(', ')})`;
 
-            const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
-                    st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
-                FROM targets st
-                JOIN user u ON st.userId = u.id
-                WHERE st.monthDate = '${month}' AND ${conditionsString1}`;
-            console.log(query);
-            const [targets] = await db.query(query);
 
-            var groupedByUser = {};
-
-            // check if targets is empty, if so we need to get the previous month targets for the same userIds
-            if(targets.length === 0){
-                const previousMonth = new Date(new Date(month).setMonth(new Date(month).getMonth() - 1)).toISOString().slice(0, 7) + '-01';
-                console.log(previousMonth);
+                const [rows, fields] = [];
+                // Recursively get userIds until we reach Dealer role
+                let currentIds = userIds;
+                const allUserIds = new Set(userIds);
                 
+                // Loop until there are no more userIds to process
+                while (currentIds.length > 0) {
+                    const conditionStr = `(${currentIds.map((id) => `'${id}'`).join(', ')})`;
+                    const [rows] = await db.query(`SELECT id, role FROM user WHERE mapTo IN ${conditionStr}`);
+                    
+                    if (rows.length === 0) break;
+                    
+                    const nextIds = [];
+                    rows.forEach((row) => {
+                        allUserIds.add(row.id);
+                        if (row.role !== 'Dealer') {
+                            nextIds.push(row.id);
+                        }
+                    });
+                    
+                    currentIds = nextIds;
+                }
+                
+                // Build conditions string for SQL IN clause with all userIds
+                var conditionsString1 = `(${Array.from(allUserIds).map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
+
                 const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
-                    st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
-                FROM targets st
-                JOIN user u ON st.userId = u.id
-                WHERE st.monthDate = '${previousMonth}' AND ${conditionsString1}`;
-                
+                        st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
+                    FROM targets st
+                    JOIN user u ON st.userId = u.id
+                    WHERE ${conditionsString1} ${monthCondition}`;
+                console.log(query);
                 const [targets] = await db.query(query);
-                
-                groupedByUser = targets.reduce((acc, target) => {
-                    const userId = target.userId;
-                    if (!acc[userId]) {
-                    acc[userId] = {
-                        userId: userId,
-                        name: target.name,
-                        monthDate: 'To be decided',
-                        targets: []
+
+                var groupedByUser = {};
+
+                // check if targets is empty, if so we need to get the previous month targets for the same userIds
+                if(targets.length === 0 && monthCondition !== ''){
+                    const previousMonth = new Date(new Date(params.ids[2]).setMonth(new Date(params.ids[2]).getMonth() - 1)).toISOString().slice(0, 7) + '-01';
+                    console.log(previousMonth);
+                    
+                    const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
+                        st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
+                    FROM targets st
+                    JOIN user u ON st.userId = u.id
+                    WHERE st.monthDate = '${previousMonth}' AND ${conditionsString1}`;
+                    
+                    const [targets] = await db.query(query);
+                    
+                    groupedByUser = targets.reduce((acc, target) => {
+                        const userId = target.userId;
+                        if (!acc[userId]) {
+                        acc[userId] = {
+                            userId: userId,
+                            name: target.name,
+                            monthDate: 'To be decided',
+                            targets: []
+                            };
+                        }
+                        acc[userId].targets.push(target);
+                        return acc;
+                    }, {});
+                }
+                else {
+                    // Group targets by userId
+                    groupedByUser = targets.reduce((acc, target) => {
+                        const userId = target.userId;
+                        if (!acc[userId]) {
+                        acc[userId] = {
+                            userId: userId,
+                            name: target.name,
+                            monthDate: target.monthDate,
+                            targets: []
                         };
-                    }
-                    acc[userId].targets.push(target);
-                    return acc;
-                }, {});
+                        }
+                        acc[userId].targets.push(target);
+                        return acc;
+                    }, {});
+                }
+                return NextResponse.json({
+                    success: true,
+                    data: Object.values(groupedByUser),
+                    count: targets.length,
+                });
             }
-            else {
-                // Group targets by userId
-                groupedByUser = targets.reduce((acc, target) => {
-                    const userId = target.userId;
-                    if (!acc[userId]) {
-                    acc[userId] = {
-                        userId: userId,
-                        name: target.name,
-                        monthDate: target.monthDate,
-                        targets: []
-                    };
+        
+        else  if(params.ids[1] === 'T1'){
+
+                // check if month value is All, if so we need to get the targets for all months for the given userIds
+                var monthCondition = '';
+                if(params.ids[2] === 'All'){
+                    monthCondition = '';
+                }
+                else {
+                    
+                    monthCondition = `AND st.monthDate = '${new Date(new Date(params.ids[2]).setMonth(new Date(params.ids[2]).getMonth())).toISOString().slice(0, 7) + '-01'}'`;
+                }
+                const userIds = params.ids[3].split(',');
+                
+                // Build conditions string for SQL IN clause
+                var conditionsString = `(${userIds.map((userId) => `'${userId}'`).join(', ')})`;
+
+                const [rows, fields] = [];
+                // Recursively get userIds until we reach Dealer role
+                let currentIds = userIds;
+                const allUserIds = new Set(userIds);
+                
+                // Loop until there are no more userIds to process
+                while (currentIds.length > 0) {
+                    const conditionStr = `(${currentIds.map((id) => `'${id}'`).join(', ')})`;
+                    const [rows] = await db.query(`SELECT id, role FROM user WHERE mapTo IN ${conditionStr}`);
+                    
+                    if (rows.length === 0) break;
+                    
+                    const nextIds = [];
+                    rows.forEach((row) => {
+                        allUserIds.add(row.id);
+                        if (row.role !== 'Dealer') {
+                            nextIds.push(row.id);
+                        }
+                    });
+                    
+                    currentIds = nextIds;
+                }
+                
+                // Build conditions string for SQL IN clause with all userIds
+                var conditionsString1 = `(${Array.from(allUserIds).map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
+
+                const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
+                        st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
+                    FROM targets st
+                    JOIN user u ON st.userId = u.id
+                    WHERE ${conditionsString1} ${monthCondition}`;
+                
+                    const [targets] = await db.query(query);
+
+                var groupedByUser = {};
+
+                // check if targets is empty, if so we need to get the previous month targets for the same userIds
+                if(targets.length === 0 && monthCondition !== ''){
+                    
+                    // Add 3 entries for all the users with role 'dealer' for the given month with categoryId 1, 2 and 3 with targetAmount and actualAmount as 0, we can identify these entries by checking the monthDate value as 'To be decided'
+                    const newMonth = new Date(new Date(params.ids[2]).setMonth(new Date(params.ids[2]).getMonth())).toISOString().slice(0, 7) + '-01';
+                    console.log(newMonth);
+
+                    // get all users with role 'dealer'
+                    const [dealerRows] = await db.query(`SELECT id FROM user WHERE role='Dealer'`);
+                    
+                    // insert 3 entries for each dealer for the given month
+                    for(const dealer of dealerRows){
+                        await db.query(`INSERT INTO targets (userId, monthDate, categoryId, targetAmount, actualAmount, createdAt, updatedAt) VALUES ('${dealer.id}', '${newMonth}', 1, 0, 0, NOW(), NOW())`);
+                        await db.query(`INSERT INTO targets (userId, monthDate, categoryId, targetAmount, actualAmount, createdAt, updatedAt) VALUES ('${dealer.id}', '${newMonth}', 2, 0, 0, NOW(), NOW())`);
+                        await db.query(`INSERT INTO targets (userId, monthDate, categoryId, targetAmount, actualAmount, createdAt, updatedAt) VALUES ('${dealer.id}', '${newMonth}', 3, 0, 0, NOW(), NOW())`);
                     }
-                    acc[userId].targets.push(target);
-                    return acc;
-                }, {});
+                    
+                    const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
+                        st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
+                    FROM targets st
+                    JOIN user u ON st.userId = u.id
+                    WHERE st.monthDate = '${newMonth}' AND ${conditionsString1}`;
+                    
+                    const [targets] = await db.query(query);
+                    
+                    groupedByUser = targets.reduce((acc, target) => {
+                        const userId = target.userId;
+                        if (!acc[userId]) {
+                        acc[userId] = {
+                            userId: userId,
+                            name: target.name,
+                            monthDate: 'To be decided',
+                            targets: []
+                            };
+                        }
+                        acc[userId].targets.push(target);
+                        return acc;
+                    }, {});
+                }
+                else {
+                    // Group targets by userId
+                    groupedByUser = targets.reduce((acc, target) => {
+                        const userId = target.userId;
+                        if (!acc[userId]) {
+                        acc[userId] = {
+                            userId: userId,
+                            name: target.name,
+                            monthDate: target.targetAmount > 0 ? target.monthDate : 'To be decided',
+                            targets: []
+                        };
+                        }
+                        acc[userId].targets.push(target);
+                        return acc;
+                    }, {});
+                }
+                return NextResponse.json({
+                    success: true,
+                    data: Object.values(groupedByUser),
+                    count: targets.length,
+                });
             }
-            return NextResponse.json({
-                success: true,
-                data: Object.values(groupedByUser),
-                count: targets.length,
-            });
-        } 
+        }
         
         else {
             // wrong secret key
