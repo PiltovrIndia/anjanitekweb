@@ -313,8 +313,15 @@ export async function POST(request, {params}) {
             );
 
             // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 1]);
-            const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthOfPaymentDate+'"', [invoice.appliedAmount, 3]);
+            const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE userId=? AND categoryId=? AND monthDate="'+firstOfMonthOfPaymentDate+'"', [invoice.appliedAmount, invoice.billTo, 3]);
             console.log(invoice.appliedAmount);
+
+          
+          if(remainingAmount > 0){
+            // update target collection
+              const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE userId=? AND categoryId=? AND monthDate="'+firstOfMonthOfPaymentDate+'"', [remainingAmount, invoice.billTo, 3]);
+              console.log(remainingAmount);
+          }
             
             // add applied amounts for each invoice in sequence
             // if(appliedAmounts.length > 0){
@@ -352,12 +359,6 @@ export async function POST(request, {params}) {
             const q = 'UPDATE payments SET amounts=?,invoiceNo=?, paymentDate=?, adminId=?, balance=? WHERE paymentId=?';
             const [payments] = await connection.query(q,[appliedAmounts,invcs, paymentDate, adminId, bal, particular.split(',')[1]]);
     
-          }
-
-          if(remainingAmount > 0){
-            // update target collection
-              const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthOfPaymentDate+'"', [remainingAmount, 3]);
-              console.log(remainingAmount);
           }
 
           
@@ -580,13 +581,13 @@ export async function POST(request, {params}) {
             
             category = 1;
             // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 1]);
-            const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
+            const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE userId=? AND categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, invoice.billTo, 3]);
           } else if (invoice.invoiceType == 'ATL') {
             
             category = 2;
             
             // const [targetResult] = await connection.query('UPDATE targets SET actualAmount = actualAmount - ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.sales, 2]);
-            const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, 3]);
+            const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE userId=? AND categoryId=? AND monthDate="'+firstOfMonthStr+'"', [invoice.appliedAmount, invoice.billTo, 3]);
           } 
 
         }
@@ -694,7 +695,7 @@ export async function POST(request, {params}) {
                 // get the invoiceDate's month first date
                 const invoiceDateFirstDate = dayjs(selectedInvoice[0].invoiceDate).startOf('month').format('YYYY-MM-DD');
                 
-                const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE categoryId=? AND monthDate="'+invoiceDateFirstDate+'"', [boxes, 3]);
+                const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE userId=? AND categoryId=? AND monthDate="'+invoiceDateFirstDate+'"', [boxes, selectedInvoice[0].billTo, 3]);
                 
             }
             

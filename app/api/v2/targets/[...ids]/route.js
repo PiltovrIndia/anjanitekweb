@@ -58,7 +58,7 @@ export async function GET(request, { params }) {
                 // Build conditions string for SQL IN clause with all userIds
                 var conditionsString1 = `(${Array.from(allUserIds).map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
 
-                const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
+                const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.targetOpening, st.actualAmount, 
                         st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
                     FROM targets st
                     JOIN user u ON st.userId = u.id
@@ -73,7 +73,7 @@ export async function GET(request, { params }) {
                     const previousMonth = new Date(new Date(params.ids[2]).setMonth(new Date(params.ids[2]).getMonth() - 1)).toISOString().slice(0, 7) + '-01';
                     console.log(previousMonth);
                     
-                    const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
+                    const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.targetOpening, st.actualAmount, 
                         st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
                     FROM targets st
                     JOIN user u ON st.userId = u.id
@@ -160,7 +160,7 @@ export async function GET(request, { params }) {
                 // Build conditions string for SQL IN clause with all userIds
                 var conditionsString1 = `(${Array.from(allUserIds).map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
 
-                const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
+                const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.targetOpening, st.actualAmount, 
                         st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
                     FROM targets st
                     JOIN user u ON st.userId = u.id
@@ -175,19 +175,18 @@ export async function GET(request, { params }) {
                     
                     // Add 3 entries for all the users with role 'dealer' for the given month with categoryId 1, 2 and 3 with targetAmount and actualAmount as 0, we can identify these entries by checking the monthDate value as 'To be decided'
                     const newMonth = new Date(new Date(params.ids[2]).setMonth(new Date(params.ids[2]).getMonth())).toISOString().slice(0, 7) + '-01';
-                    console.log(newMonth);
-
+                    
                     // get all users with role 'dealer'
                     const [dealerRows] = await db.query(`SELECT id FROM user WHERE role='Dealer'`);
                     
                     // insert 3 entries for each dealer for the given month
                     for(const dealer of dealerRows){
-                        await db.query(`INSERT INTO targets (userId, monthDate, categoryId, targetAmount, actualAmount, createdAt, updatedAt) VALUES ('${dealer.id}', '${newMonth}', 1, 0, 0, NOW(), NOW())`);
-                        await db.query(`INSERT INTO targets (userId, monthDate, categoryId, targetAmount, actualAmount, createdAt, updatedAt) VALUES ('${dealer.id}', '${newMonth}', 2, 0, 0, NOW(), NOW())`);
-                        await db.query(`INSERT INTO targets (userId, monthDate, categoryId, targetAmount, actualAmount, createdAt, updatedAt) VALUES ('${dealer.id}', '${newMonth}', 3, 0, 0, NOW(), NOW())`);
+                        await db.query(`INSERT INTO targets (userId, monthDate, categoryId, targetAmount, targetOpening, actualAmount, createdAt, updatedAt) VALUES ('${dealer.id}', '${newMonth}', 1, 0, 0, 0, NOW(), NOW())`);
+                        await db.query(`INSERT INTO targets (userId, monthDate, categoryId, targetAmount, targetOpening, actualAmount, createdAt, updatedAt) VALUES ('${dealer.id}', '${newMonth}', 2, 0, 0, 0, NOW(), NOW())`);
+                        await db.query(`INSERT INTO targets (userId, monthDate, categoryId, targetAmount, targetOpening, actualAmount, createdAt, updatedAt) VALUES ('${dealer.id}', '${newMonth}', 3, 0, 0, 0, NOW(), NOW())`);
                     }
                     
-                    const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.actualAmount, 
+                    const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.targetOpening, st.actualAmount, 
                         st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
                     FROM targets st
                     JOIN user u ON st.userId = u.id
