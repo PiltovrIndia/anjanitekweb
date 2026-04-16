@@ -82,13 +82,13 @@ export async function GET(request,{params}) {
             // update a reservation status
             else if(params.ids[1] == 'U3'){
                 try {
-                    
-                    // We shall use approvedOn field as modified timestamp 
-                    const [rows, fields] = await connection.execute('UPDATE reservations SET approvedQty='+params.ids[4]+', approvedOn = "'+params.ids[6]+'", status="'+params.ids[3]+'" WHERE id="'+params.ids[2]+'"');
-                    
+                                        
                     // get the design of the reservation to update the stock if the reservation is approved
                     const [reservationRows, reservationFields] = await connection.execute('SELECT * from reservations WHERE id="'+params.ids[2]+'"');
 
+                    // We shall use approvedOn field as modified timestamp 
+                    const [rows, fields] = await connection.execute('UPDATE reservations SET approvedQty='+params.ids[4]+', approvedOn = "'+params.ids[6]+'", status="'+params.ids[3]+'" WHERE id="'+params.ids[2]+'"');
+                    
                     // if status is 'approved', lets minus the approvedQty from the respective design stock
                     if(params.ids[3] == 'Approved' && reservationRows.length > 0){
                         const design = reservationRows[0].design;
@@ -125,11 +125,11 @@ export async function GET(request,{params}) {
             // modify a reservation status & quantity
             else if(params.ids[1] == 'U3.1'){
                 try {
-                    // We shall use approvedOn field as modified timestamp 
-                    const [rows, fields] = await connection.execute('UPDATE reservations SET approvedQty='+params.ids[4]+', modifiedOn = "'+params.ids[6]+'", status="'+params.ids[3]+'" WHERE id="'+params.ids[2]+'"');
-
                     // get the design of the reservation to update the stock if the reservation is approved
                     const [reservationRows, reservationFields] = await connection.execute('SELECT * from reservations WHERE id="'+params.ids[2]+'"');
+
+                    // We shall use approvedOn field as modified timestamp 
+                    const [rows, fields] = await connection.execute('UPDATE reservations SET approvedQty='+params.ids[4]+', modifiedOn = "'+params.ids[6]+'", status="'+params.ids[3]+'" WHERE id="'+params.ids[2]+'"');
 
                     // if status is 'approved', lets minus the approvedQty from the respective design stock
                     if(params.ids[3] == 'Modified' && reservationRows.length > 0){
@@ -147,9 +147,12 @@ export async function GET(request,{params}) {
                     }
                     // rejected reservation should add the approvedQty back to the stock
                     else if(params.ids[3] == 'Rejected' && reservationRows.length > 0){
+                        console.log(reservationRows[0]);
+                        
                         const design = reservationRows[0].design;
                         const stockType = reservationRows[0].stockType;
-                        const approvedQty = Number(params.ids[4]);
+                        const approvedQty = Number(reservationRows[0].approvedQty);
+                        // const approvedQty = Number(params.ids[4]);
 
                         // update the stock directly based on stockType
                         if(stockType == 'std'){
