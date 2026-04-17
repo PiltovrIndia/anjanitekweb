@@ -4,6 +4,11 @@
 // that way we are simplyflying the targets management for dealers
 
 "use client";
+import { Inter } from 'next/font/google';
+import styles from '../../../../app/page.module.css'
+const inter = Inter({ subsets: ['latin'] })
+import dayjs from "dayjs";
+import { SpinnerGap } from "phosphor-react";
 import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 
@@ -15,16 +20,36 @@ export default function TargetsPage() {
     const [message, setMessage] = useState({ type: "", text: "" });
 
     useEffect(() => {
-        fetchTargets();
+        fetchTargets(dayjs().format('YYYY-MM-01'));
     }, []);
 
-    const fetchTargets = async () => {
+    const fetchTargets = async (month) => {
         setLoading(true);
         try {
-            const response = await fetch("/api/targets");
+            // const response = await fetch(`/api/targets/${process.env.NEXT_PUBLIC_API_PASS}/T1/${dayjs().format('YYYY-MM-DD')}/A0004,A0005`);
+            const response = await fetch(`/api/v2/user/${process.env.NEXT_PUBLIC_API_PASS}/U7/superadmin`);
             const data = await response.json();
-            if (data.success) {
-                setTargets(data.targets);
+
+            if (data.status == 200) {
+                // get the list from data.data into a list
+                var list = data.data || [];
+
+                // parse through the list and create a comma separated string of all ids from each object
+                var ids = list.map(item => item.id).join(",");
+
+                const response1 = await fetch(`/api/v2/targets/${process.env.NEXT_PUBLIC_API_PASS}/T1/${month}/${ids}`);
+                const data1 = await response1.json();
+                
+                if (data1.success) {
+                    
+                    setTargets(data1.data);
+                    setLoading(false);
+                } else {
+                    setMessage({ type: "error", text: data1.message || "Failed to fetch targets" });
+                    setLoading(false);
+                }
+                setLoading(false);
+                // setTargets(data.targets);
             }
         } catch (error) {
             console.error("Error fetching targets:", error);
@@ -89,8 +114,6 @@ export default function TargetsPage() {
 
             // Process the combined data using processExcelData
             const processedTargets = processExcelData(allJsonData);
-
-            console.log(processedTargets);
             
 
             const response = await fetch("/api/v2/targets/upload", {
@@ -185,7 +208,9 @@ export default function TargetsPage() {
     };
 
     return (
-        <div className="container mx-auto p-6">
+        <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px', overflow:'scroll'}}>
+        
+        <div className="overflow-scroll mx-auto py-6 pr-6 pl-1" style={{width:'100%',height:'100%'}}>
             <h1 className="text-2xl font-bold mb-6">Sales Targets Management</h1>
 
             {/* Upload Section */}
@@ -227,47 +252,170 @@ export default function TargetsPage() {
                 </div>
             </div>
 
-            {/* Targets Table */}
-            <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold mb-4">Targets & Achievements</h2>
+            {/* Month Selector */}
+            <div className='flex flex-row items-center py-6 justify-between'>
+                
+                <div className="flex flex-row items-center gap-2">
+                    <h2 className="text-lg font-semibold">Targets</h2>
+                    <select
+                        onChange={(e) => {
+                            const selectedMonth = e.target.value;
+                            fetchTargets(selectedMonth);
+                        }}
+                        className="shadow w-full px-3 py-2 border border-input rounded-md bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {Array.from({ length: 12 }, (_, i) => {
+                            const date = dayjs().subtract(i, 'month');
+                            return (
+                                <option key={i} value={date.format('YYYY-MM-01')}>
+                                    {date.format('MMM YYYY')}
+                                </option>
+                            );
+                        })}
+                    </select>
+                </div>
+
+                <button
+                    onClick={() => {
+                        const worksheet = XLSX.utils.json_to_sheet([]);
+                        const workbook = XLSX.utils.book_new();
+                        
+                        // Add headers
+                        const headers = ['Dealer', 'VCL Target', 'VCL Actual', 'VCL Achieved %', 'ATL Target', 'ATL Actual', 'ATL Achieved %', 'Collection Target', 'Collection Actual', 'Collection Achieved %'];
+                        XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
+                        
+                        // Add data rows
+                        const data = targets.map((item) => {
+                            const categoryMap = {};
+                            if (Array.isArray(item.targets)) {
+                                item.targets.forEach(target => {
+                                    if (!categoryMap[target.categoryId]) {
+                                        categoryMap[target.categoryId] = [];
+                                    }
+                                    categoryMap[target.categoryId].push(target);
+                                });
+                            }
+                            
+                            const getCategoryValues = (categoryId) => {
+                                const targetEntry = categoryMap[categoryId]?.find(t => t.targetAmount !== undefined) || {};
+                                const actualEntry = categoryMap[categoryId]?.find(t => t.actualAmount !== undefined) || {};
+                                const targetAmount = Number(targetEntry.targetAmount ?? 0);
+                                const actualAmount = Number(actualEntry.actualAmount ?? 0);
+                                return {
+                                    targetAmount,
+                                    actualAmount,
+                                    achievement: targetAmount > 0 ? ((actualAmount / targetAmount) * 100).toFixed(1) : "0.0",
+                                };
+                            };
+                            
+                            const vcl = getCategoryValues(1);
+                            const atl = getCategoryValues(2);
+                            const collection = getCategoryValues(3);
+                            
+                            return [item.name, vcl.targetAmount, vcl.actualAmount, vcl.achievement, atl.targetAmount, atl.actualAmount, atl.achievement, collection.targetAmount, collection.actualAmount, collection.achievement];
+                        });
+                        
+                        XLSX.utils.sheet_add_aoa(worksheet, data, { origin: 'A2' });
+                        XLSX.utils.book_append_sheet(workbook, worksheet, "Targets");
+                        XLSX.writeFile(workbook, `targets_${dayjs().format('YYYY-MM-DD')}.xlsx`);
+                    }}
+                    className="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-600"
+                >
+                    Download Targets
+                </button>
+            </div>
+
+<div className="mx-auto" style={{width:'100%',height:'100%'}}>
+            <div className="bg-white rounded-lg shadow">
                 {loading ? (
-                    <p>Loading...</p>
+                    <div className="flex flex-row p-12">    
+                        <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
+                        <p className={`${inter.className} ${styles.text3}`}>Loading targets...</p> 
+                    </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="min-w-full table-auto">
                             <thead>
                                 <tr className="bg-gray-100">
-                                    <th className="px-4 py-2 text-left">User ID</th>
-                                    <th className="px-4 py-2 text-left">Category</th>
-                                    <th className="px-4 py-2 text-left">Month</th>
-                                    <th className="px-4 py-2 text-right">Target Amount</th>
-                                    <th className="px-4 py-2 text-right">Actual Amount</th>
-                                    <th className="px-4 py-2 text-right">Achievement %</th>
+                                    <th className="px-4 py-2 text-left rounded-tl-lg">Dealer</th>
+                                    {/* <th className="px-4 py-2 text-left">Month</th> */}
+                                    <th colSpan="3" className="px-4 py-2 text-center bg-orange-300">VCL (boxes)</th>
+                                    <th colSpan="3" className="px-4 py-2 text-center bg-pink-300">ATL (boxes)</th>
+                                    <th colSpan="3" className="px-4 py-2 text-center bg-indigo-300 rounded-tr-lg">Collections (INR)</th>
+                                </tr>
+                                <tr className="bg-gray-50">
+                                    <th colSpan="1"></th>
+                                    <th className="px-4 py-2 text-right bg-orange-200">Target</th>
+                                    <th className="px-4 py-2 text-right bg-orange-200">Actual</th>
+                                    <th className="px-4 py-2 text-right bg-orange-200">Achieved</th>
+                                    <th className="px-4 py-2 text-right bg-pink-200">Target</th>
+                                    <th className="px-4 py-2 text-right bg-pink-200">Actual</th>
+                                    <th className="px-4 py-2 text-right bg-pink-200">Achieved</th>
+                                    <th className="px-4 py-2 text-right bg-indigo-200">Target</th>
+                                    <th className="px-4 py-2 text-right bg-indigo-200">Actual</th>
+                                    <th className="px-4 py-2 text-right bg-indigo-200">Achieved</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {targets.map((target, index) => (
-                                    <tr key={index} className="border-b hover:bg-gray-50">
-                                        <td className="px-4 py-2">{target.user_id}</td>
-                                        <td className="px-4 py-2">{target.category}</td>
-                                        <td className="px-4 py-2">{target.month}</td>
-                                        <td className="px-4 py-2 text-right">
-                                            {target.target_amount?.toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-2 text-right">
-                                            {target.actual_amount?.toLocaleString()}
-                                        </td>
-                                        <td className="px-4 py-2 text-right">
-                                            {target.target_amount > 0
-                                                ? ((target.actual_amount / target.target_amount) * 100).toFixed(1)
-                                                : 0}
-                                            %
-                                        </td>
-                                    </tr>
-                                ))}
+                                {targets?.map((item, index) => {
+                                    const categoryMap = {};
+                                    
+                                    if (Array.isArray(item.targets)) {
+                                        item.targets.forEach(target => {
+                                            if (!categoryMap[target.categoryId]) {
+                                                categoryMap[target.categoryId] = [];
+                                            }
+                                            categoryMap[target.categoryId].push(target);
+                                        });
+                                    }
+
+                                    const getCategoryValues = (categoryId) => {
+                                        const targetEntry = categoryMap[categoryId]?.find(t => t.targetAmount !== undefined) || {};
+                                        const actualEntry = categoryMap[categoryId]?.find(t => t.actualAmount !== undefined) || {};
+                                        
+                                        const targetAmount = Number(targetEntry.targetAmount ?? 0);
+                                        const actualAmount = Number(actualEntry.actualAmount ?? 0);
+
+                                        return {
+                                            targetAmount,
+                                            actualAmount,
+                                            achievement:
+                                                targetAmount > 0
+                                                    ? ((actualAmount / targetAmount) * 100).toFixed(1)
+                                                    : "0.0",
+                                        };
+                                    };
+
+                                    const vcl = getCategoryValues(1);
+                                    const atl = getCategoryValues(2);
+                                    const collection = getCategoryValues(3);
+
+                                    return (
+                                        <tr
+                                            key={`${item.userId || item.id || index}`}
+                                            className="border-b hover:bg-gray-50"
+                                        >
+                                            <td className="px-4 py-2">{item.name}
+                                                <br/><span className="text-sm text-gray-500">{item.userId || item.id || "-"}</span></td>
+                                            {/* <td className="px-4 py-2">{item.name}</td> */}
+                                            
+                                            <td className="px-4 py-2 text-right bg-orange-100 font-mono">{vcl.targetAmount.toLocaleString()}</td>
+                                            <td className="px-4 py-2 text-right bg-orange-100 font-mono">{vcl.actualAmount.toLocaleString()}</td>
+                                            <td className="px-4 py-2 text-right bg-orange-100 font-mono">{vcl.achievement}%</td>
+
+                                            <td className="px-4 py-2 text-right bg-pink-100 font-mono">{atl.targetAmount.toLocaleString()}</td>
+                                            <td className="px-4 py-2 text-right bg-pink-100 font-mono">{atl.actualAmount.toLocaleString()}</td>
+                                            <td className="px-4 py-2 text-right bg-pink-100 font-mono">{atl.achievement}%</td>
+
+                                            <td className="px-4 py-2 text-right bg-indigo-100 font-mono">{collection.targetAmount.toLocaleString()}</td>
+                                            <td className="px-4 py-2 text-right bg-indigo-100 font-mono">{collection.actualAmount.toLocaleString()}</td>
+                                            <td className="px-4 py-2 text-right bg-indigo-100 font-mono">{collection.achievement}%</td>
+                                        </tr>
+                                    );
+                                })}
                                 {targets.length === 0 && (
                                     <tr>
-                                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                                        <td colSpan="11" className="px-4 py-8 text-center text-gray-500">
                                             No targets found. Upload an Excel file to get started.
                                         </td>
                                     </tr>
@@ -277,6 +425,8 @@ export default function TargetsPage() {
                     </div>
                 )}
             </div>
+            </div>
+        </div>
         </div>
     );
 }

@@ -9,7 +9,6 @@ console.log(params);
     // authorize secret key
     if(await Keyverify(params.ids[0])){
 
-      // get the list of product related tags
       if(params.ids[1] == 'U0'){
     
           // month query param: "2025-10" (YYYY-MM). Default = current month.
@@ -69,6 +68,7 @@ console.log(params);
             }
 
             sql += ' ORDER BY u.name, c.code';
+console.log(sql);
 
             const [rows] = await conn.query(sql, params);
             const result = groupByUser(rows);

@@ -118,7 +118,7 @@ export async function GET(request, { params }) {
                 });
             }
         
-        else  if(params.ids[1] === 'T1'){
+        else if(params.ids[1] === 'T1'){
 
                 // check if month value is All, if so we need to get the targets for all months for the given userIds
                 var monthCondition = '';
@@ -167,6 +167,7 @@ export async function GET(request, { params }) {
                     WHERE ${conditionsString1} ${monthCondition}`;
                 
                     const [targets] = await db.query(query);
+console.log(targets);
 
                 var groupedByUser = {};
 
@@ -230,6 +231,87 @@ export async function GET(request, { params }) {
                     count: targets.length,
                 });
             }
+            // This is for Web
+        else if(params.ids[1] === 'T2'){
+
+                // check if month value is All, if so we need to get the targets for all months for the given userIds
+                var monthCondition = '';
+                if(params.ids[2] === 'All'){
+                    monthCondition = '';
+                }
+                else {
+                    monthCondition = ` AND st.monthDate = '${new Date(new Date(params.ids[2]).setMonth(new Date(params.ids[2]).getMonth())).toISOString().slice(0, 7) + '-01'}' `;
+                }
+
+                var usersCondition = '';
+                var userIds = '';
+                if(params.ids[3] === 'All'){
+                    usersCondition = '';
+                }
+                else {
+                
+                    userIds = params.ids[3].split(',');
+                    usersCondition = `(${userIds.map((userId) => `'${userId}'`).join(', ')})`;
+                }
+
+                const [rows, fields] = [];
+                // Recursively get userIds until we reach Dealer role
+                let currentIds = userIds;
+                const allUserIds = new Set(userIds);
+                
+                // Loop until there are no more userIds to process
+                while (currentIds.length > 0) {
+                    const conditionStr = `(${currentIds.map((id) => `'${id}'`).join(', ')})`;
+                    const [rows] = await db.query(`SELECT id, role FROM user WHERE mapTo IN ${conditionStr}`);
+                    
+                    if (rows.length === 0) break;
+                    
+                    const nextIds = [];
+                    rows.forEach((row) => {
+                        allUserIds.add(row.id);
+                        if (row.role !== 'Dealer') {
+                            nextIds.push(row.id);
+                        }
+                    });
+                    
+                    currentIds = nextIds;
+                }
+                
+                // Build conditions string for SQL IN clause with all userIds
+                var conditionsString1 = `(${Array.from(allUserIds).map((userId) => `st.userId LIKE '%${userId}%'`).join(' OR ')})`;
+
+                const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.targetOpening, st.actualAmount, 
+                        st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
+                    FROM targets st
+                    JOIN user u ON st.userId = u.id
+                    WHERE ${conditionsString1} ${monthCondition}`;
+                
+                    const [targets] = await db.query(query);
+console.log(targets);
+
+                var groupedByUser = {};
+                
+                    // Group targets by userId
+                    groupedByUser = targets.reduce((acc, target) => {
+                        const userId = target.userId;
+                        if (!acc[userId]) {
+                        acc[userId] = {
+                            userId: userId,
+                            name: target.name,
+                            monthDate: target.targetAmount > 0 ? target.monthDate : 'To be decided',
+                            targets: []
+                        };
+                        }
+                        acc[userId].targets.push(target);
+                        return acc;
+                    }, {});
+                }
+                return NextResponse.json({
+                    success: true,
+                    data: Object.values(groupedByUser),
+                    count: targets.length,
+                });
+            
         }
         
         else {
@@ -240,7 +322,7 @@ export async function GET(request, { params }) {
     } catch (error) {
         console.error('Error fetching targets:', error);
         return NextResponse.json(
-            { error: 'Failed to fetch targets' },
+            { error: 'Failed to fetch targets'+error.message },
             { status: 500 }
         );
     }

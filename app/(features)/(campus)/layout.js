@@ -156,8 +156,8 @@ const inter = Inter({ subsets: ['latin'] })
     }
     function navigateSaleTargets(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('SaleTargets')
-      router.push('/saletargets')
+      setSelectedTab('Targets')
+      router.push('/targets')
     }
     function navigateMessages(){
       // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
@@ -229,7 +229,7 @@ const inter = Inter({ subsets: ['latin'] })
                 {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Confirmations' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateConfirmations.bind(this)} style={{cursor:'pointer'}}><CheckCircle className={styles.menuicon}/> Confirmations</div> : <div></div>}
                 {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Sales' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSales.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Sales</div> : <div></div>}
                 {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers Pending' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealersPending.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers Pending</div> */}
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'SaleTargets' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSaleTargets.bind(this)} style={{cursor:'pointer'}}><Target className={styles.menuicon}/> Sale Targets</div>
+                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'SaleTargets' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSaleTargets.bind(this)} style={{cursor:'pointer'}}><Target className={styles.menuicon}/> Targets</div>
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Messages' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateMessages.bind(this)} style={{cursor:'pointer'}}><Chats className={styles.menuicon}/> Messages</div>
                 <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Feed' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateFeed.bind(this)} style={{cursor:'pointer'}}><Rows className={styles.menuicon}/> Feed</div>
                 {(role == 'SuperAdmin' || role == 'StockAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'App Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateAppReports.bind(this)} style={{cursor:'pointer'}}><PresentationChart className={styles.menuicon}/> App Reports</div> : <div></div>}
