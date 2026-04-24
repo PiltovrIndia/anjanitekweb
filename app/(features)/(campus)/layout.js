@@ -1,315 +1,111 @@
 'use client'
-import { Inter } from 'next/font/google'
-import styles from '../../../app/page.module.css'
-import { Monitor, UserFocus, Chats, ArrowSquareOut, CaretUp, PresentationChart, IdentificationBadge, CalendarCheck, UserPlus, FileImage, PersonSimpleRun, Files, Rows, Power, Receipt, CheckCircle, Tag, ChartLine, GridFour, Target } from 'phosphor-react'
+
 import Image from 'next/image'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import Biscuits from 'universal-cookie'
-const biscuits = new Biscuits
-import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react';
-import Registration from './registration/form/page'
 
-import { Toaster } from "@/app/components/ui/toaster"
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuContent } from "@/app/components/ui/dropdown-menu"
+import { AppSidebar } from '@/app/components/app-sidebar'
+import { Separator } from '@/app/components/ui/separator'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/app/components/ui/sidebar'
+import { Toaster } from '@/app/components/ui/toaster'
 
+const biscuits = new Biscuits()
 
-const inter = Inter({ subsets: ['latin'] })
+const PAGE_TITLES = {
+  '/appreports': 'App Reports',
+  '/confirmations': 'Confirmations',
+  '/dashboard': 'Dashboard',
+  '/dashboard2': 'Dealer Requests',
+  '/dealers': 'Dealers',
+  '/feed': 'Feed',
+  '/forecast': 'Forecast',
+  '/invoices': 'Invoices',
+  '/ledger': 'Ledger Import',
+  '/manageimages': 'Manage Images',
+  '/messages': 'Messages',
+  '/offers': 'Offers',
+  '/productsv2': 'Designs',
+  '/registration/form': 'Registration',
+  '/sales': 'Sales',
+  '/targets': 'Targets',
+}
 
-  export default function CampusLayout({ children }) {
+function formatSegment(segment = '') {
+  return segment
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
 
-    // // variable to store the active tab
-    const [selectedTab, setSelectedTab] = useState('Dashboard');
-    const [userData, setUserData] = useState();
-    const [name, setName] = useState();
-    var userName = '';
-    const [role, setRole] = useState();
-    const [id, setId] = useState();
-    // function handleTabChange(tabName){
-    //     setSelectedTab(tabName);
-    //     console.log(tabName);
-    //   }
-    
-    // create a router for auto navigation
-    const router = useRouter();
-    // setTab();
-    // clear cookies or logout and navigate to verification
-    function clearCookies(){
+function getPageTitle(pathname) {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname]
 
-      //  document.cookie = "";
-      biscuits.remove('sc_user_detail')
-      router.push('/')
-      
+  const segments = pathname.split('/').filter(Boolean)
+  return formatSegment(segments[segments.length - 1] || 'Workspace')
+}
+
+export default function CampusLayout({ children }) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [userData, setUserData] = useState(null)
+  const [isReady, setIsReady] = useState(false)
+
+  useEffect(() => {
+    const cookieValue = biscuits.get('sc_user_detail')
+
+    if (!cookieValue) {
+      router.replace('/')
+      setIsReady(true)
+      return
+    }
+
+    try {
+      const parsedUser = JSON.parse(decodeURIComponent(cookieValue))
+      setUserData(parsedUser)
+    } catch {
+      biscuits.remove('sc_user_detail', { path: '/' })
+      router.replace('/')
+    } finally {
+      setIsReady(true)
+    }
+  }, [router])
+
+  const pageTitle = useMemo(() => getPageTitle(pathname), [pathname])
+  const showSidebar = userData?.role && userData.role !== 'Student'
+
+  if (!isReady) {
+    return null
   }
 
-  // this will ask you to stop before reloading
-  useEffect(() => {
-
-
-    let cookieValue = biscuits.get('sc_user_detail')
-    if(cookieValue){
-        const obj = JSON.parse(decodeURIComponent(cookieValue)) // get the cookie data
-        userName = obj.name;
-        // configure some variables
-        setUserData(obj);
-        setName(obj.name);
-        setRole(obj.role);
-        setId(obj.collegeId);
-
-        // set the user state variable
-        
-        // get the requests data if doesnot exist
-        // if(!requests){
-
-        //     // set the view by status based on the role
-            if(obj.role == 'SuperAdmin'){
-                setSelectedTab('Dashboard')
-                // getData(obj.role, 'Returned', obj.collegeId, obj.branch);
-            }
-            else if(obj.role == 'admin'){
-                setSelectedTab('Dealers')
-                // getData(obj.role, 'Returned', obj.collegeId, obj.branch);
-            }
-            
-            else if(obj.role == 'StockAdmin' || obj.role == 'SuperAdmin'){
-                setSelectedTab('Products')
-                // getData(obj.role, 'Returned', obj.collegeId, obj.branch);
-            }
-            
-        //     else if(obj.role == 'SuperAdmin' || obj.role == 'Admin'){
-        //         console.log('SuperAdmin');
-        //         setViewByStatus('Submitted')
-        //         getData(obj.role, 'Submitted', obj.collegeId, obj.branch);
-        //     }
-        //     else if(obj.role == 'OutingAdmin' || obj.role == 'OutingIssuer'){
-        //         console.log('OutingAdmin');
-        //         setViewByStatus('Approved')
-        //         getData(obj.role, 'Approved', obj.collegeId, obj.branch);
-        //     }
-        //     else if(obj.role == 'OutingAssistant'){
-        //         console.log('OutingAssistant');
-        //         setViewByStatus('Issued')
-        //         getData(obj.role, 'Issued', obj.collegeId, obj.branch);
-        //     }   
-        // }
-    }
-    else{
-        router.push('/')
-    }
-
-    // const handleBeforeUnload = (event) => {
-    //   event.returnValue = 'ok ok';
-    // };
-
-    // window.addEventListener('beforeunload', handleBeforeUnload);
-
-    // return () => {
-    //   window.removeEventListener('beforeunload', handleBeforeUnload);
-    // }
-  }, []);
-
-    
-    // Navigation
-    function navigateAppReports(){
-      // biscuits.set('selectedTab', 'Dashboard', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('App Reports')
-      router.push('/appreports')
-    }
-    function navigateDashboard(){
-      // biscuits.set('selectedTab', 'Dashboard', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Dashboard')
-      router.push('/dashboard')
-    }
-    function navigateDealers(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Dealers')
-      router.push('/dealers')
-    }
-    function navigateOffers(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Offers')
-      router.push('/offers')
-    }
-    function navigateConfirmations(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Confirmations')
-      router.push('/confirmations')
-    }
-    function navigateInvoices(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Invoices')
-      router.push('/invoices')
-    }
-    function navigateSales(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Sales')
-      router.push('/sales')
-    }
-    function navigateProducts(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Products')
-      router.push('/productsv2')
-    }
-    function navigateDealersPending(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Dashboard2')
-      router.push('/dashboard2')
-    }
-    function navigateSaleTargets(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Targets')
-      router.push('/targets')
-    }
-    function navigateMessages(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Messages')
-      router.push('/messages')
-    }
-    function navigateForecast(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Forecast')
-      router.push('/forecast')
-    }
-    function navigateFeed(){
-      // biscuits.set('selectedTab', 'Dealers', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Feed')
-      router.push('/feed')
-    }
-    function navigateRegistration(){
-      // biscuits.set('selectedTab', 'Registration', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Registration')
-      router.push('/registration/form')
-    }
-    function navigateManageImages(){
-      // biscuits.set('selectedTab', 'Registration', {path: '/', expires: new Date(Date.now() + 10800000)})
-      setSelectedTab('Manage images')
-      router.push('/manageimages')
-    }
-
-    return (
-
-
-        <div className={styles.main}>
-          
-        <div className={inter.className}>
-          <div className={styles.topbar} style={{height:'6vh'}}>
-            <div className={styles.horizontalsection}>
-              {/* <Image src="/anjani_title.webp" alt="Anjani Tek" width={130} height={36} priority style={{height:'auto'}}/> */}
-              <Image src="/anjani_logo.webp" alt="Anjani Tek" width={40} height={40} priority style={{height:'auto'}}/>
-              <Image src="/anjani_title.webp" alt="Anjani Tek" width={120} height={32} priority style={{height:'auto'}}/>
-              {/* <span style={{color: '#CCCCCC'}}>|</span>
-              <Image src="/anjani_title.webp" alt="Anjani Tek" width={90} height={40} priority style={{height:'auto'}} /> */}
-              {/* <Image src="/svecw_sc_logo.svg" alt="Smart Campus" width={90} height={40} priority style={{height:'auto'}} /> */}
-              {/* <h3>Smart Campus</h3> */}
+  return (
+    <SidebarProvider defaultOpen>
+      {showSidebar ? <AppSidebar userData={userData} /> : null}
+      <SidebarInset>
+        <header className='sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6'>
+          {showSidebar ? <SidebarTrigger className='-ml-1' /> : null}
+          {showSidebar ? <Separator orientation='vertical' className='h-4' /> : null}
+          <div className='flex min-w-0 items-center gap-3'>
+            <div className='relative size-9 overflow-hidden rounded-xl border bg-card'>
+              <Image src='/anjani_logo.webp' alt='Anjani Tek' fill className='object-cover' sizes='36px' priority />
             </div>
-            <div>
-              <p onClick={clearCookies.bind(this)} className='text-sm text-red-600' style={{cursor:'pointer'}} >Log out</p>
-              {/* <p className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >{userName}</p> */}
-              {/* <p className={`${inter.className} ${styles.text2}`} style={{cursor:'pointer'}} >{JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).name}</p> */}
-              {/* <ProfileBtn show={false} /> */}
+            <div className='min-w-0'>
+              <p className='truncate text-sm font-semibold leading-none'>Anjani Tek</p>
+              <p className='truncate pt-1 text-xs text-muted-foreground'>{pageTitle}</p>
             </div>
           </div>
-         
-          <div style={{border: '0.5px solid #E5E7EB', width:'100vw'}}></div>
-              
-              
-          
-        </div>
-
-      <div className={styles.mainlayoutsection} style={{height:'98vh',gap:'0px'}}>
-
-        {(role != 'Student') ? 
-            <div style={{padding:'24px 0px 24px 0px',height: '100%',borderRight: '1px solid #efefef',width:'15%', display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
-              
-              <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-              {(role == 'SuperAdmin' || role == 'SalesManager' ) ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dashboard' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDashboard.bind(this)} style={{cursor:'pointer'}}><Monitor className={styles.menuicon}/> Dashboard</div> : <div></div>}
-              {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Invoices' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateInvoices.bind(this)} style={{cursor:'pointer'}}><Receipt className={styles.menuicon}/> Invoices</div> : <div></div>}
-              {(role == 'SuperAdmin' || role == 'StockAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Products' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateProducts.bind(this)} style={{cursor:'pointer'}}><GridFour className={styles.menuicon}/> Designs</div> : <div></div>}
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealers.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers</div>
-                {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Offers' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOffers.bind(this)} style={{cursor:'pointer'}}><Tag className={styles.menuicon}/> Offers</div> : <div></div>}
-                {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Confirmations' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateConfirmations.bind(this)} style={{cursor:'pointer'}}><CheckCircle className={styles.menuicon}/> Confirmations</div> : <div></div>}
-                {(role == 'SuperAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Sales' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSales.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Sales</div> : <div></div>}
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Dealers Pending' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateDealersPending.bind(this)} style={{cursor:'pointer'}}><UserFocus className={styles.menuicon}/> Dealers Pending</div> */}
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'SaleTargets' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateSaleTargets.bind(this)} style={{cursor:'pointer'}}><Target className={styles.menuicon}/> Targets</div>
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Messages' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateMessages.bind(this)} style={{cursor:'pointer'}}><Chats className={styles.menuicon}/> Messages</div>
-                <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Feed' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateFeed.bind(this)} style={{cursor:'pointer'}}><Rows className={styles.menuicon}/> Feed</div>
-                {(role == 'SuperAdmin' || role == 'StockAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'App Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateAppReports.bind(this)} style={{cursor:'pointer'}}><PresentationChart className={styles.menuicon}/> App Reports</div> : <div></div>}
-                {(role == 'SuperAdmin' || role == 'StockAdmin') ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Forecast' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateForecast.bind(this)} style={{cursor:'pointer'}}><ChartLine className={styles.menuicon}/> Forecast</div> : <div></div>}
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Requests' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOuting.bind(this)} style={{cursor:'pointer'}}><PersonSimpleRun className={styles.menuicon}/> Outing Requests</div> */}
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Outing Reports' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateOutingReports.bind(this)} style={{cursor:'pointer'}}><Files className={styles.menuicon}/> Outing Reports</div> */}
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} style={{cursor:'pointer'}}><ArrowSquareOut className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Outing</div>
-                <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} style={{cursor:'pointer'}}><PresentationChart className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Reports</div> */}
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Registration' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateRegistration.bind(this)} style={{cursor:'pointer'}}><UserPlus className={styles.menuicon}/> Registration</div> */}
-                
-                {/* {id == 'S33' ? <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Manage images' ? styles.leftMenuItem_selected : styles.leftMenuItem} `} onClick={navigateManageImages.bind(this)} style={{cursor:'pointer'}}><FileImage className={styles.menuicon}/> Manage images</div> : ''} */}
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${selectedTab == 'Registration' ? styles.text1 : styles.text2}`} onClick={navigateRegistration.bind(this)} style={{cursor:'pointer'}}><IdentificationBadge className={styles.menuicon} style={{backgroundColor: '#26379b'}}/> Visitor pass</div> */}
-                {/* <div className={`${styles.horizontalsection} ${inter.className} ${styles.text2}`} ><CalendarCheck className={styles.menuicon} /> Control campus outing</div> */}
-              </div>
-              
-              {userData ?
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    {/* <div className={styles.horizontalsection} style={{gap:'8px',padding: '8px',backgroundColor: '#f0f0f0',border: '1px solid #e5e5e5',borderRadius: '8px',margin: '0px 12px'}}> */}
-                    <div className='flex flex-row gap-4 px-4 my-12 items-center'>
-                      <p className='text-sm' style={{cursor:'pointer'}} >{userData.name} - {userData.role}</p>
-                      <CaretUp className="ml-auto" />
-                      {/* <p className={`${inter.className} ${styles.text1}`} style={{cursor:'pointer'}} >{userData.name}</p> */}
-                      {/* <p onClick={clearCookies.bind(this)} className='flex flex-row gap-2 items-center text-slate-600 cursor-pointer' ><Power className={styles.menuicon}/> Log out</p> */}
-                  </div>
-                  {/* <SidebarMenuButton>
-                    <User2 /> Username
-                    <ChevronUp className="ml-auto" />
-                  </SidebarMenuButton> */}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  side="top"
-                  className="w-[--radix-popper-anchor-width]"
-                >
-                  {/* <DropdownMenuItem>
-                    <span>Account</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <span>Billing</span>
-                  </DropdownMenuItem> */}
-                  <DropdownMenuItem onClick={clearCookies.bind(this)} >
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-
-              // <div className={styles.verticalsection} style={{gap:'8px',padding: '8px',backgroundColor: '#f0f0f0',border: '1px solid #e5e5e5',borderRadius: '8px',margin: '0px 12px'}}>
-              //     <p className={`${inter.className} ${styles.text3}  ${styles.tag}`} style={{cursor:'pointer'}} >{userData.name} - {userData.role}</p>
-              //     {/* <p className={`${inter.className} ${styles.text1}`} style={{cursor:'pointer'}} >{userData.name}</p> */}
-              //     <p onClick={clearCookies.bind(this)} className='flex flex-row gap-2 items-center text-slate-600 cursor-pointer' ><Power className={styles.menuicon}/> Log out</p>
-              // </div>
-              : ''}
+          {userData ? (
+            <div className='ml-auto hidden min-w-0 text-right md:block'>
+              <p className='truncate text-sm font-medium'>{userData.name}</p>
+              <p className='truncate text-xs text-muted-foreground'>{userData.role}</p>
             </div>
-          : ''}
-
-        <div className={styles.maindivcenter} style={{height:'90vh', padding: '0px 24px', overflow: 'hidden', scroll:'no'}}>
-        {/* <div className={styles.maindivcenter} style={{height:'90vh', contentVisibility:'auto',padding: '0px 24px'}}> */}
-            
-{/* 
-          <div style={{height:'8vh',display:'flex',flexDirection:'column',justifyContent:'space-around'}}>
-              <h2 className={montserrat.className}>{selectedTab}</h2>
-          </div> */}
-
+          ) : null}
+        </header>
+        <div className='flex flex-1 flex-col overflow-hidden px-4 py-4 md:px-6 md:py-6'>
           {children}
-
           <Toaster />
         </div>
-          
-        </div>
-
-
-
-
-
-          {/* <div className={`${styles.bottombar} ${montserrat.className} ${styles.text3}`} style={{display: 'flex', flexDirection:'column', height:'4vh'}}> 
-          Made with 💙 to empower campuses
-          <br/>
-            
-          </div> */}
-      </div>
-    )
-  }
+      </SidebarInset>
+    </SidebarProvider>
+  )
+}
   

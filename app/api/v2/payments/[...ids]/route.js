@@ -170,6 +170,9 @@ export async function GET(request,{params}) {
 
   
 export async function POST(request, {params}) {
+
+  // get the pool connection to db
+  const connection = await pool.getConnection();
     
   try{
       // authorize secret key
@@ -214,8 +217,19 @@ export async function POST(request, {params}) {
 
             return Response.json({status: 200, message:'Success!'}, {status: 200})
           }
+          else if(params.ids[1] == 'ledgerbulk') {
+            // Bulk insert credit payments from a General Ledger import
+            // Body: array of { amount, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance }
+            const items = await request.json()
+            const q = 'INSERT INTO payments (amount, amounts, type, id, invoiceNo, transactionId, paymentDate, adminId, particular, balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS DECIMAL(10, 2)))'
+            for (const item of items) {
+              await connection.query(q, [item.amount, '', 'credit', item.id, item.invoiceNo ?? '-', item.transactionId, item.paymentDate, item.adminId, item.particular, item.balance])
+            }
+            connection.release()
+            return Response.json({status: 200, message: 'Success!'}, {status: 200})
+          }
           else if(params.ids[1] == 'delete_receipt'){
-            
+
             const paymentItem = await request.json();
             
             // items.forEach(async (item, index) => {
