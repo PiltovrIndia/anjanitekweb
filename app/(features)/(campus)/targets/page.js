@@ -15,9 +15,14 @@ import * as XLSX from "xlsx";
 export default function TargetsPage() {
     const [file, setFile] = useState(null);
     const [targets, setTargets] = useState([]);
+    const [dealerSearch, setDealerSearch] = useState("");
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [message, setMessage] = useState({ type: "", text: "" });
+
+    const filteredTargets = targets.filter((item) =>
+        (item?.name || "").toLowerCase().includes(dealerSearch.trim().toLowerCase())
+    );
 
     useEffect(() => {
         fetchTargets(dayjs().format('YYYY-MM-01'));
@@ -273,6 +278,13 @@ export default function TargetsPage() {
                             );
                         })}
                     </select>
+                    <input
+                        type="search"
+                        value={dealerSearch}
+                        onChange={(e) => setDealerSearch(e.target.value)}
+                        placeholder="Search dealer name"
+                        className="shadow w-full min-w-56 px-3 py-2 border border-input rounded-md bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    />
                 </div>
 
                 <button
@@ -285,7 +297,7 @@ export default function TargetsPage() {
                         XLSX.utils.sheet_add_aoa(worksheet, [headers], { origin: 'A1' });
                         
                         // Add data rows
-                        const data = targets.map((item) => {
+                        const data = filteredTargets.map((item) => {
                             const categoryMap = {};
                             if (Array.isArray(item.targets)) {
                                 item.targets.forEach(target => {
@@ -357,7 +369,7 @@ export default function TargetsPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {targets?.map((item, index) => {
+                                {filteredTargets?.map((item, index) => {
                                     const categoryMap = {};
                                     
                                     if (Array.isArray(item.targets)) {
@@ -413,10 +425,12 @@ export default function TargetsPage() {
                                         </tr>
                                     );
                                 })}
-                                {targets.length === 0 && (
+                                {filteredTargets.length === 0 && (
                                     <tr>
                                         <td colSpan="11" className="px-4 py-8 text-center text-gray-500">
-                                            No targets found. Upload an Excel file to get started.
+                                            {targets.length === 0
+                                                ? "No targets found. Upload an Excel file to get started."
+                                                : "No dealers match the current search."}
                                         </td>
                                     </tr>
                                 )}

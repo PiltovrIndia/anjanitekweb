@@ -709,7 +709,7 @@ export async function POST(request, {params}) {
                 // get the invoiceDate's month first date
                 const invoiceDateFirstDate = dayjs(selectedInvoice[0].invoiceDate).startOf('month').format('YYYY-MM-DD');
                 
-                const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE userId=? AND categoryId=? AND monthDate="'+invoiceDateFirstDate+'"', [boxes, selectedInvoice[0].billTo, 3]);
+                const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE userId=? AND categoryId=? AND monthDate="'+invoiceDateFirstDate+'"', [paymentItem.boxes, selectedInvoice[0].billTo, 3]);
                 
             }
             

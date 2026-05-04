@@ -152,6 +152,7 @@ export default function Products() {
     const [totalReservations, setTotalReservations] = useState([]);
     const [reservations, setReservations] = useState([]);
     const [resLoading, setResLoading] = useState(false);
+    const [downloadingReservations, setDownloadingReservations] = useState(false);
     const [resOffset, setResOffset] = useState(0);
     const [resStatus, setResStatus] = useState('All');
 
@@ -365,6 +366,73 @@ export default function Products() {
             toast({
                 description: "Issue loading, try again later!",
               })
+        }
+    }
+
+    async function downloadReservationsNow() {
+        const statusToDownload = resStatus || 'All';
+        const pageSize = 20;
+
+        setDownloadingReservations(true);
+
+        try {
+            let offsetValue = 0;
+            let hasMore = true;
+            let expectedCount = 0;
+            const allReservations = [];
+
+            while (hasMore) {
+                const result = await getReservationsAPI(process.env.NEXT_PUBLIC_API_PASS, statusToDownload, offsetValue);
+                const queryResult = await result.json();
+
+                if (queryResult.status !== 200) {
+                    throw new Error(queryResult.message || 'Failed to download reservations');
+                }
+
+                const currentBatch = Array.isArray(queryResult.data) ? queryResult.data : [];
+                expectedCount = Number(queryResult.count || 0);
+                allReservations.push(...currentBatch);
+
+                if (currentBatch.length < pageSize || (expectedCount > 0 && allReservations.length >= expectedCount)) {
+                    hasMore = false;
+                } else {
+                    offsetValue += pageSize;
+                }
+            }
+
+            if (allReservations.length === 0) {
+                toast({ description: 'No reservations available to download' });
+                return;
+            }
+
+            const reservationRows = allReservations.map((res) => ({
+                // reservationId: res.id,
+                dealerName: res.dealer || res.username || '-',
+                userId: res.userId || '-',
+                mobile: res.mobile || '-',
+                // salesPerson: res.mapTo || '-',
+                design: res.design || '-',
+                productName: res.name || '-',
+                // productId: res.productId || '-',
+                requestedQty: Number(res.requestedQty || 0),
+                approvedQty: Number(res.approvedQty || 0),
+                stockType: res.stockType || '-',
+                status: res.status || '-',
+                submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                approvedOn: res.approvedOn ? dayjs(res.approvedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+            }));
+
+            const worksheet = xlsx.utils.json_to_sheet(reservationRows);
+            const workbook = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(workbook, worksheet, 'Reservations');
+            xlsx.writeFile(workbook, `reservations_${statusToDownload.toLowerCase()}_${dayjs().format('YYYY-MM-DD_HH-mm')}.xlsx`);
+
+            toast({ description: `Downloaded ${reservationRows.length} reservations` });
+        } catch (e) {
+            toast({ description: e.message || 'Failed to download reservations' });
+        } finally {
+            setDownloadingReservations(false);
         }
     }
 
@@ -804,7 +872,7 @@ return (
                     
                     {(filteredProducts==null) ? '' :
                     filteredProducts.map((product) => (
-                        <TableRow key={product.id} >
+                        <TableRow key={product.id}>
                             <TableCell>
                                 {/* <div className='flex flex-row gap-2 items-center text-blue-600 font-semibold py-4 w-max cursor-pointer' onClick={() => handleRowClick(product)}> {product.name} </div> */}
 
@@ -1325,7 +1393,7 @@ return (
                                     </div>
                                     :
                                     <div className="flex flex-row items-center gap-2">
-                                        <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{handleDeleteClick(row)}}><Trash size={24} className="text-red-600"/> &nbsp;Delete</Button>            
+                                        <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{handleDeleteClick(row)}}><Trash size={16} className="text-red-600"/></Button>            
                                         {/* <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{setSelectedInvoice(row),setIsDialogOpen(true)}}><Trash size={24} className="text-red-600"/> &nbsp;Delete</Button>             */}
                                         {/* Dialog Component */}
                                         
@@ -1359,18 +1427,24 @@ return (
             <TabsContent value="reservations" className="w-full">
                 <div className="flex flex-row justify-between items-center py-4">
                     <span className='text-sm text-slate-500'>{totalReservations} Reservations found</span>
-                    <Select value={resStatus} onValueChange={(val) => { setResStatus(val); getReservations(val, 0); }}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Filter by status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="All">All Status</SelectItem>
-                            <SelectItem value="Submitted">Pending</SelectItem>
-                            <SelectItem value="Approved">Approved</SelectItem>
-                            <SelectItem value="Rejected">Rejected</SelectItem>
-                            <SelectItem value="Modified">Modified</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <div className="flex flex-row items-center gap-3">
+                        <Select value={resStatus} onValueChange={(val) => { setResStatus(val); getReservations(val, 0); }}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Filter by status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Status</SelectItem>
+                                <SelectItem value="Submitted">Pending</SelectItem>
+                                <SelectItem value="Approved">Approved</SelectItem>
+                                <SelectItem value="Rejected">Rejected</SelectItem>
+                                <SelectItem value="Modified">Modified</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Button variant="outline" onClick={downloadReservationsNow} disabled={downloadingReservations}>
+                            <ArrowDown className="mr-2 h-4 w-4" />
+                            {downloadingReservations ? 'Downloading...' : 'Download Reservations'}
+                        </Button>
+                    </div>
                 </div>
 
                 <Card>
