@@ -222,58 +222,66 @@ export async function GET(request,{params}) {
             
             // create a reservation
             else if(params.ids[1] == 'U4'){
-                try {
-                    // for the given design and stock type, check if there is sufficient stock available before creating the reservation
-                    const [stockRows, stockFields] = await connection.execute('SELECT design, prm, std from products1 WHERE design="'+params.ids[3]+'"');
+
+                // we are pausing this feature till June 5th
+                const notificationResult = await send_notification('New stock request received!', params.ids[2], 'Single');
                     
-                    if(stockRows.length == 0){
-                        connection.release();
-                        return Response.json({status: 201, message:'Design not found!'}, {status: 200})
-                    }
+                return Response.json({status: 201, message:'Created!', data: 0, notification: notificationResult}, {status: 200});
 
-                    const stockType = params.ids[5];
-                    const requestedQty = Number(params.ids[4]);
-                    const availableStock = stockType == 'std' ? stockRows[0].std : stockRows[0].prm;
 
-                    // (Future) if requested quantity is greater than available stock, then place 2 separate reservations - one for available stock with status 'approved' and another for remaining quantity with status 'submitted'. This is to make sure that the available stock is reserved for the user and the remaining quantity is in queue for approval once the stock is available.
-                    // if requested quantity is greater than available stock, then place 2 separate reservations - one for available stock with isProduction = 0 and another for remaining quantity with isProduction = 1.
-                    if(requestedQty > availableStock){
+
+                // try {
+                //     // for the given design and stock type, check if there is sufficient stock available before creating the reservation
+                //     const [stockRows, stockFields] = await connection.execute('SELECT design, prm, std from products1 WHERE design="'+params.ids[3]+'"');
+                    
+                //     if(stockRows.length == 0){
+                //         connection.release();
+                //         return Response.json({status: 201, message:'Design not found!'}, {status: 200})
+                //     }
+
+                //     const stockType = params.ids[5];
+                //     const requestedQty = Number(params.ids[4]);
+                //     const availableStock = stockType == 'std' ? stockRows[0].std : stockRows[0].prm;
+
+                //     // (Future) if requested quantity is greater than available stock, then place 2 separate reservations - one for available stock with status 'approved' and another for remaining quantity with status 'submitted'. This is to make sure that the available stock is reserved for the user and the remaining quantity is in queue for approval once the stock is available.
+                //     // if requested quantity is greater than available stock, then place 2 separate reservations - one for available stock with isProduction = 0 and another for remaining quantity with isProduction = 1.
+                //     if(requestedQty > availableStock){
                         
-                        // place the reservation for available stock with status 'submitted'
-                        const [rows1, fields] = await connection.execute('INSERT into reservations (userId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, isProduction) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+(requestedQty-availableStock)+'", "Submitted", 0, "'+params.ids[5]+'", "'+params.ids[6]+'", NULL, NULL, 1)');
-                    }
-                    const [rows, fields] = await connection.execute('INSERT into reservations (userId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, isProduction) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+availableStock+'", "Submitted", 0, "'+params.ids[5]+'", "'+params.ids[6]+'", NULL, NULL, 0)');
+                //         // place the reservation for available stock with status 'submitted'
+                //         const [rows1, fields] = await connection.execute('INSERT into reservations (userId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, isProduction) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+(requestedQty-availableStock)+'", "Submitted", 0, "'+params.ids[5]+'", "'+params.ids[6]+'", NULL, NULL, 1)');
+                //     }
+                //     const [rows, fields] = await connection.execute('INSERT into reservations (userId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, isProduction) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+availableStock+'", "Submitted", 0, "'+params.ids[5]+'", "'+params.ids[6]+'", NULL, NULL, 0)');
                     
-                    // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
-                    const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where role='SuperAdmin'`);
-                    connection.release();
+                //     // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
+                //     const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where role='SuperAdmin'`);
+                //     connection.release();
                     
-                    // get the gcm_regIds list from the query result
-                    var gcmIds = [];
-                    for (let index = 0; index < nrows.length; index++) {
-                        const element = nrows[index].gcm_regId;
+                //     // get the gcm_regIds list from the query result
+                //     var gcmIds = [];
+                //     for (let index = 0; index < nrows.length; index++) {
+                //         const element = nrows[index].gcm_regId;
                         
-                        if(element.length > 3)
-                        gcmIds.push(element); 
-                    }
+                //         if(element.length > 3)
+                //         gcmIds.push(element); 
+                //     }
 
-                    // var gcmIds = 
-                    // console.log(gcmIds);
+                //     // var gcmIds = 
+                //     // console.log(gcmIds);
 
-                    // send the notification
-                    const notificationResult = gcmIds.length > 0 ? await send_notification('New stock request received!', gcmIds, 'Multiple') : null;
+                //     // send the notification
+                //     const notificationResult = gcmIds.length > 0 ? await send_notification('New stock request received!', gcmIds, 'Multiple') : null;
                     
-                    if(rows.insertId > 0){
-                        // return successful update
-                        // return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId}, {status: 200})
-                        return Response.json({status: 200, message:'Created!', data: rows.insertId, notification: notificationResult}, {status: 200})
-                    }
-                    else {
-                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
-                    }
-                } catch (error) {
-                    return Response.json({status: 404, message:'No reservation found!'+error}, {status: 200})
-                }
+                //     if(rows.insertId > 0){
+                //         // return successful update
+                //         // return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId}, {status: 200})
+                //         return Response.json({status: 200, message:'Created!', data: rows.insertId, notification: notificationResult}, {status: 200})
+                //     }
+                //     else {
+                //         return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                //     }
+                // } catch (error) {
+                //     return Response.json({status: 404, message:'No reservation found!'+error}, {status: 200})
+                // }
             }
             // delete a reservation
             else if(params.ids[1] == 'U5'){
