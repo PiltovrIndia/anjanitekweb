@@ -116,6 +116,15 @@ fetch("/api/v2/reservations/"+pass+"/U0/"+type+"/"+offset, {
     },
 });
 
+const getReservationsByDateAPI = async (pass, type, fromDate, toDate) =>
+fetch("/api/v2/reservations/"+pass+"/U0/"+type+"/0?fromDate="+encodeURIComponent(fromDate)+"&toDate="+encodeURIComponent(toDate), {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
 // update reservation status
 const updateReservationStatusAPI = async (pass, path, reservationId, status, qty, userId, actionDate) => 
 fetch("/api/v2/reservations/"+pass+"/"+path+"/"+reservationId+"/"+status+"/"+qty+"/"+userId+"/"+actionDate, {
@@ -155,6 +164,10 @@ export default function Products() {
     const [downloadingReservations, setDownloadingReservations] = useState(false);
     const [resOffset, setResOffset] = useState(0);
     const [resStatus, setResStatus] = useState('All');
+    const [resSearch, setResSearch] = useState('');
+    const [downloadFromDate, setDownloadFromDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
+    const [downloadToDate, setDownloadToDate] = useState(dayjs().format('YYYY-MM-DD'));
+    const [showDownloadPopover, setShowDownloadPopover] = useState(false);
 
     // Approval Dialog State
     const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
@@ -371,34 +384,24 @@ export default function Products() {
 
     async function downloadReservationsNow() {
         const statusToDownload = resStatus || 'All';
-        const pageSize = 20;
 
         setDownloadingReservations(true);
+        setShowDownloadPopover(false);
 
         try {
-            let offsetValue = 0;
-            let hasMore = true;
-            let expectedCount = 0;
-            const allReservations = [];
+            const result = await getReservationsByDateAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                statusToDownload,
+                downloadFromDate,
+                downloadToDate
+            );
+            const queryResult = await result.json();
 
-            while (hasMore) {
-                const result = await getReservationsAPI(process.env.NEXT_PUBLIC_API_PASS, statusToDownload, offsetValue);
-                const queryResult = await result.json();
-
-                if (queryResult.status !== 200) {
-                    throw new Error(queryResult.message || 'Failed to download reservations');
-                }
-
-                const currentBatch = Array.isArray(queryResult.data) ? queryResult.data : [];
-                expectedCount = Number(queryResult.count || 0);
-                allReservations.push(...currentBatch);
-
-                if (currentBatch.length < pageSize || (expectedCount > 0 && allReservations.length >= expectedCount)) {
-                    hasMore = false;
-                } else {
-                    offsetValue += pageSize;
-                }
+            if (queryResult.status !== 200) {
+                throw new Error(queryResult.message || 'Failed to download reservations');
             }
+
+            const allReservations = Array.isArray(queryResult.data) ? queryResult.data : [];
 
             if (allReservations.length === 0) {
                 toast({ description: 'No reservations available to download' });
@@ -407,7 +410,7 @@ export default function Products() {
 
             const reservationRows = allReservations.map((res) => ({
                 // reservationId: res.id,
-                dealerName: res.dealer || res.username || '-',
+                dealerName: res.dealer || '-',
                 userId: res.userId || '-',
                 mobile: res.mobile || '-',
                 // salesPerson: res.mapTo || '-',
@@ -421,12 +424,13 @@ export default function Products() {
                 submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
                 approvedOn: res.approvedOn ? dayjs(res.approvedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
                 modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                requestType: res.isProduction == 1 ? 'Production request' : 'Reserved',
             }));
 
             const worksheet = xlsx.utils.json_to_sheet(reservationRows);
             const workbook = xlsx.utils.book_new();
             xlsx.utils.book_append_sheet(workbook, worksheet, 'Reservations');
-            xlsx.writeFile(workbook, `reservations_${statusToDownload.toLowerCase()}_${dayjs().format('YYYY-MM-DD_HH-mm')}.xlsx`);
+            xlsx.writeFile(workbook, `reservations_${statusToDownload.toLowerCase()}_${downloadFromDate}_to_${downloadToDate}.xlsx`);
 
             toast({ description: `Downloaded ${reservationRows.length} reservations` });
         } catch (e) {
@@ -771,7 +775,7 @@ return (
           </div>
 
           
-          <Tabs defaultValue="allProducts" className="w-fit">
+          <Tabs defaultValue="allProducts" className="">
             <TabsList className="w-fit bg-slate-100 p-1 border border-slate-300">
               <TabsTrigger value="allProducts" className="w-1/2">All Designs</TabsTrigger>
               <TabsTrigger value="reservations" className="w-1/2" onClick={()=>getReservations('All', 0)}>Reservations</TabsTrigger>
@@ -863,8 +867,8 @@ return (
                         <TableHead>Design</TableHead>
                         <TableHead>Design Number</TableHead>
                         <TableHead>Size</TableHead>
-                        <TableHead>Premium stock</TableHead>
-                        <TableHead>Standard stock</TableHead>
+                        <TableHead className='text-right'>Premium stock</TableHead>
+                        <TableHead className='text-right'>Standard stock</TableHead>
                         <TableHead></TableHead>
                     </TableRow>
                 </TableHeader>
@@ -1375,14 +1379,14 @@ return (
                                                     </Sheet>
                             </TableCell>
                             <TableCell>
-                                <div className="w-fit">
+                                <div className="w-fit font-mono">
                                     {product.design} 
                                     {/* <br/><span className='text-muted-foreground text-xs font-normal'>{row.billTo}</span>  */}
                                 </div>
                             </TableCell>
-                            <TableCell>{product.size}</TableCell>
-                            <TableCell>{product.prm}</TableCell>
-                            <TableCell>{product.std}</TableCell>
+                            <TableCell className='font-mono'>{product.size}</TableCell>
+                            <TableCell className='font-mono text-right'>{product.prm}</TableCell>
+                            <TableCell className='font-mono text-right'>{product.std}</TableCell>
                             {/* <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY hh:mm A")}</TableCell> */}
                             
                                 <TableCell>
@@ -1428,6 +1432,15 @@ return (
                 <div className="flex flex-row justify-between items-center py-4">
                     <span className='text-sm text-slate-500'>{totalReservations} Reservations found</span>
                     <div className="flex flex-row items-center gap-3">
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search dealer ID or design"
+                                value={resSearch}
+                                onChange={e => setResSearch(e.target.value)}
+                                className="pl-8 w-56"
+                            />
+                        </div>
                         <Select value={resStatus} onValueChange={(val) => { setResStatus(val); getReservations(val, 0); }}>
                             <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Filter by status" />
@@ -1440,10 +1453,43 @@ return (
                                 <SelectItem value="Modified">Modified</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Button variant="outline" onClick={downloadReservationsNow} disabled={downloadingReservations}>
-                            <ArrowDown className="mr-2 h-4 w-4" />
-                            {downloadingReservations ? 'Downloading...' : 'Download Reservations'}
-                        </Button>
+                        <Popover open={showDownloadPopover} onOpenChange={setShowDownloadPopover}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" disabled={downloadingReservations}>
+                                    <ArrowDown className="mr-2 h-4 w-4" />
+                                    {downloadingReservations ? 'Downloading...' : 'Download Reservations'}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 p-4" align="end">
+                                <p className="text-sm font-semibold mb-3">Select date range</p>
+                                <div className="flex flex-col gap-3">
+                                    <div className="flex flex-col gap-1">
+                                        <Label className="text-xs text-muted-foreground">From</Label>
+                                        <Input
+                                            type="date"
+                                            value={downloadFromDate}
+                                            onChange={e => setDownloadFromDate(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <Label className="text-xs text-muted-foreground">To</Label>
+                                        <Input
+                                            type="date"
+                                            value={downloadToDate}
+                                            onChange={e => setDownloadToDate(e.target.value)}
+                                        />
+                                    </div>
+                                    <Button
+                                        className="w-full mt-1"
+                                        onClick={downloadReservationsNow}
+                                        disabled={!downloadFromDate || !downloadToDate}
+                                    >
+                                        <ArrowDown className="mr-2 h-4 w-4" />
+                                        Download
+                                    </Button>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
 
@@ -1453,32 +1499,58 @@ return (
                             <TableRow>
                                 <TableHead>User ID</TableHead>
                                 <TableHead>Design</TableHead>
-                                <TableHead>Quantity</TableHead>
-                                <TableHead>Approved Quantity</TableHead>
-                                <TableHead>Stock Type</TableHead>
+                                <TableHead className="text-right">Requested</TableHead>
+                                <TableHead className="text-right">Approved</TableHead>
+                                <TableHead>Stock</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead>Request Type</TableHead>
                                 <TableHead>Submitted On</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {resLoading ? (
-                                <TableRow><TableCell colSpan={7} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={9} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
                             ) : reservations.length === 0 ? (
-                                <TableRow><TableCell colSpan={7} className="text-center py-10">No reservations found</TableCell></TableRow>
-                            ) : reservations.map((res) => (
+                                <TableRow><TableCell colSpan={9} className="text-center py-10">No reservations found</TableCell></TableRow>
+                            ) : reservations
+                            .filter(res => {
+                                if (!resSearch.trim()) return true
+                                const q = resSearch.trim().toLowerCase()
+                                return (
+                                    (res.dealer || '').toLowerCase().includes(q) ||
+                                    String(res.userId || '').toLowerCase().includes(q) ||
+                                    (res.design || '').toLowerCase().includes(q)
+                                )
+                            })
+                            .map((res) => (
                                 <TableRow key={res.id} className="hover:bg-gray-50 text-sm">
-                                    <TableCell className="font-medium  py-4">{res.userId} - {res.username}</TableCell>
-                                    <TableCell>{res.design}</TableCell>
-                                    <TableCell>{res.requestedQty}</TableCell>
-                                    <TableCell>{res.approvedQty}</TableCell>
-                                    <TableCell>{res.stockType}</TableCell>
+                                    <TableCell className="py-4">
+                                        <span className='font-medium  '>{res.dealer}</span><br/>
+                                        <span className='text-xs text-slate-500'>{res.userId}</span>
+                                    </TableCell>
+                                    <TableCell>
+                                        {res.design}<br/>
+                                        <span className='text-xs text-slate-500'>{res.name}</span>
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
+                                    <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
+                                    <TableCell>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${res.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : res.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                            {res.stockType}
+                                        </span>
+                                    </TableCell>
                                     <TableCell>
                                         <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
                                             {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
                                         </span>
                                     </TableCell>
-                                    <TableCell>{dayjs(res.createdOn).format('DD/MM/YYYY')}</TableCell>
+                                    <TableCell>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${(res.isProduction == 1) ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                            {(res.isProduction == 1) ? 'Production request' : 'Reserved'}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className='font-mono'>{dayjs(res.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
                                             {res.status === 'Submitted' && (
