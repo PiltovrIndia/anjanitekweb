@@ -678,6 +678,7 @@ export async function POST(request, {params}) {
         // 1
         const invoices = paymentItem.invoiceNo.split(','); // await connection.query(query1,[]);
         const amounts = paymentItem.amounts.split(','); // await connection.query(query1,[]);
+        const userId = paymentItem.id;
 
 
         // 2
@@ -686,7 +687,7 @@ export async function POST(request, {params}) {
           const invoice = invoices[index];
           const amount = parseFloat(amounts[index]);
 
-          const [selectedInvoice] = await connection.query('SELECT * FROM invoices WHERE invoiceNo = "'+invoice+'" ORDER BY invoiceDate DESC LIMIT 1',[]);
+          const [selectedInvoice] = await connection.query('SELECT * FROM invoices WHERE invoiceNo = "'+invoice+'" and billTo = "'+userId+'" ORDER BY invoiceDate DESC LIMIT 1',[]);
           
             if (amount <= 0) break;
 
@@ -707,9 +708,10 @@ export async function POST(request, {params}) {
                 
                 // need to only update the current month related target, not the past month even if the invoice date is in the past, because we are updating the current payment status of the invoice, not changing the invoice date. So we will consider the current month for updating the target achieved value.
                 // get the invoiceDate's month first date
-                const invoiceDateFirstDate = dayjs(selectedInvoice[0].invoiceDate).startOf('month').format('YYYY-MM-DD');
+                const paymentFirstDate = dayjs(paymentItem.paymentDate).startOf('month').format('YYYY-MM-DD');
+                // const invoiceDateFirstDate = dayjs(selectedInvoice[0].invoiceDate).startOf('month').format('YYYY-MM-DD');
                 
-                const [targetResult1] = await connection.query('UPDATE targets SET actualAmount = actualAmount + ? WHERE userId=? AND categoryId=? AND monthDate="'+invoiceDateFirstDate+'"', [paymentItem.boxes, selectedInvoice[0].billTo, 3]);
+                const [targetResult1] = await connection.query(`UPDATE targets SET actualAmount = actualAmount - ${amount} WHERE userId="${selectedInvoice[0].billTo}" AND categoryId=3 AND monthDate="${paymentFirstDate}"`, []);
                 
             }
             

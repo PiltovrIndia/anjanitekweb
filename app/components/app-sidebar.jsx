@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Newspaper,
   Package2,
+  ScrollText,
   ShoppingCart,
   Target,
   TrendingUp,
@@ -68,6 +69,7 @@ function getNavigationSections(role) {
   if (role === "SuperAdmin" || role === "StockAdmin") {
     operationsItems.push(
       { title: "Designs", href: "/productsv2", icon: Package2 },
+      { title: "Reservations", href: "/reservations", icon: ScrollText },
       { title: "App Reports", href: "/appreports", icon: BarChart3 },
       { title: "Forecast", href: "/forecast", icon: TrendingUp }
     )

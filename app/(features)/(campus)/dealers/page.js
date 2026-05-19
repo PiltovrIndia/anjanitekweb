@@ -1097,13 +1097,11 @@ const sendMessageNow = async (e) => {
 
         try {    
             
-            
             const result  = payment.invoiceNo.length > 2 ? await deleteSelectedPaymentOfSelectedDealerAPI(process.env.NEXT_PUBLIC_API_PASS, payment) : await deleteSelectedPaymentReceiptOfSelectedDealerAPI(process.env.NEXT_PUBLIC_API_PASS, payment) 
             const queryResult = await result.json() // get data
 
             // setOffsetPayments(offsetPayments+20); // update the offset for next use
 
-            console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
 
@@ -1367,14 +1365,14 @@ const sendMessageNow = async (e) => {
         
         try {    
             
-            console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/addcredit/"+totalCredit+"/credit/"+dealerId+"/"+decodedTransactionId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+totalCredit+"/"+selectePendingdPaymentRequest);
+            // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/addcredit/"+totalCredit+"/credit/"+dealerId+"/"+decodedTransactionId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+totalCredit+"/"+selectePendingdPaymentRequest);
             // console.log("/api/v2/payments/"+process.env.NEXT_PUBLIC_API_PASS+"/webbulk/"+dealerId+"/"+totalCredit+"/credit/"+decodedTransactionId+"/"+dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/-");
             // check for special characters before passing to api
             
             const result  = await addCreditAPI(process.env.NEXT_PUBLIC_API_PASS, dealerId, totalCredit, decodedTransactionId, dayjs(paymentUpdateDate).format("YYYY-MM-DD hh:mm:ss").toString(), JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, totalCredit, selectePendingdPaymentRequest); 
             const queryResult = await result.json() // get data
 
-            console.log(queryResult);
+            // console.log(queryResult);
             // check for the status
             if(queryResult.status == 200){
             
@@ -1453,7 +1451,7 @@ const sendMessageNow = async (e) => {
   };
   
   const handleDeletePayment = (payment) => {
-    console.log(payment.amount);
+    // console.log(payment.amount);
     
     // setSelectedDealer(dealer); // Set the selected dealer
     // setOpenPayments(true); // Open the sheet
@@ -1620,7 +1618,7 @@ const handlePaymentTypeChange = (value) => {
   // once the textfield is selected, clear the payment requests selection
   const handlePaymentRequestSelection = (paymentItem) => {
     
-    console.log(paymentItem.paymentId);
+    // console.log(paymentItem.paymentId);
     (paymentItem.paymentId);
         
         if (paymentItem.selection == 0) {

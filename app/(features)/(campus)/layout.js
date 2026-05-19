@@ -89,8 +89,8 @@ export default function CampusLayout({ children }) {
               <Image src='/anjani_logo.webp' alt='Anjani Tek' fill className='object-cover' sizes='36px' priority />
             </div>
             <div className='min-w-0'>
-              <p className='truncate text-sm font-semibold leading-none'>Anjani Tek</p>
-              <p className='truncate pt-1 text-xs text-muted-foreground'>{pageTitle}</p>
+              <p className='truncate text-xl font-semibold leading-none'>Anjani Tek</p>
+              {/* <p className='truncate pt-1 text-xs text-muted-foreground'>{pageTitle}</p> */}
             </div>
           </div>
           {userData ? (

@@ -63,7 +63,7 @@ export async function GET(request, { params }) {
                     FROM targets st
                     JOIN user u ON st.userId = u.id
                     WHERE ${conditionsString1} ${monthCondition}`;
-                console.log(query);
+                // console.log(query);
                 const [targets] = await db.query(query);
 
                 var groupedByUser = {};
@@ -71,7 +71,7 @@ export async function GET(request, { params }) {
                 // check if targets is empty, if so we need to get the previous month targets for the same userIds
                 if(targets.length === 0 && monthCondition !== ''){
                     const previousMonth = new Date(new Date(params.ids[2]).setMonth(new Date(params.ids[2]).getMonth() - 1)).toISOString().slice(0, 7) + '-01';
-                    console.log(previousMonth);
+                    // console.log(previousMonth);
                     
                     const query = `SELECT st.id, st.userId, st.monthDate, st.categoryId, st.targetAmount, st.targetOpening, st.actualAmount, 
                         st.createdAt, st.updatedAt, u.name, u.mapTo, u.relatedTo
@@ -167,7 +167,7 @@ export async function GET(request, { params }) {
                     WHERE ${conditionsString1} ${monthCondition}`;
                 
                     const [targets] = await db.query(query);
-console.log(targets);
+// console.log(targets);
 
                 var groupedByUser = {};
 
@@ -287,7 +287,7 @@ console.log(targets);
                     WHERE ${conditionsString1} ${monthCondition}`;
                 
                     const [targets] = await db.query(query);
-console.log(targets);
+// console.log(targets);
 
                 var groupedByUser = {};
                 

@@ -1355,7 +1355,7 @@ export default function Invoices() {
                             </div>
                             :
                             <div className="flex flex-row items-center gap-2">
-                                <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{handleDeleteClick(row)}}><Trash size={24} className="text-red-600"/> &nbsp;Delete</Button>            
+                                <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{handleDeleteClick(row)}}><Trash size={24} className="text-red-600"/> </Button>            
                                 {/* <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{setSelectedInvoice(row),setIsDialogOpen(true)}}><Trash size={24} className="text-red-600"/> &nbsp;Delete</Button>             */}
                                 {/* Dialog Component */}
                                 

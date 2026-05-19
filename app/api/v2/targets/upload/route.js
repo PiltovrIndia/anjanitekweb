@@ -9,8 +9,8 @@ export async function POST(request) {
         const { targets } = body;
         const records = Array.isArray(targets) ? targets : targets.records || targets.data || [];
 
-        console.log('Parsed body:', body);
-        console.log('Is array:', Array.isArray(records), 'Length:', records.length);
+        // console.log('Parsed body:', body);
+        // console.log('Is array:', Array.isArray(records), 'Length:', records.length);
 
             // console.log('Received records:', records);
 
@@ -97,7 +97,7 @@ export async function POST(request) {
             });
         }
 
-        console.log(`Inserted ${insertedRecords.length} records into the targets table.`);
+        // console.log(`Inserted ${insertedRecords.length} records into the targets table.`);
         return new Response(JSON.stringify({
           message: 'Data processed successfully',
             count: insertedRecords.length,
