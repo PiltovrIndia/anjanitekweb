@@ -351,3 +351,71 @@ export async function GET(request,{params}) {
         return Response.json({status: 500, message:'Facing issues. Please try again!'}, {status: 200})
     }
   }
+
+
+
+export async function POST(request, {params}) {
+
+  // get the pool connection to db
+  const connection = await pool.getConnection();
+    
+  try{
+      // authorize secret key
+      if(await Keyverify(params.ids[0])){
+
+        if(params.ids[1] == 'U4'){
+
+                try {
+                    const body = await request.json();
+                    const { userId, cartId, designs, createdOn } = body;
+
+                    if (!userId || !cartId || !Array.isArray(designs) || designs.length === 0) {
+                        connection.release();
+                        return Response.json({ status: 400, message: 'Invalid request body' }, { status: 200 });
+                    }
+
+                    await connection.beginTransaction();
+
+                    let insertedCount = 0;
+
+                    for (const item of designs) {
+                        const { serialId, design, quantity, stockType, isProduction } = item;
+                        await connection.execute(
+                            'INSERT INTO reservations (userId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, isProduction, serialId, cartId) VALUES (?, ?, ?, "Submitted", 0, ?, ?, NULL, NULL, ?, ?, ?)',
+                            [userId, design, quantity, stockType, createdOn, isProduction ? 1 : 0, serialId, cartId]
+                        );
+                        insertedCount++;
+                    }
+
+                    await connection.commit();
+
+                    const [nrows] = await connection.execute(`SELECT gcm_regId FROM users where role='SuperAdmin'`);
+                    connection.release();
+
+                    const gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
+                    const notificationResult = gcmIds.length > 0
+                        ? await send_notification('New stock request received!', gcmIds, 'Multiple')
+                        : null;
+
+                    return Response.json({ status: 200, message: 'Success!', data: insertedCount, notification: notificationResult }, { status: 200 });
+
+                } catch (error) {
+                    await connection.rollback();
+                    connection.release();
+                    return Response.json({ status: 404, message: 'Reservation creation failed! ' + error }, { status: 200 });
+                }
+          }
+          else {
+              return Response.json({status: 404, message:'Not found!'}, {status: 200})
+          }
+      }
+      else {
+          // wrong secret key
+          return Response.json({status: 401, message:'Unauthorized'}, {status: 200})
+      }
+  }
+  catch (err){
+      // some error occured
+      return Response.json({status: 500, message:'Facing issues. Please try again!'+err}, {status: 200})
+  }
+}
