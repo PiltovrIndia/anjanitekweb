@@ -702,6 +702,29 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
                 }
             }
+            // Search by Name or Id for Dealer role
+            else if(params.ids[1] == 'U9.1'){
+                try {
+                    const [rows, fields] = await connection.execute('SELECT * from user where role IN ("Dealer") AND name LIKE "%'+params.ids[3]+'%" ORDER BY role DESC');
+                    
+                    connection.release();
+                    // return successful update
+
+                    // check if user is found
+                    if(rows.length > 0){
+                        
+                        // return the requests data
+                        return Response.json({status: 200, length: rows.length, data: rows, message:'Data found!'}, {status: 200})
+
+                    }
+                    else {
+                        // user doesn't exist in the system
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                }
+            }
             // update the mapping of the user
             // used for search and assign to a person
             // proper loading to be taken care
