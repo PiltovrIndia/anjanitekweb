@@ -16,6 +16,7 @@ import FilterSidebar from './filtersidebar';
 import TagDialog from './product_details';
 import { Button } from '@/app/components/ui/button'
 import NewProductDialog from './newproduct'
+import StockOrderDialog from './stock_order_dialog'
 import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
@@ -84,6 +85,7 @@ export default function Products() {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [newProductOn, setNewProductOn] = useState(false);
     const [creatingProduct, setCreatingProduct] = useState(false);
+    const [stockOrderOpen, setStockOrderOpen] = useState(false);
 
     // var groupedTags = [];
     const [imgSrc, setImgSrc] = useState(``);
@@ -572,6 +574,10 @@ return (
                                                     <Button onClick={()=>{changeDatesSelection(date)}}>Apply selection</Button> : <br/>}
                                                 </PopoverContent>
                                             </Popover> */}
+                                                <Button onClick={() => setStockOrderOpen(true)} className='bg-green-600 hover:bg-green-700 text-white'>
+                                                    <Plus className="mr-2 h-4 w-4" />
+                                                    Add Stock Order
+                                                </Button>
                                                 <Button variant="outline" onClick={() => downloadHostelsDataNowExcel()}  className='border-green-600 bg-green-600 text-white hover:bg-green-700 hover:text-white'>
                                                     <FileXls className="mr-2 h-6 w-6 text-white"/>
                                                     Download Excel
@@ -721,6 +727,14 @@ return (
                                             createProduct={createNewProduct}
                                         />
                                     )}
+
+                                    <StockOrderDialog
+                                        isOpen={stockOrderOpen}
+                                        onClose={() => setStockOrderOpen(false)}
+                                        pass={process.env.NEXT_PUBLIC_API_PASS}
+                                        role={role}
+                                        onSuccess={(msg) => toast({ description: msg })}
+                                    />
                                 </div>
                             </div>
                         </div>

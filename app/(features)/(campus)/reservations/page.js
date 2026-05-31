@@ -27,6 +27,7 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHe
 import { Label } from '@/app/components/ui/label'
 import * as XLSX from 'xlsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs'
+import StockOrderDialog from '../products/stock_order_dialog'
 
 const xlsx = require('xlsx');
 // Child references can also take paths delimited by '/'
@@ -168,6 +169,7 @@ export default function Reservations() {
     const [downloadFromDate, setDownloadFromDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
     const [downloadToDate, setDownloadToDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [showDownloadPopover, setShowDownloadPopover] = useState(false);
+    const [stockOrderOpen, setStockOrderOpen] = useState(false);
 
     // Approval Dialog State
     const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
@@ -530,6 +532,10 @@ return (
                                 <SelectItem value="Modified">Modified</SelectItem>
                             </SelectContent>
                         </Select>
+                        <Button onClick={() => setStockOrderOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add Stock Order
+                            </Button>
                         <Popover open={showDownloadPopover} onOpenChange={setShowDownloadPopover}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" disabled={downloadingReservations}>
@@ -656,6 +662,14 @@ return (
                 </div>
             </div>
           
+          <StockOrderDialog
+              isOpen={stockOrderOpen}
+              onClose={() => setStockOrderOpen(false)}
+              pass={process.env.NEXT_PUBLIC_API_PASS}
+              role={user?.role}
+              onSuccess={(msg) => { toast({ description: msg }); getReservations(resStatus, resOffset); }}
+          />
+
           {/* Approval Confirmation Dialog */}
           <Dialog open={isActionDialogOpen} onOpenChange={setIsActionDialogOpen}>
             <DialogContent className="sm:max-w-[425px]">

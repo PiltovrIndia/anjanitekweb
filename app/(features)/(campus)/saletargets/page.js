@@ -189,8 +189,9 @@ export default function SaleTargets() {
         // setOffset(offset+0); // update the offset for every call
 
         try {    
-            console.log("/api/v2/salespersons-targets/"+process.env.NEXT_PUBLIC_API_PASS+"/U0/2025-10/2025-10-01/2025-10-31/All");
-            const result  = await getSalesPersonsTargets(process.env.NEXT_PUBLIC_API_PASS, '2025-10', '2025-10-01', '2025-10-31', 'All') 
+            console.log("/api/v2/salespersons-targets/"+process.env.NEXT_PUBLIC_API_PASS+"/U0/"+dayjs().format('YYYY-MM')+"/"+dayjs().startOf('month').format('YYYY-MM-DD')+"/"+dayjs().endOf('month').format('YYYY-MM-DD')+"/All");
+            // lets update month, current month start and end date dynamically based on current date
+            const result  = await getSalesPersonsTargets(process.env.NEXT_PUBLIC_API_PASS, dayjs().format('YYYY-MM'), dayjs().startOf('month').format('YYYY-MM-DD'), dayjs().endOf('month').format('YYYY-MM-DD'), 'All')
             const queryResult = await result.json() // get data
 
             console.log(queryResult);
@@ -358,9 +359,10 @@ export default function SaleTargets() {
     };
 
     function parseWorkbookToImportPayload(workbook) {
-  const sheetNames = workbook.SheetNames.filter((name) =>
-    ['ATL', 'VCL', 'COLLECTION'].includes(name.toUpperCase())
-  );
+  const sheetNames = workbook.SheetNames;
+//   const sheetNames = workbook.SheetNames.filter((name) =>
+//     ['ATL', 'VCL', 'COLLECTION'].includes(name.toUpperCase())
+//   );
 
   if (sheetNames.length === 0) {
     throw new Error('No ATL / VCL / COLLECTION sheets found');
@@ -610,6 +612,57 @@ function toIsoDate(year, month, day) {
             setUploadProgress(false);
         }
     }
+
+
+
+    // const uploadSaleTargets = async () => {
+    //         if (!file) {
+    //             toast({description: "Please select a file first"});
+    //             return;
+    //         }
+    
+    //         setUploadProgress(true);
+    //         try {
+    //             const data = await file.arrayBuffer();
+    //             const workbook = XLSX.read(data);
+                
+    //             // Read data from all sheets
+    //             let allJsonData = [];
+    //             workbook.SheetNames.forEach((sheetName) => {
+    //                 const worksheet = workbook.Sheets[sheetName];
+    //                 const sheetData = XLSX.utils.sheet_to_json(worksheet);
+    //                 allJsonData = [...allJsonData, ...sheetData];
+    //             });
+    
+    //             // Process the combined data using processExcelData
+    //             const processedTargets = processExcelData(allJsonData);
+    
+    //             console.log(processedTargets);
+                
+    
+    //             const response = await fetch("/api/v2/targets/upload", {
+    //                 method: "POST",
+    //                 headers: {
+    //                     "Content-Type": "application/json",
+    //                 },
+    //                 body: JSON.stringify({ targets: processedTargets }),
+    //             });
+    
+    //             const result = await response.json();
+    //             if (result.success) {
+    //                 toast({description: "Targets uploaded successfully"});
+    //                 setFile(null);
+    //                 fetchTargets();
+    //             } else {
+    //                 toast({description: result.message || "Upload failed"});
+    //             }
+    //         } catch (error) {
+    //             console.error("Error uploading file:", error);
+    //             toast({description: error.message || "Error processing file"});
+    //         } finally {
+    //             setUploadProgress(false);
+    //         }
+    //     };
     
     
 return (
