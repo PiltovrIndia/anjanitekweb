@@ -367,9 +367,9 @@ export async function POST(request, {params}) {
 
                 try {
                     const body = await request.json();
-                    const { userId, cartId, designs, createdOn } = body;
+                    const { userId, designs, createdOn } = body;
 
-                    if (!userId || !cartId || !Array.isArray(designs) || designs.length === 0) {
+                    if (!userId || !Array.isArray(designs) || designs.length === 0) {
                         connection.release();
                         return Response.json({ status: 400, message: 'Invalid request body' }, { status: 200 });
                     }
@@ -379,7 +379,7 @@ export async function POST(request, {params}) {
                     let insertedCount = 0;
 
                     for (const item of designs) {
-                        const { serialId, dealerId, design, quantity, stockType, isProduction } = item;
+                        const { cartId, serialId, dealerId, design, quantity, stockType, isProduction } = item;
                         await connection.execute(
                             'INSERT INTO reservations (userId, dealerId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, isProduction, serialId, cartId) VALUES (?, ?, ?, ?, "Submitted", 0, ?, ?, NULL, NULL, ?, ?, ?)',
                             [userId, dealerId, design, quantity, stockType, createdOn, isProduction ? 1 : 0, serialId, cartId]
