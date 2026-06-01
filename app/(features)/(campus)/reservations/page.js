@@ -2,7 +2,7 @@
 
 import { Inter } from 'next/font/google'
 import { Check, Checks, PaperPlaneRight, Info, SpinnerGap, X, XCircle, Plus, CurrencyInr, Receipt, CirclesFour, CircleDashed, CheckCircle, CheckSquare, CalendarBlank, Calendar, FileXls, FilePdf, Tag, GridFour } from 'phosphor-react'
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useMemo, useRef, useEffect, useState } from 'react'
 const inter = Inter({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
 import Biscuits from 'universal-cookie'
@@ -15,7 +15,7 @@ import { Button } from '@/app/components/ui/button'
 import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
-import { ArrowDown, CheckIcon, HeartIcon, Pencil, Search, Trash } from 'lucide-react'
+import { ArrowDown, CheckIcon, ChevronDown, ChevronRight, HeartIcon, Pencil, Search, Trash } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
@@ -127,8 +127,8 @@ fetch("/api/v2/reservations/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDa
 });
 
 // update reservation status
-const updateReservationStatusAPI = async (pass, path, reservationId, status, qty, userId, actionDate) => 
-fetch("/api/v2/reservations/"+pass+"/"+path+"/"+reservationId+"/"+status+"/"+qty+"/"+userId+"/"+actionDate, {
+const updateReservationStatusAPI = async (pass, path, reservationId, status, qty, userId, actionDate, design) => 
+fetch("/api/v2/reservations/"+pass+"/"+path+"/"+reservationId+"/"+status+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -170,11 +170,19 @@ export default function Reservations() {
     const [downloadToDate, setDownloadToDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [showDownloadPopover, setShowDownloadPopover] = useState(false);
     const [stockOrderOpen, setStockOrderOpen] = useState(false);
+    const [expandedCartGroups, setExpandedCartGroups] = useState({});
 
     // Approval Dialog State
     const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
     const [selectedRes, setSelectedRes] = useState(null);
     const [approvalQty, setApprovalQty] = useState('');
+    const [reviewDesignQuery, setReviewDesignQuery] = useState('')
+    const [reviewDesignResults, setReviewDesignResults] = useState([])
+    const [searchingReviewDesigns, setSearchingReviewDesigns] = useState(false)
+    const [showReviewDesignDrop, setShowReviewDesignDrop] = useState(false)
+    const [selectedReviewDesign, setSelectedReviewDesign] = useState(null)
+    const reviewDesignTimer = useRef(null)
+    const reviewDesignRef = useRef(null)
 
     // var groupedTags = [];
     const [imgSrc, setImgSrc] = useState(``);
@@ -217,6 +225,27 @@ export default function Reservations() {
                 router.push('/')
             }
     },[]);
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (reviewDesignRef.current && !reviewDesignRef.current.contains(e.target)) {
+                setShowReviewDesignDrop(false)
+            }
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [])
+
+    useEffect(() => {
+        if (!isActionDialogOpen) {
+            clearTimeout(reviewDesignTimer.current)
+            setReviewDesignQuery('')
+            setReviewDesignResults([])
+            setShowReviewDesignDrop(false)
+            setSearchingReviewDesigns(false)
+            setSelectedReviewDesign(null)
+        }
+    }, [isActionDialogOpen])
 
     // useEffect(() => {
     //         if (user && user.id) {
@@ -303,6 +332,7 @@ console.log(`${process.env.NEXT_PUBLIC_API_PASS}/report/${statusToDownload}/${do
             const reservationRows = allReservations.map((res) => ({
                 // reservationId: res.id,
                 dealerName: res.dealer || '-',
+                orderedBy: res.orderedBy || '-',
                 userId: res.userId || '-',
                 mobile: res.mobile || '-',
                 // salesPerson: res.mapTo || '-',
@@ -316,7 +346,7 @@ console.log(`${process.env.NEXT_PUBLIC_API_PASS}/report/${statusToDownload}/${do
                 submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
                 approvedOn: res.approvedOn ? dayjs(res.approvedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
                 modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
-                requestType: res.isProduction == 1 ? 'Production request' : 'Reserved',
+                requestType: res.isProduction == 1 ? 'Production' : 'Current',
             }));
 
             const worksheet = xlsx.utils.json_to_sheet(reservationRows);
@@ -448,14 +478,56 @@ console.log(`${process.env.NEXT_PUBLIC_API_PASS}/report/${statusToDownload}/${do
     async function handleUpdateStatus(res) {
         setSelectedRes(res);
         setApprovalQty(res.requestedQty); // Default to requested quantity
+        setSelectedReviewDesign(res)
+        setReviewDesignQuery('')
+        setReviewDesignResults([])
+        setShowReviewDesignDrop(false)
         
             setIsActionDialogOpen(true);
         
     }
 
+    const handleReviewDesignSearch = (value) => {
+        setReviewDesignQuery(value)
+        clearTimeout(reviewDesignTimer.current)
+        if (!value.trim()) {
+            setReviewDesignResults([])
+            setShowReviewDesignDrop(false)
+            return
+        }
+
+        reviewDesignTimer.current = setTimeout(async () => {
+            setSearchingReviewDesigns(true)
+            try {
+                const res = await fetch(`/api/v2/products/${process.env.NEXT_PUBLIC_API_PASS}/U4/${encodeURIComponent(value)}/0`, {
+                    headers: { 'Content-Type': 'application/json' },
+                })
+                const data = await res.json()
+                setReviewDesignResults(data.status === 200 ? data.data : [])
+                setShowReviewDesignDrop(true)
+            } catch {
+                setReviewDesignResults([])
+            } finally {
+                setSearchingReviewDesigns(false)
+            }
+        }, 400)
+    }
+
+    const selectReviewDesign = (product) => {
+        setSelectedReviewDesign(product)
+        setReviewDesignQuery('')
+        setReviewDesignResults([])
+        setShowReviewDesignDrop(false)
+    }
+
     async function submitApproval(status) {
         if (!approvalQty || isNaN(approvalQty)) {
             toast({ description: "Please enter a valid quantity" });
+            return;
+        }
+
+        if (!selectedReviewDesign?.design) {
+            toast({ description: "Please choose a design before updating this reservation" });
             return;
         }
 
@@ -472,7 +544,8 @@ console.log(`${process.env.NEXT_PUBLIC_API_PASS}/report/${statusToDownload}/${do
                 status, 
                 approvalQty,
                 selectedRes.userId,
-                dayjs().format('YYYY-MM-DD HH:mm:ss') // Set expiry to 7 days from now
+                dayjs().format('YYYY-MM-DD HH:mm:ss'), // Set expiry to 7 days from now
+                selectedReviewDesign.design,
             );
             const queryResult = await result.json();
             if (queryResult.status === 200) {
@@ -488,6 +561,75 @@ console.log(`${process.env.NEXT_PUBLIC_API_PASS}/report/${statusToDownload}/${do
             setResLoading(false);
         }
     }
+
+    function toggleCartGroup(cartId) {
+        setExpandedCartGroups((prev) => ({
+            ...prev,
+            [cartId]: !prev[cartId],
+        }))
+    }
+
+    const filteredReservations = useMemo(() => {
+        return reservations.filter((res) => {
+            if (!resSearch.trim()) return true
+            const q = resSearch.trim().toLowerCase()
+            return (
+                (res.dealer || '').toLowerCase().includes(q) ||
+                (res.orderedBy || '').toLowerCase().includes(q) ||
+                String(res.userId || '').toLowerCase().includes(q) ||
+                (res.design || '').toLowerCase().includes(q) ||
+                String(res.cartId || '').toLowerCase().includes(q)
+            )
+        })
+    }, [reservations, resSearch])
+
+    const groupedReservations = useMemo(() => {
+        const groups = []
+        const groupMap = new Map()
+
+        filteredReservations.forEach((reservation) => {
+            const groupKey = reservation.cartId || `single-${reservation.id}`
+            if (!groupMap.has(groupKey)) {
+                const nextGroup = {
+                    cartId: groupKey,
+                    rows: [],
+                }
+                groupMap.set(groupKey, nextGroup)
+                groups.push(nextGroup)
+            }
+            groupMap.get(groupKey).rows.push(reservation)
+        })
+
+        return groups.map((group) => {
+            const first = group.rows[0]
+            const requestedQty = group.rows.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0)
+            const approvedQty = group.rows.reduce((sum, item) => sum + Number(item.approvedQty || 0), 0)
+            const requestTypes = [...new Set(group.rows.map((item) => item.isProduction == 1 ? 'Production' : 'Current'))]
+            const stockTypes = [...new Set(group.rows.map((item) => item.stockType).filter(Boolean))]
+            const statusCounts = group.rows.reduce((counts, item) => {
+                if (!item.status) {
+                    return counts
+                }
+
+                counts.set(item.status, (counts.get(item.status) || 0) + 1)
+                return counts
+            }, new Map())
+            const statuses = Array.from(statusCounts.entries()).map(([label, count]) => ({
+                label,
+                count,
+            }))
+
+            return {
+                ...group,
+                first,
+                requestedQty,
+                approvedQty,
+                requestTypes,
+                stockTypes,
+                statuses,
+            }
+        })
+    }, [filteredReservations])
     
     
 return (
@@ -580,7 +722,8 @@ return (
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>User ID</TableHead>
+                                <TableHead>Ordered by</TableHead>
+                                <TableHead>Dealer</TableHead>
                                 <TableHead>Design</TableHead>
                                 <TableHead className="text-right">Requested</TableHead>
                                 <TableHead className="text-right">Approved</TableHead>
@@ -594,64 +737,164 @@ return (
                         <TableBody>
                             {resLoading ? (
                                 <TableRow><TableCell colSpan={9} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
-                            ) : reservations.length === 0 ? (
+                            ) : groupedReservations.length === 0 ? (
                                 <TableRow><TableCell colSpan={9} className="text-center py-10">No reservations found</TableCell></TableRow>
-                            ) : reservations
-                            .filter(res => {
-                                if (!resSearch.trim()) return true
-                                const q = resSearch.trim().toLowerCase()
+                            ) : groupedReservations.map((group) => {
+                                const isExpanded = Boolean(expandedCartGroups[group.cartId])
+                                const hasMultipleRows = group.rows.length > 1
+
                                 return (
-                                    (res.dealer || '').toLowerCase().includes(q) ||
-                                    String(res.userId || '').toLowerCase().includes(q) ||
-                                    (res.design || '').toLowerCase().includes(q)
+                                    <React.Fragment key={group.cartId}>
+                                        <TableRow
+                                            className={`text-sm transition-colors ${hasMultipleRows ? 'cursor-pointer bg-slate-50/80 hover:bg-slate-100/80' : 'bg-slate-50/40 hover:bg-slate-100/60'}`}
+                                            onClick={hasMultipleRows ? () => toggleCartGroup(group.cartId) : undefined}
+                                        >
+                                            <TableCell className="py-4">
+                                                <div className="flex items-start gap-3">
+                                                    {/* <div className="mt-0.5 rounded-md border border-slate-200 bg-white p-1 text-slate-500">
+                                                        {hasMultipleRows ? (
+                                                            isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                                                        ) : (
+                                                            <GridFour className="h-4 w-4" />
+                                                        )}
+                                                    </div> */}
+                                                    {hasMultipleRows ?
+                                                    <div className="mt-0.5 rounded-md border border-slate-200 bg-white p-1 text-slate-500">
+                                                        
+                                                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                                        
+                                                        </div>  : 
+                                                    <div className="mt-0.5 p-3 text-slate-500"></div>}
+                                                    <div>
+                                                        <span className='font-medium'>{group.first.orderedBy}</span><br/>
+                                                        <span className='text-xs text-slate-500'>{group.first.userId}</span>
+                                                        {/* <div className="mt-2 flex flex-wrap items-center gap-2"> */}
+                                                            {/* <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                                                                Cart {group.first.cartId || group.cartId}
+                                                            </span> */}
+                                                            {/* <span className="text-[11px] text-slate-500">
+                                                                {group.rows.length} item{group.rows.length > 1 ? 's' : ''}
+                                                            </span> */}
+                                                        {/* </div> */}
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-4">
+                                                <span className='font-medium'>{group.first.dealer}</span><br/>
+                                                <span className='text-xs text-slate-500'>{group.first.dealerId}</span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="font-medium text-slate-800">
+                                                    {hasMultipleRows ? `${group.rows.length} designs` : group.first.design}
+                                                </span><br/>
+                                                {/* <span className='text-xs text-slate-500'>
+                                                    {hasMultipleRows
+                                                        ? group.rows.length
+                                                        : group.first.name}
+                                                </span> */}
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono">{group.requestedQty}</TableCell>
+                                            <TableCell className="text-right font-mono">{group.approvedQty}</TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-row gap-1">
+                                                    {group.stockTypes.map((stockType) => (
+                                                        <span key={`${group.cartId}-${stockType}`} className={`px-2 py-1 rounded-full text-xs font-medium ${stockType === 'prm' ? 'bg-purple-100 text-purple-700' : stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                            {stockType}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {group.statuses.map((status) => (
+                                                        <span key={`${group.cartId}-${status.label}`} className={`px-2 py-1 rounded-full text-xs ${status.label === 'Approved' ? 'bg-green-100 text-green-700' : status.label === 'Rejected' ? 'bg-red-100 text-red-700' : status.label === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                            {status.label == 'Submitted' ? 'Pending' : status.label} {status.count > 1 ? `(${status.count})` : ''}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {group.requestTypes.map((requestType) => (
+                                                        <span key={`${group.cartId}-${requestType}`} className={`px-2 py-1 rounded-full text-xs font-medium ${requestType === 'Production' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                            {requestType}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className='font-mono text-xs text-slate-500'>{dayjs(group.first.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
+                                            <TableCell className="text-right">
+                                                {hasMultipleRows ? (
+                                                    <span className="text-xs font-medium text-slate-500">
+                                                        {isExpanded ? 'Hide items' : 'View items'}
+                                                    </span>
+                                                ) : (
+                                                    <div className="flex justify-end gap-2">
+                                                        {group.first.status === 'Submitted' && (
+                                                            <div className='flex flex-row items-center gap-2'>
+                                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => handleUpdateStatus(group.first)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
+                                                            </div>
+                                                        )}
+                                                        {(group.first.status === 'Approved' || group.first.status === 'Modified' || group.first.status === 'Rejected') && (
+                                                            <div className='flex flex-row items-center gap-2'>
+                                                                <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(group.first)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                        {hasMultipleRows && isExpanded && group.rows.map((res) => (
+                                            <TableRow key={res.id} className="bg-white text-sm hover:bg-slate-50/80">
+                                                <TableCell className="py-4 pl-16">
+                                                    <span className='font-medium'>{res.orderedBy}</span><br/>
+                                                    <span className='text-xs text-slate-500'>{res.userId}</span>
+                                                </TableCell>
+                                                <TableCell className="py-4">
+                                                    <span className='font-medium'>{res.dealer}</span><br/>
+                                                    <span className='text-xs text-slate-500'>{res.dealerId}</span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {res.design}<br/>
+                                                    <span className='text-xs text-slate-500'>{res.name}</span>
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
+                                                <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
+                                                <TableCell>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${res.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : res.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        {res.stockType}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${(res.isProduction == 1) ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        {(res.isProduction == 1) ? 'Production' : 'Current'}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className='font-mono text-xs text-slate-500'>{dayjs(res.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        {res.status === 'Submitted' && (
+                                                            <div className='flex flex-row items-center gap-2'>
+                                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
+                                                            </div>
+                                                        )}
+                                                        {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected') && (
+                                                            <div className='flex flex-row items-center gap-2'>
+                                                                <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(res)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </React.Fragment>
                                 )
-                            })
-                            .map((res) => (
-                                <TableRow key={res.id} className="hover:bg-gray-50 text-sm">
-                                    <TableCell className="py-4">
-                                        <span className='font-medium  '>{res.dealer}</span><br/>
-                                        <span className='text-xs text-slate-500'>{res.userId}</span>
-                                    </TableCell>
-                                    <TableCell>
-                                        {res.design}<br/>
-                                        <span className='text-xs text-slate-500'>{res.name}</span>
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
-                                    <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
-                                    <TableCell>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${res.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : res.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
-                                            {res.stockType}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell>
-                                        <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                                            {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${(res.isProduction == 1) ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-                                            {(res.isProduction == 1) ? 'Production request' : 'Reserved'}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className='font-mono'>{dayjs(res.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            {res.status === 'Submitted' && (
-                                                <div className='flex flex-row items-center gap-2'>
-                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
-                                                {/* <Button size="sm" variant="outline" className="text-red-600 border-red-600" onClick={() => handleUpdateStatus(res)}>Reject</Button> */}
-                                                </div>
-                                            )}
-                                            {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected') && (
-                                                <div className='flex flex-row items-center gap-2'>
-                                                <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(res)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
-                                                {/* <Button size="sm" variant="outline" className="text-red-600 border-red-600" onClick={() => handleUpdateStatus(res)}>Reject</Button> */}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            })}
                         </TableBody>
                     </Table>
                 </Card>
@@ -672,14 +915,80 @@ return (
 
           {/* Approval Confirmation Dialog */}
           <Dialog open={isActionDialogOpen} onOpenChange={setIsActionDialogOpen}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[560px]">
                 <DialogHeader>
-                    <DialogTitle>Approve Reservation</DialogTitle>
+                    <DialogTitle>Review Reservation</DialogTitle>
                     <DialogDescription>
-                        Confirm the quantity to approve for <b>{selectedRes?.design}</b> requested by <b>{selectedRes?.userId}</b>.
+                        for <b>{selectedRes?.dealer}</b>
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-5 py-4">
+                    <div className="space-y-2" ref={reviewDesignRef}>
+                        <Label>Design</Label>
+                        {selectedReviewDesign?.design ? (
+                            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                                <div className="flex-1">
+                                    <div className="font-medium text-sm text-slate-900">{selectedReviewDesign.design}</div>
+                                    <div className="text-xs text-slate-500">{selectedReviewDesign.name || 'Selected design'}</div>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 px-2 text-slate-500 hover:text-slate-800"
+                                    onClick={() => {
+                                        setSelectedReviewDesign(null)
+                                        setReviewDesignQuery(selectedRes?.design || '')
+                                    }}
+                                >
+                                    Change
+                                </Button>
+                            </div>
+                        ) : null}
+                        <div className="relative">
+                            <Input
+                                placeholder="Search design by code or name..."
+                                value={reviewDesignQuery}
+                                onChange={(e) => handleReviewDesignSearch(e.target.value)}
+                                onFocus={() => reviewDesignResults.length > 0 && setShowReviewDesignDrop(true)}
+                                className="pr-9"
+                            />
+                            {searchingReviewDesigns ? (
+                                <SpinnerGap className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-gray-400" />
+                            ) : (
+                                <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+                            )}
+                            {showReviewDesignDrop && reviewDesignResults.length > 0 && (
+                                <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-white shadow-lg">
+                                    {reviewDesignResults.map((product) => (
+                                        <div
+                                            key={product.productId}
+                                            className="cursor-pointer px-3 py-2.5 hover:bg-gray-50"
+                                            onMouseDown={() => selectReviewDesign(product)}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="font-medium text-sm text-slate-900">{product.design}</div>
+                                                    <div className="text-xs text-slate-500">{product.name}</div>
+                                                </div>
+                                                <div className="flex gap-3 text-xs shrink-0">
+                                                    <span className="font-medium text-violet-600">PRM <span className="font-bold">{product.prm ?? 0}</span></span>
+                                                    <span className="font-medium text-blue-600">STD <span className="font-bold">{product.std ?? 0}</span></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {showReviewDesignDrop && !searchingReviewDesigns && reviewDesignResults.length === 0 && reviewDesignQuery.trim() && (
+                                <div className="absolute z-50 mt-1 w-full rounded-md border bg-white p-3 text-sm text-gray-500 shadow">
+                                    No designs found
+                                </div>
+                            )}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            Current reservation: <span className="font-medium text-slate-700">{selectedRes?.design}</span>
+                        </p>
+                    </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="qty" className="text-right">Quantity</Label>
                         {/* {(selectedRes?.status === 'Submitted' || selectedRes?.status === 'Approved') ? */}
