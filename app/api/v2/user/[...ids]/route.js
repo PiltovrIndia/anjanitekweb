@@ -69,7 +69,10 @@ export async function GET(request,{params}) {
                 try {
                     
                     var query = '';
-                    if(params.ids[4] == 'SuperAdmin' || params.ids[4] == 'GlobalAdmin'){
+                    if(params.ids[4] == 'Staff'){
+                        query = 'SELECT * from user WHERE role="customer" AND name LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3];
+                    }
+                    else if(params.ids[4] == 'SuperAdmin' || params.ids[4] == 'GlobalAdmin'){
                         query = 'SELECT * from user WHERE role="dealer" AND name LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3];
                     }
                     else if(params.ids[4] == 'StateHead'){
@@ -971,8 +974,9 @@ export async function GET(request,{params}) {
 
 
 export async function POST(request, {params}) {
-    
+    let connection;
     try{
+        connection = await pool.getConnection();
 
         // authorize secret key
         if(await Keyverify(params.ids[0])){
@@ -990,6 +994,37 @@ export async function POST(request, {params}) {
                     return Response.json({status: 200, message:'Success!'}, {status: 200})
                     
             }
+            // creating user
+            else if(params.ids[1] == 'U11'){
+                try {
+                    const userObject = await request.json();
+                    if (!userObject || Array.isArray(userObject)) {
+                        return Response.json({status: 400, message:'Invalid user payload!'}, {status: 200})
+                    }
+
+                    const userEntries = Object.entries(userObject).filter(([, value]) => value !== undefined)
+                    if(userEntries.length === 0){
+                        return Response.json({status: 400, message:'User payload is empty!'}, {status: 200})
+                    }
+
+                    const userKeys = userEntries.map(([key]) => `\`${key}\``).join(',')
+                    const placeholders = userEntries.map(() => '?').join(',')
+                    const userValues = userEntries.map(([, value]) => value)
+
+                    const q = `INSERT INTO user (${userKeys}) VALUES (${placeholders})`
+                    const [rows1] = await connection.execute(q, userValues)
+
+                    if(rows1.affectedRows > 0){
+                        return Response.json({status: 200, data1: rows1, message:'Updated successfully!'}, {status: 200})
+                    }
+                    else {
+                        return Response.json({status: 201, message:'No updated!'}, {status: 200})
+                    }
+
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                }
+            }
             else {
                 return Response.json({status: 404, message:'Not found!'}, {status: 200})
             }
@@ -1002,6 +1037,11 @@ export async function POST(request, {params}) {
     catch (err){
         // some error occured
         return Response.json({status: 500, message:'Facing issues. Please try again!'+err}, {status: 200})
+    }
+    finally {
+        if (connection) {
+            connection.release();
+        }
     }
   }
 
