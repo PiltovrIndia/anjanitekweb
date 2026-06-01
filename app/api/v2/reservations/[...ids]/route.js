@@ -38,8 +38,8 @@ export async function GET(request,{params}) {
                     else {
                         // if(params.ids[4] != 'SuperAdmin'){
                             // lets update the query to add user table as well to get user details
-                            var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE u.relatedTo LIKE "%'+params.ids[5]+'%" AND r.isDeleted = 0 ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
-                            var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE u.relatedTo LIKE "%'+params.ids[5]+'%" AND r.isDeleted = 0';
+                            var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") AND r.isDeleted = 0 ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                            var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") AND r.isDeleted = 0';
 
                             // if status is provided then filter by status as well
                             if(params.ids[2] != 'All'){
@@ -49,8 +49,8 @@ export async function GET(request,{params}) {
                                 //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                                 // }
                                 // else
-                                query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND u.relatedTo LIKE "%'+params.ids[5]+'%" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
-                                queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND u.relatedTo LIKE "%'+params.ids[5]+'%"';
+                                query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                                queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%")';
                             }
                         // }
                     }
@@ -74,8 +74,8 @@ export async function GET(request,{params}) {
             // get the list of reservations by userId
             else if(params.ids[1] == 'U1'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.isDeleted = 0 AND r.userId LIKE "%'+params.ids[2]+'%" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
-                    const [countRows, countFields] = await connection.execute('SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.isDeleted = 0 AND r.userId LIKE "%'+params.ids[2]+'%"');
+                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.isDeleted = 0 AND (r.userId LIKE "%'+params.ids[2]+'%" OR r.dealerId LIKE "%'+params.ids[2]+'%") ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
+                    const [countRows, countFields] = await connection.execute('SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design WHERE r.isDeleted = 0 AND (r.userId LIKE "%'+params.ids[2]+'%" OR r.dealerId LIKE "%'+params.ids[2]+'%")');
                     connection.release();
 
                     if(rows.length > 0)
@@ -90,8 +90,8 @@ export async function GET(request,{params}) {
             // get the list of reservations by dealer name
             else if(params.ids[1] == 'U1.1'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN dealer d ON r.userId=d.dealerId WHERE d.accountName LIKE "%'+params.ids[2]+'%" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
-                    const [countRows, countFields] = await connection.execute('SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN dealer d ON r.userId=d.dealerId WHERE d.accountName LIKE "%'+params.ids[2]+'%"');
+                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN dealer d ON r.dealerId=d.dealerId WHERE d.accountName LIKE "%'+params.ids[2]+'%" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
+                    const [countRows, countFields] = await connection.execute('SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN dealer d ON r.dealerId=d.dealerId WHERE d.accountName LIKE "%'+params.ids[2]+'%"');
                     connection.release();
 
                     if(rows.length > 0)
