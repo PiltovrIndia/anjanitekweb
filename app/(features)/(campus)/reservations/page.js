@@ -108,8 +108,8 @@ const updateUploadStockData = async (pass, items1, adminId) =>
 
 
 // get reservations
-const getReservationsAPI = async (pass, type, offset) => 
-fetch("/api/v2/reservations/"+pass+"/U0/"+type+"/"+offset, {
+const getReservationsAPI = async (pass, type, offset, isProduction) => 
+fetch("/api/v2/reservations/"+pass+"/U0.1/"+type+"/"+offset+"/"+isProduction, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -117,8 +117,8 @@ fetch("/api/v2/reservations/"+pass+"/U0/"+type+"/"+offset, {
     },
 });
 
-const getReservationsByDateAPI = async (pass, type, fromDate, toDate) =>
-fetch("/api/v2/reservations/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate), {
+const getReservationsByDateAPI = async (pass, type, fromDate, toDate, isProduction) =>
+fetch("/api/v2/reservations/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -162,6 +162,7 @@ export default function Reservations() {
     const [totalReservations, setTotalReservations] = useState([]);
     const [reservations, setReservations] = useState([]);
     const [resLoading, setResLoading] = useState(false);
+    const [isProduction, setisProduction] = useState('All');
     const [downloadingReservations, setDownloadingReservations] = useState(false);
     const [resOffset, setResOffset] = useState(0);
     const [resStatus, setResStatus] = useState('All');
@@ -255,14 +256,14 @@ export default function Reservations() {
 
     
     // fetch the reservations
-    async function getReservations(val, offsetR){
+    async function getReservations(val, offsetR, productionFilter = isProduction){
         
         
         setResLoading(true);
         // setOffset(offset+0); // update the offset for every call
 
         try {    
-            const result  = await getReservationsAPI(process.env.NEXT_PUBLIC_API_PASS,val, offsetR) 
+            const result  = await getReservationsAPI(process.env.NEXT_PUBLIC_API_PASS,val, offsetR, productionFilter) 
             const queryResult = await result.json() // get data
 
             // check for the status
@@ -307,14 +308,14 @@ export default function Reservations() {
 
         setDownloadingReservations(true);
         setShowDownloadPopover(false);
-console.log(`${process.env.NEXT_PUBLIC_API_PASS}/report/${statusToDownload}/${downloadFromDate},${downloadToDate}`);
 
         try {
             const result = await getReservationsByDateAPI(
                 process.env.NEXT_PUBLIC_API_PASS,
                 statusToDownload,
                 downloadFromDate,
-                downloadToDate
+                downloadToDate,
+                isProduction
             );
             const queryResult = await result.json();
 
@@ -352,7 +353,7 @@ console.log(`${process.env.NEXT_PUBLIC_API_PASS}/report/${statusToDownload}/${do
             const worksheet = xlsx.utils.json_to_sheet(reservationRows);
             const workbook = xlsx.utils.book_new();
             xlsx.utils.book_append_sheet(workbook, worksheet, 'Reservations');
-            xlsx.writeFile(workbook, `reservations_${statusToDownload.toLowerCase()}_${downloadFromDate}_to_${downloadToDate}.xlsx`);
+            xlsx.writeFile(workbook, `reservations${isProduction != 'All' ? (isProduction == 1 ? '_Production' : '_Current') : ''}_${statusToDownload.toLowerCase()}_${downloadFromDate}_to_${downloadToDate}.xlsx`);
 
             toast({ description: `Downloaded ${reservationRows.length} reservations` });
         } catch (e) {
@@ -651,6 +652,7 @@ return (
           
             <div className="w-full">
                 <div className="flex flex-row justify-between items-center py-4">
+                    
                     <span className='text-sm text-slate-500'>{totalReservations} Reservations found</span>
                     <div className="flex flex-row items-center gap-3">
                         <div className="relative">
@@ -717,6 +719,37 @@ return (
                         </Popover>
                     </div>
                 </div>
+
+                <Tabs
+                    value={isProduction}
+                    onValueChange={(val) => {
+                        setisProduction(val)
+                        setResOffset(0)
+                        getReservations(resStatus, 0, val)
+                    }}
+                    className="mb-4"
+                >
+                    <TabsList className="grid w-full max-w-[360px] grid-cols-3 rounded-2xl bg-slate-100 p-1 shadow-sm">
+                        <TabsTrigger
+                            value="All"
+                            className="rounded-xl text-sm font-semibold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+                        >
+                            All
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="1"
+                            className="rounded-xl text-sm font-semibold text-slate-600 data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm"
+                        >
+                            Production
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="0"
+                            className="rounded-xl text-sm font-semibold text-slate-600 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm"
+                        >
+                            Current
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
 
                 <Card>
                     <Table>
@@ -832,7 +865,7 @@ return (
                                                     <div className="flex justify-end gap-2">
                                                         {group.first.status === 'Submitted' && (
                                                             <div className='flex flex-row items-center gap-2'>
-                                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => handleUpdateStatus(group.first)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
+                                                                <Button size="sm" variant="secondary" className="bg-blue-600 shadow-md text-white hover:bg-blue-700" onClick={() => handleUpdateStatus(group.first)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
                                                             </div>
                                                         )}
                                                         {(group.first.status === 'Approved' || group.first.status === 'Modified' || group.first.status === 'Rejected') && (
@@ -880,7 +913,7 @@ return (
                                                     <div className="flex justify-end gap-2">
                                                         {res.status === 'Submitted' && (
                                                             <div className='flex flex-row items-center gap-2'>
-                                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
+                                                                <Button size="sm" variant="outline" className="bg-blue-600 shadow-md text-white hover:bg-blue-700 hover:text-white" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
                                                             </div>
                                                         )}
                                                         {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected') && (

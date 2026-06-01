@@ -14,9 +14,68 @@ export async function GET(request,{params}) {
         if(await Keyverify(params.ids[0])){
 
             // get the list of reservations ordered by createdOn and by selected status
+            if(params.ids[1] == 'U0.1'){
+                try {
+
+                    // this is for web
+                    if(params.ids[4] == 'All'){
+
+                        // lets update the query to add user table as well to get user details
+                        var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                        var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0';
+
+                        // if status is provided then filter by status as well
+                        if(params.ids[2] != 'All'){
+
+                            // expiryDate field is used to store the modified timestamp for the reservation. So we can filter the reservations modified after a particular timestamp using this field.
+                            // if(params.ids[2] == 'Modified'){
+                            //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                            // }
+                            // else
+                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                            queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'"';
+                        }
+                    }
+                    else {
+                        // if(params.ids[4] != 'SuperAdmin'){
+                            // lets update the query to add user table as well to get user details
+                            var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isProduction = '+params.ids[4]+' ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                            var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isProduction = '+params.ids[4]+' AND r.isDeleted = 0';
+
+                            // if status is provided then filter by status as well
+                            if(params.ids[2] != 'All'){
+
+                                // expiryDate field is used to store the modified timestamp for the reservation. So we can filter the reservations modified after a particular timestamp using this field.
+                                // if(params.ids[2] == 'Modified'){
+                                //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                                // }
+                                // else
+                                query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND r.isProduction = '+params.ids[4]+' ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                                queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND r.isProduction = '+params.ids[4];
+                            }
+                        // }
+                    }
+
+                    
+                    const [rows, fields] = await connection.execute(query);
+                    const [countRows, countFields] = await connection.execute(queryCount);
+                    connection.release();
+
+                    if(rows.length > 0){
+                        return Response.json({status: 200, data: rows, count: countRows[0].count, message:'Updated!'}, {status: 200})
+                    }
+                    else {
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No reservation found!'+error}, {status: 200})
+                }
+            }
             if(params.ids[1] == 'U0'){
                 try {
 
+                    // this is for web
                     if(params.ids[4] == undefined){
 
                         // lets update the query to add user table as well to get user details
@@ -312,8 +371,8 @@ export async function GET(request,{params}) {
 
 
                         // lets update the query to add user table as well to get user details based on the createdOn and modifiedOn fields using the provided date range in params.ids[3]
-                        var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) ORDER BY r.createdOn DESC';
-                        var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?))';
+                        var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'" ORDER BY r.createdOn DESC';
+                        var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'"';
 
                         // if status is provided then filter by status as well
                         if(params.ids[2] != 'All'){
@@ -323,8 +382,8 @@ export async function GET(request,{params}) {
                             //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                             // }
                             // else
-                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC';
-                            queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'"';
+                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" AND r.isProduction="'+params.ids[4]+'" ORDER BY r.createdOn DESC';
+                            queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" AND r.isProduction="'+params.ids[4]+'"';
                         }
 
                     const [rows, fields] = await connection.execute(query, [params.ids[3].split(',')[0], params.ids[3].split(',')[1], params.ids[3].split(',')[0], params.ids[3].split(',')[1]]);
