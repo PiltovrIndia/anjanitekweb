@@ -964,6 +964,17 @@ return (
                                     <div className="font-medium text-sm text-slate-900">{selectedReviewDesign.design}</div>
                                     <div className="text-xs text-slate-500">{selectedReviewDesign.name || 'Selected design'}</div>
                                 </div>
+                                {selectedReviewDesign.stockType == 'prm' ?
+                                <div className="flex gap-3 text-xs shrink-0">
+                                                    <span className="font-medium text-violet-600">PRM <span className="font-bold">{selectedReviewDesign.stockType}</span></span>
+                                                    <span className="font-medium text-violet-600">PRM <span className="font-bold">{selectedReviewDesign.design.prm}</span></span>
+                                                </div>
+                                                :
+                                <div className="flex gap-3 text-xs shrink-0">
+                                                    <span className="font-medium text-blue-600">STD <span className="font-bold">{selectedReviewDesign.stockType}</span></span>
+                                                </div>
+                                                }
+
                                 <Button
                                     size="sm"
                                     variant="ghost"
@@ -1023,7 +1034,7 @@ return (
                         </p>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="qty" className="text-right">Quantity</Label>
+                        <Label htmlFor="qty" className="text-right">Requested Quantity</Label>
                         {/* {(selectedRes?.status === 'Submitted' || selectedRes?.status === 'Approved') ? */}
                             <Input
                                 id="qty"

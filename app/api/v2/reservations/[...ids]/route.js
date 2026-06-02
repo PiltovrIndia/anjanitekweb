@@ -199,10 +199,10 @@ export async function GET(request,{params}) {
 
                         // update the stock directly based on stockType
                         if(stockType == 'std'){
-                            await connection.execute('UPDATE products1 SET std = std - ? WHERE design = ?', [approvedQty, nextDesign]);
+                            await connection.execute('UPDATE products1 SET std = std - ? WHERE design = ? and std >= ?', [approvedQty, nextDesign, approvedQty]);
                         }
                         else if(stockType == 'prm'){
-                            await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ?', [approvedQty, nextDesign]);
+                            await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ? and prm >= ?', [approvedQty, nextDesign, approvedQty]);
                         }
                     }
 
@@ -261,10 +261,10 @@ export async function GET(request,{params}) {
                     if(params.ids[3] == 'Modified' && reservationRows.length > 0 && nextDesign){
                         // update the stock directly based on stockType
                         if(stockType == 'std'){
-                            await connection.execute('UPDATE products1 SET std = std - ? WHERE design = ?', [nextApprovedQty, nextDesign]);
+                            await connection.execute('UPDATE products1 SET std = std - ? WHERE design = ? and std >= ?', [nextApprovedQty, nextDesign, nextApprovedQty]);
                         }
                         else if(stockType == 'prm'){
-                            await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ?', [nextApprovedQty, nextDesign]);
+                            await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ? and prm >= ?', [nextApprovedQty, nextDesign, nextApprovedQty]);
                         }
                     }
                     connection.release();
