@@ -855,7 +855,7 @@ return (
                                                     ))}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className='font-mono text-xs text-slate-500'>{dayjs(group.first.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
+                                            <TableCell className='font-mono text-xs text-slate-500'>{dayjs(group.first.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A')}</TableCell>
                                             <TableCell className="text-right">
                                                 {hasMultipleRows ? (
                                                     <span className="text-xs font-medium text-slate-500">
