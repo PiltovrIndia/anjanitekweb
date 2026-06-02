@@ -957,23 +957,20 @@ return (
                 </DialogHeader>
                 <div className="grid gap-5 py-4">
                     <div className="space-y-2" ref={reviewDesignRef}>
-                        <Label>Design</Label>
+                        <Label>Requested Design: <span className="font-bold text-black uppercase">{selectedReviewDesign?.stockType}</span></Label>
                         {selectedReviewDesign?.design ? (
                             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                                <div className="flex-1">
+                                <div className="flex-1 flex flex-col gap-2">
                                     <div className="font-medium text-sm text-slate-900">{selectedReviewDesign.design}</div>
-                                    <div className="text-xs text-slate-500">{selectedReviewDesign.name || 'Selected design'}</div>
+                                    <div className="text-xs text-slate-500 flex flex-row items-center gap-1">
+                                        {selectedReviewDesign.name || 'Selected design'} 
+                                    </div>
+                                    <div className="text-xs text-slate-500 flex flex-row items-center gap-1">
+                                        Current Stock:
+                                        <span className="font-medium text-violet-600">PRM <span className="font-bold">{selectedReviewDesign.prm}</span></span>
+                                                  •  <span className="font-medium text-blue-600">STD <span className="font-bold">{selectedReviewDesign.std}</span></span>
+                                    </div>
                                 </div>
-                                {selectedReviewDesign.stockType == 'prm' ?
-                                <div className="flex gap-3 text-xs shrink-0">
-                                                    <span className="font-medium text-violet-600">PRM <span className="font-bold">{selectedReviewDesign.stockType}</span></span>
-                                                    <span className="font-medium text-violet-600">PRM <span className="font-bold">{selectedReviewDesign.design.prm}</span></span>
-                                                </div>
-                                                :
-                                <div className="flex gap-3 text-xs shrink-0">
-                                                    <span className="font-medium text-blue-600">STD <span className="font-bold">{selectedReviewDesign.stockType}</span></span>
-                                                </div>
-                                                }
 
                                 <Button
                                     size="sm"
