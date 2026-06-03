@@ -487,6 +487,7 @@ export async function POST(request, {params}) {
                 try {
                     const body = await request.json();
                     const { userId, designs, createdOn } = body;
+                    var isProductionOrder = 0;
 
                     if (!userId || !Array.isArray(designs) || designs.length === 0) {
                         connection.release();
@@ -499,6 +500,7 @@ export async function POST(request, {params}) {
 
                     for (const item of designs) {
                         const { cartId, serialId, dealerId, design, quantity, stockType, isProduction } = item;
+                        isProductionOrder = isProduction
                         await connection.execute(
                             'INSERT INTO reservations (userId, dealerId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, isProduction, serialId, cartId) VALUES (?, ?, ?, ?, "Submitted", 0, ?, ?, NULL, NULL, ?, ?, ?)',
                             [userId, dealerId, design, quantity, stockType, createdOn, isProduction ? 1 : 0, serialId, cartId]
@@ -529,7 +531,7 @@ export async function POST(request, {params}) {
                     }
                     
                     // send the notification
-                    const notificationResult = gcmIds.length > 0 ? await send_notification(`One ${isProduction == 1 ? 'Production' : 'Stock'} request received`, gcmIds, 'Multiple') : null;
+                    const notificationResult = gcmIds.length > 0 ? await send_notification(`One ${isProductionOrder == 1 ? 'Production' : 'Stock'} request received`, gcmIds, 'Multiple') : null;
 
 
                     return Response.json({ status: 200, message: 'Success!', data: insertedCount, notification: notificationResult }, { status: 200 });
