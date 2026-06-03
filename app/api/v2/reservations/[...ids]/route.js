@@ -76,7 +76,7 @@ export async function GET(request,{params}) {
                 try {
 
                     // this is for web
-                    if(params.ids[4] == undefined){
+                    if(params.ids[4] == undefined || params.ids[4] == 'GlobalAdmin'){
 
                         // lets update the query to add user table as well to get user details
                         var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
@@ -205,12 +205,30 @@ export async function GET(request,{params}) {
                             await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ? and prm >= ?', [approvedQty, nextDesign, approvedQty]);
                         }
                     }
-
+                    
+                    const [nrows] = await connection.execute(`SELECT gcm_regId FROM user where role='SuperAdmin'`);
+                    const [nrows1] = await connection.execute(`SELECT id, relatedTo FROM user where mapTo ='${params.ids[5]}'`);
                     connection.release();
+
+                    var gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
+                    // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
+                    if(nrows1.length > 0){
+                        for (let index = 0; index < nrows1.length; index++) {
+                            const element = nrows1[index];
+                            gcmIds.push(element.id);
+                            if(element.relatedTo){
+                                const relatedIds = element.relatedTo.split(',');
+                                for (let index = 0; index < relatedIds.length; index++) {
+                                    const relatedId = relatedIds[index];
+                                    gcmIds.push(relatedId);
+                                }
+                            }
+                        }
+                    }
                     
                     // send the notification
-                    const notificationResult = await send_notification('Your stock request is '+params.ids[3], params.ids[5], 'Single');
-                    
+                    const notificationResult = gcmIds.length > 0 ? await send_notification(`One ${reservationRows[0]?.isProduction == 1 ? 'Production' : 'Stock'} request is ${params.ids[3]}`, gcmIds, 'Multiple') : null;
+
                     if(rows.affectedRows > 0){
                         // return successful update
                         // return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId}, {status: 200})
@@ -267,11 +285,30 @@ export async function GET(request,{params}) {
                             await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ? and prm >= ?', [nextApprovedQty, nextDesign, nextApprovedQty]);
                         }
                     }
+                    
+                    const [nrows] = await connection.execute(`SELECT gcm_regId FROM user where role='SuperAdmin'`);
+                    const [nrows1] = await connection.execute(`SELECT id, relatedTo FROM user where mapTo ='${params.ids[5]}'`);
                     connection.release();
+
+                    var gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
+                    // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
+                    if(nrows1.length > 0){
+                        for (let index = 0; index < nrows1.length; index++) {
+                            const element = nrows1[index];
+                            gcmIds.push(element.id);
+                            if(element.relatedTo){
+                                const relatedIds = element.relatedTo.split(',');
+                                for (let index = 0; index < relatedIds.length; index++) {
+                                    const relatedId = relatedIds[index];
+                                    gcmIds.push(relatedId);
+                                }
+                            }
+                        }
+                    }
                     
                     // send the notification
-                    const notificationResult = await send_notification('Your stock request is '+params.ids[3], params.ids[5], 'Single');
-                    
+                    const notificationResult = gcmIds.length > 0 ? await send_notification(`One ${reservationRows[0]?.isProduction == 1 ? 'Production' : 'Stock'} request is ${params.ids[3]}`, gcmIds, 'Multiple') : null;
+
                     if(rows.affectedRows > 0){
                         // return successful update
                         // return Response.json({status: 200, message:'Posted to feed!', id: rows.insertId}, {status: 200})
@@ -367,12 +404,22 @@ export async function GET(request,{params}) {
             else  if(params.ids[1] == 'report'){
                 try {
 
+                    var query = '';
+                    var queryCount = '';
                         // params.ids[3] will be date range, lets download the reservations modified/created in that date range.
 
 
-                        // lets update the query to add user table as well to get user details based on the createdOn and modifiedOn fields using the provided date range in params.ids[3]
-                        var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'" ORDER BY r.createdOn DESC';
-                        var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'"';
+                        // if params.ids[4] value is 'All', then lets have a where condition which we can add in the query to get all the reservations irrespective of the production status. If params.ids[4] value is not 'All', then we will filter the reservations based on the production status as well.
+                        if(params.ids[4] == 'All'){
+                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) ORDER BY r.createdOn DESC';
+                            queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?))';
+                        }
+                        else {
+
+                            // lets update the query to add user table as well to get user details based on the createdOn and modifiedOn fields using the provided date range in params.ids[3]
+                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'" ORDER BY r.createdOn DESC';
+                            queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'"';
+                        }
 
                         // if status is provided then filter by status as well
                         if(params.ids[2] != 'All'){
@@ -382,8 +429,15 @@ export async function GET(request,{params}) {
                             //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                             // }
                             // else
-                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" AND r.isProduction="'+params.ids[4]+'" ORDER BY r.createdOn DESC';
-                            queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" AND r.isProduction="'+params.ids[4]+'"';
+
+                                if(params.ids[4] == 'All'){
+                                    query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC';
+                                    queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'"';
+                                }
+                                else {
+                                    query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" AND r.isProduction="'+params.ids[4]+'" ORDER BY r.createdOn DESC';
+                                    queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" AND r.isProduction="'+params.ids[4]+'"';
+                                }
                         }
 
                     const [rows, fields] = await connection.execute(query, [params.ids[3].split(',')[0], params.ids[3].split(',')[1], params.ids[3].split(',')[0], params.ids[3].split(',')[1]]);
@@ -454,13 +508,29 @@ export async function POST(request, {params}) {
 
                     await connection.commit();
 
-                    const [nrows] = await connection.execute(`SELECT gcm_regId FROM users where role='SuperAdmin'`);
+                    const [nrows] = await connection.execute(`SELECT gcm_regId FROM user where role='SuperAdmin'`);
+                    const [nrows1] = await connection.execute(`SELECT id, relatedTo FROM user where mapTo ='${params.ids[5]}'`);
                     connection.release();
 
-                    const gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
-                    const notificationResult = gcmIds.length > 0
-                        ? await send_notification('New stock request received!', gcmIds, 'Multiple')
-                        : null;
+                    var gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
+                    // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
+                    if(nrows1.length > 0){
+                        for (let index = 0; index < nrows1.length; index++) {
+                            const element = nrows1[index];
+                            gcmIds.push(element.id);
+                            if(element.relatedTo){
+                                const relatedIds = element.relatedTo.split(',');
+                                for (let index = 0; index < relatedIds.length; index++) {
+                                    const relatedId = relatedIds[index];
+                                    gcmIds.push(relatedId);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // send the notification
+                    const notificationResult = gcmIds.length > 0 ? await send_notification(`One ${isProduction == 1 ? 'Production' : 'Stock'} request received`, gcmIds, 'Multiple') : null;
+
 
                     return Response.json({ status: 200, message: 'Success!', data: insertedCount, notification: notificationResult }, { status: 200 });
 
