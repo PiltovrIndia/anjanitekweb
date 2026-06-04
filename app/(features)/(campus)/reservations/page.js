@@ -550,7 +550,7 @@ export default function Reservations() {
             );
             const queryResult = await result.json();
             if (queryResult.status === 200) {
-                toast({ description: `Reservation ${status.toLowerCase()} successfully` });
+                toast({ description: `Reservation marked as ${status.toLowerCase()}!` });
                 setIsActionDialogOpen(false);
                 getReservations(resStatus, resOffset); // Refresh list
             } else {
@@ -674,6 +674,7 @@ return (
                                 <SelectItem value="Approved">Approved</SelectItem>
                                 <SelectItem value="Rejected">Rejected</SelectItem>
                                 <SelectItem value="Modified">Modified</SelectItem>
+                                <SelectItem value="OutOfStock">OutofStock</SelectItem>
                             </SelectContent>
                         </Select>
                         <Button onClick={() => setStockOrderOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
@@ -900,7 +901,7 @@ return (
                                                 </TableCell>
                                                 <TableCell>
                                                     <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                        {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
+                                                        {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY') : ''}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell>
@@ -908,7 +909,7 @@ return (
                                                         {(res.isProduction == 1) ? 'Production' : 'Current'}
                                                     </span>
                                                 </TableCell>
-                                                <TableCell className='font-mono text-xs text-slate-500'>{dayjs(res.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
+                                                <TableCell className='font-mono text-xs text-slate-500'>{dayjs(res.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A')}</TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-2">
                                                         {res.status === 'Submitted' && (
@@ -957,7 +958,7 @@ return (
                 </DialogHeader>
                 <div className="grid gap-5 py-4">
                     <div className="space-y-2" ref={reviewDesignRef}>
-                        <Label>Requested Design: <span className="font-bold text-black uppercase">{selectedReviewDesign?.stockType}</span></Label>
+                        <Label>Requested Design: <span className="font-bold text-black uppercase">{selectedRes?.design}</span></Label>
                         {selectedReviewDesign?.design ? (
                             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
                                 <div className="flex-1 flex flex-col gap-2">
@@ -1026,12 +1027,15 @@ return (
                                 </div>
                             )}
                         </div>
-                        <p className="text-xs text-slate-500">
+                        {/* <p className="text-xs text-slate-500">
                             Current reservation: <span className="font-medium text-slate-700">{selectedRes?.design}</span>
-                        </p>
+                        </p> */}
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="qty" className="text-right">Requested Quantity</Label>
+                    
+                    
+                    <div className="flex flex-col gap-4">
+                        <Label htmlFor="qty" className="text-left mt-4">Requested <span className={`font-bold ${selectedReviewDesign?.stockType == 'prm' ? 'text-violet-600' : 'text-blue-600'} uppercase`}>{selectedReviewDesign?.stockType}</span> Quantity</Label>
+                        {/* <Label htmlFor="qty" className="text-right">Requested Quantity</Label> */}
                         {/* {(selectedRes?.status === 'Submitted' || selectedRes?.status === 'Approved') ? */}
                             <Input
                                 id="qty"
@@ -1054,6 +1058,10 @@ return (
                     <Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={resLoading}>
                         {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
                         Reject
+                    </Button>
+                    <Button className="bg-gray-600 text-white" onClick={() => submitApproval('OutOfStock')} disabled={resLoading}>
+                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                        Mark Out of Stock
                     </Button>
                 </div>
             </DialogContent>

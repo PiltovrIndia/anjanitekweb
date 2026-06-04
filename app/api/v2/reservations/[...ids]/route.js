@@ -198,12 +198,22 @@ export async function GET(request,{params}) {
                         const approvedQty = Number(params.ids[4]);
 
                         // update the stock directly based on stockType
+                        // var availableStock = -1;
                         if(stockType == 'std'){
+                            // get the updated stock value after minus operation to send in notification
                             await connection.execute('UPDATE products1 SET std = std - ? WHERE design = ? and std >= ?', [approvedQty, nextDesign, approvedQty]);
+                            // const [results] = await connection.execute('UPDATE products1 SET std = std - ? WHERE design = ? and std >= ?; SELECT std AS availableStock', [approvedQty, nextDesign, approvedQty]);
+                            // availableStock = results[1][0].availableStock;
                         }
                         else if(stockType == 'prm'){
                             await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ? and prm >= ?', [approvedQty, nextDesign, approvedQty]);
+                            // const [results] = await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ? and prm >= ?; SELECT prm AS availableStock', [approvedQty, nextDesign, approvedQty]);
+                            // availableStock = results[1][0].availableStock;
                         }
+
+                        // if(availableStock == 0){
+                        //     const [nrows] = await connection.execute(`SELECT userId FROM reservations where status='Submitted' AND design='${nextDesign}'`);
+                        // }
                     }
                     
                     const [nrows] = await connection.execute(`SELECT gcm_regId FROM user where role='SuperAdmin'`);
