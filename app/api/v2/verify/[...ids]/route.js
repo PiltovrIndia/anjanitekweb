@@ -148,6 +148,9 @@ export async function GET(request,{params}) {
                     // Preview only available when sending through an Ethereal account
                     // console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
 
+                    // add 'appVersion' with value 5 into the rows[0]
+                    rows[0].appVersion = '5';
+                    
                     // return the user data
                     // if user is a dealer, get dealer details
                     if(rows[0].role == 'Dealer' || rows[0].role == 'dealer'){

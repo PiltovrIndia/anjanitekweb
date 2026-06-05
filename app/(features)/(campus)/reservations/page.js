@@ -1051,10 +1051,14 @@ return (
                 </div>
                 <div className="flex justify-end gap-3">
                     <Button variant="outline" onClick={() => setIsActionDialogOpen(false)}>Cancel</Button>
-                    <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
-                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                        Approve
-                    </Button>
+                    {(selectedReviewDesign?.stockType == 'prm' && selectedReviewDesign?.prm === 0) || (selectedReviewDesign?.stockType == 'std' && selectedReviewDesign?.std === 0) ? 
+                     null
+                    : (
+                        <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
+                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                            Approve
+                        </Button>)}
+                    
                     <Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={resLoading}>
                         {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
                         Reject
