@@ -927,6 +927,9 @@ export async function GET(request,{params}) {
                     connection.release();
                     // return successful update
 
+                    // add 'appVersion' with value 5 into the rows[0]
+                    rows[0].appVersion = '5';
+                    
                     if(rows[0].role == 'Dealer' || rows[0].role == 'dealer'){
                         let p = 'SELECT * from dealer WHERE dealerId ="'+rows[0].id+'"';
                         // let p = 'SELECT d.*, (SELECT name from user where id="'+rows[0].mapTo+'" ) as mapName  from dealer WHERE dealerId ="'+rows[0].id+'"';
