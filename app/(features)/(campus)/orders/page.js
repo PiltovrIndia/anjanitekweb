@@ -343,6 +343,7 @@ export default function Reservations() {
                 requestedQty: Number(res.requestedQty || 0),
                 approvedQty: Number(res.approvedQty || 0),
                 stockType: res.stockType || '-',
+                size: res.size || '-',
                 status: res.status || '-',
                 submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
                 approvedOn: res.approvedOn ? dayjs(res.approvedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
@@ -643,7 +644,7 @@ return (
              
     <div className={`${inter.className} flex flex-col min-h-screen w-full overflow-auto`} style={{ gap: '8px' }}>
         <div className='flex flex-row gap-2 items-center py-4' >
-              <h2 className="text-xl font-semibold mr-4">Stock Reservations</h2>
+              <h2 className="text-xl font-semibold mr-4">Orders</h2>
               
               <Toaster />
           </div>
@@ -1051,22 +1052,41 @@ return (
                 </div>
                 <div className="flex justify-end gap-3">
                     <Button variant="outline" onClick={() => setIsActionDialogOpen(false)}>Cancel</Button>
-                    {(selectedReviewDesign?.stockType == 'prm' && selectedReviewDesign?.prm === 0) || (selectedReviewDesign?.stockType == 'std' && selectedReviewDesign?.std === 0) ? 
-                     null
-                    : (
-                        <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
+
+                    {(selectedReviewDesign?.stockType == 'prm' && selectedReviewDesign?.prm === 0) 
+                    || (selectedReviewDesign?.stockType == 'std' && selectedReviewDesign?.std === 0) ?  
+                    
+                    (selectedRes?.isProduction == 1) ? 
+                        (<Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
+                                {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                Approve
+                            </Button>)
+                        : null
+                    
+                    : 
+                    (<Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
                             {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
                             Approve
-                        </Button>)}
+                        </Button>)
+                    }
                     
-                    <Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={resLoading}>
-                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                        Reject
-                    </Button>
-                    <Button className="bg-gray-600 text-white" onClick={() => submitApproval('OutOfStock')} disabled={resLoading}>
-                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                        Mark Out of Stock
-                    </Button>
+                    
+                    
+                    {selectedRes?.isProduction == 0 ? 
+                        (<Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={resLoading}>
+                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                            Reject
+                        </Button>)
+                    : null
+                    }
+
+                    {selectedRes?.isProduction == 0 ? 
+                        (<Button className="bg-gray-600 text-white" onClick={() => submitApproval('OutOfStock')} disabled={resLoading}>
+                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                            Mark Out of Stock
+                        </Button>)
+                    : null
+                    }
                 </div>
             </DialogContent>
           </Dialog>

@@ -68,8 +68,8 @@ function getNavigationSections(role) {
 
   if (role === "SuperAdmin" || role === "StockAdmin") {
     operationsItems.push(
-      { title: "Designs", href: "/productsv2", icon: Package2 },
-      { title: "Reservations", href: "/reservations", icon: ScrollText },
+      { title: "Designs", href: "/designs", icon: Package2 },
+      { title: "Orders", href: "/orders", icon: ScrollText },
       { title: "App Reports", href: "/appreports", icon: BarChart3 },
       { title: "Forecast", href: "/forecast", icon: TrendingUp }
     )

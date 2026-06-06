@@ -51,7 +51,7 @@ export async function GET(request,{params}) {
                         // }
                         
                         // // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
-                        const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where isActive = 1`);
+                        const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM user where isActive = 1`);
                         connection.release();
                         // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         

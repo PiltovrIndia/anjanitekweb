@@ -28,7 +28,7 @@ import {
   import { Avatar, AvatarFallback, AvatarImage } from "../../../components/ui/avatar"
   
   import { Toaster } from "../../../components/ui/sonner"
-    import { useToast } from "@/app/components/ui/use-toast"
+import { useToast } from "@/app/components/ui/use-toast"
 
 
   import {
@@ -42,7 +42,10 @@ import {
     SheetTrigger,
   } from "../../../components/ui/sheet"
 import Image from 'next/image'
-// const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
+import firebase from '@/app/firebase'
+import { Dialog, DialogContent, DialogTrigger } from '@/app/components/ui/dialog'
+const storage = getStorage(firebase, "gs://anjanitek-communications.firebasestorage.app");
 
 
 // Create a child reference
@@ -94,9 +97,9 @@ fetch("/api/v2/user/"+pass+"/U2/"+dealer+"/"+offset, {
 });
 
 // send a post to the feed
-const sendFeedPost = async (pass, sender, sentAt, message, media) => 
+const sendFeedPost = async (pass, sender, message, media, category) => 
   
-    fetch("/api/v2/feed/"+pass+"/0/"+sender+"/"+sentAt+"/"+message+"/"+media, {
+    fetch("/api/v2/feed/"+pass+"/0/"+sender+"/"+message+"/"+media+"/"+category, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -130,8 +133,8 @@ fetch("/api/v2/dealerstats/"+pass+"/0", {
 // const spaceRef = ref(storage, 'images/space.jpg');
 // check for the user
 const updateUploadData = async (pass, items1, adminId) => 
-// userId, paymentAmount, type, transactionId, paymentDate,
-// userId, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
+// id, paymentAmount, type, transactionId, paymentDate,
+// id, paymentAmount, type, invoiceNo, transactionId, paymentDate, adminId, particular
 fetch("/api/v2/payments/"+pass+"/web/"+encodeURIComponent(JSON.stringify(items1))+"/"+adminId+"/-", {
     method: "GET",
     headers: {
@@ -146,6 +149,7 @@ fetch("/api/v2/payments/"+pass+"/web/"+encodeURIComponent(JSON.stringify(items1)
 export default function Messages() {
 
     // create a router for auto navigation
+    const { toast } = useToast();
     const router = useRouter();
 
     // user state and requests variable
@@ -153,9 +157,11 @@ export default function Messages() {
     const [role, setRole] = useState('');
     const [offset, setOffset] = useState(0);
     const [completed, setCompleted] = useState(false);
+    const [imageProgress, setImageProgress] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(false);
     const [items, setItems] = useState([]);
     const [file, setFile] = useState(null); 
+    const [mediaName, setMediaName] = useState(null); 
     
     
     const [feedList, setfeedList] = useState([]);
@@ -181,7 +187,6 @@ export default function Messages() {
     //create new date object
     const today = new dayjs();
     // const { toast } = useToast()
-    const { toast } = useToast();
     
     
     // Create an instance of Intl.NumberFormat for Indian numbering system with two decimal places
@@ -276,7 +281,7 @@ export default function Messages() {
         // setOffset(offset+10); // update the offset for every call
 
         try {    
-            const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, receiver)
+            const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, receiver)
             const queryResult = await result.json() // get data
             console.log(queryResult);
             // check for the status
@@ -323,16 +328,16 @@ export default function Messages() {
         var message = document.getElementById('message').value;
 
         try {    
-            console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId+"/"+selectedReceiver.receiver+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+message+"/0/-");
+            console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/0/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+selectedReceiver.receiver+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+message+"/0/-");
             // console.log("/api/v2/messaging/"+process.env.NEXT_PUBLIC_API_PASS+"/1/"+row.getValue('appointmentId')+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).collegeId+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).username+"/"+updatedOn+"/"+row.getValue('collegeId'));
-            const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,selectedReceiver.receiver,dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),message,"0","-");
+            const result  = await sendDealerMessage(process.env.NEXT_PUBLIC_API_PASS,JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id,selectedReceiver.receiver,dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),message,"0","-");
         
-            // const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, receiver)
+            // const result  = await getSenderMessages(process.env.NEXT_PUBLIC_API_PASS, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, receiver)
             const queryResult = await result.json() // get data
             console.log(queryResult);
             var sentObj = {
                 notificationId: 100000,
-                sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,
+                sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id,
                 receiver: selectedReceiver.receiver,
                 sentAt: dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),
                 message: document.getElementById('message').value,
@@ -386,18 +391,18 @@ const sendPostNow = async (e) => {
     
     try {    
         
-        console.log(process.env.NEXT_PUBLIC_API_PASS+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId+"/"+dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString()+"/"+document.getElementById('message').value+"/-");
+        console.log(process.env.NEXT_PUBLIC_API_PASS+"/"+JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id+"/"+document.getElementById('message').value+"/"+mediaName+"/update");
 
         const result  = await sendFeedPost(process.env.NEXT_PUBLIC_API_PASS, 
-            JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId, dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(), document.getElementById('message').value,'-') 
+            JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id, document.getElementById('message').value, mediaName, 'update') 
         const queryResult = await result.json() // get data
 
         var obj = {
-            id: 100000,
-            sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId,
+            id: queryResult.id,
+            sender: JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id,
             sentAt: dayjs(today.toDate()).format("YYYY-MM-DD hh:mm:ss").toString(),
             message: document.getElementById('message').value,
-            media: '-'
+            media: mediaName,
         };
         
         setfeedList([...feedList, obj]);
@@ -413,6 +418,9 @@ const sendPostNow = async (e) => {
                   onClick: () => console.log("Okay"),
                 },
               });
+
+            setFile(null); // Clear the file input after upload
+            toast({ description: `Feed update posted!` });
 
         }
         else if(queryResult.status != 200) {
@@ -444,7 +452,7 @@ const sendPostNow = async (e) => {
         setUploadProgress(true);
         
         try {    
-            const result  = await updateUploadData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).userId)
+            const result  = await updateUploadData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id)
             const queryResult = await result.json() // get data
             console.log("Call2 for Upload...");
             // check for the status
@@ -481,10 +489,39 @@ const sendPostNow = async (e) => {
         }
 }
 
-const handleFileSelect = (e) => {
+const handleFileSelect = async (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
         setFile(selectedFile);  // Update state
+        setImageProgress(true);
+        // let upload to firebase storage and get the url
+        // lets upload the selected file to the firebase storage and the get the url and then send the url to the api for posting to the feed
+
+        // use this FirebaseStorage.instanceFor(bucket: "gs://anjanitek-communications.firebasestorage.app").ref() to upload
+        try {
+            // Create a unique folder path/filename (e.g., uploads/1715632900_photo.jpg)
+            const uniqueFileName = `${Date.now().toString()}`;
+            const storageRef = ref(storage, `${uniqueFileName}.webp`);
+
+            // Upload the raw file bytes to Firebase Storage
+            const snapshot = await uploadBytes(storageRef, selectedFile);
+            
+            // Fetch the secure, shareable public URL of the uploaded asset
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            setMediaName(uniqueFileName);
+            setImageProgress(false);
+
+            // Success! Use the URL as needed
+            console.log("File available at:", downloadURL);
+            // statusText.innerHTML = `Upload Success! <a href="${downloadURL}" target="_blank">View File</a>`;
+            
+        } catch (error) {
+            setImageProgress(false);
+            console.error("Upload failed:", error);
+            // statusText.innerText = `Upload failed: ${error.message}`;
+        }
+
+        
     } else {
         console.log("No file selected.");
     }
@@ -502,7 +539,8 @@ const handleFileSelect = (e) => {
               {(!messaging) ?
               <Sheet>
                 <SheetTrigger asChild>
-                    <Button>Post Update</Button>
+                    <Button className="bg-green-600 hover:bg-green-700 text-white">
+                        Post Update</Button>
                 </SheetTrigger>
                 <SheetContent>
                     <SheetHeader>
@@ -525,6 +563,21 @@ const handleFileSelect = (e) => {
                             </Label>
                             <Input id="username" value="@peduarte" className="col-span-3" />
                         </div> */}
+
+                        <div className="grid w-full max-w-sm items-center gap-1.5">
+                            <Label htmlFor="image">Image</Label>
+                            <Input type="file" id="image" accept="image/*" onChange={handleFileSelect} />
+                        </div>
+
+                        {imageProgress ? <div className='flex flex-row text-sm text-gray-400'><SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;Uploading...</div> : null}
+
+                        {file ? <div className='flex flex-col gap-2'>
+                            <p className='text-sm text-gray-600'>Selected file: {file.name}</p>
+                            <Image src={URL.createObjectURL(file)} alt="Selected Image" width={200} height={200} className="object-cover rounded-md" />
+                         </div> : null}
+
+                         <br/>
+
                         <div className="grid w-full max-w-sm items-center gap-1.5">
                             <Label htmlFor="picture">Message</Label>
                             <Textarea id="message" placeholder="Type your message here." />
@@ -533,7 +586,7 @@ const handleFileSelect = (e) => {
                     </div>
                     <SheetFooter>
                     <SheetClose asChild>
-                        <Button type="submit" onClick={sendPostNow}>Post</Button>
+                        <Button type="submit" onClick={sendPostNow} disabled={imageProgress}>Post</Button>
                     </SheetClose>
                     </SheetFooter>
                 </SheetContent>
@@ -609,7 +662,7 @@ const handleFileSelect = (e) => {
                                                     </Avatar>
                                                     <div className="ml-3 overflow-hidden w-max">
                                                         <p className="text-sm font-medium text-slate-900">{searchItem.name}</p>
-                                                        <p className="text-sm text-slate-500 truncate">{searchItem.userId}</p>
+                                                        <p className="text-sm text-slate-500 truncate">{searchItem.id}</p>
                                                     </div>
                                                     </li>
                                                 </>
@@ -664,13 +717,39 @@ const handleFileSelect = (e) => {
                                                     <AvatarFallback>{message.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
                                                 </Avatar>
                                                 {message.media == '-' ? null :
-                                                <Image
-                                                src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+message.media+'.webp?alt=media'}
-                                                alt={message.name} className="w-full h-48 object-cover rounded-lg" width={400} height={200} />
-                                                }
+                                                // on click of the image, lets open it to show full image
+                                                // <Image src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+message.media+'.webp?alt=media'} alt={message.name} className="w-full h-48 object-cover rounded-lg" width={400} height={200} onClick={} />
+                                                // }
+
+                                                <Dialog>
+        
+                                                    {/* 2. DialogTrigger acts as your clickable thumbnail button */}
+                                                    <DialogTrigger asChild>
+                                                    <button className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 transition-opacity hover:opacity-90 dark:border-slate-800 dark:bg-slate-950">
+                                                        <img 
+                                                        src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+message.media+'.webp?alt=media'}
+                                                        alt={message.name} 
+                                                        className="h-40 w-full object-cover cursor-pointer"
+                                                        />
+                                                    </button>
+                                                    </DialogTrigger>
+
+                                                    {/* 3. DialogContent holds the overlay styling and the full view image */}
+                                                    <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden border-none bg-transparent shadow-none sm:max-w-[85vw]">
+                                                    <div className="flex items-center justify-center w-full h-full p-4">
+                                                        <img 
+                                                        src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+message.media+'.webp?alt=media'} 
+                                                        alt={`${message.name} - Full View`} 
+                                                        className="max-w-full max-h-[85vh] rounded-md object-contain shadow-2xl animate-in zoom-in-95 duration-200"
+                                                        />
+                                                    </div>
+                                                    </DialogContent>
+
+                                                </Dialog>
+}
                                                 <p className="text-l p-1">{message.message}</p>
                                                 {/* <Label className="text-gray-500 p-1">{message.sender}</Label> */}
-                                                <p className="text-xs text-gray-500 p-1">{dayjs(message.sentAt).format('MMMM D, YYYY h:mm A')}</p>
+                                                <p className="text-xs text-gray-500 p-1">{dayjs(message.sentAt).add(5, 'hour').add(30, 'minute').format('MMMM D, YYYY h:mm A')}</p>
                                                 
                                             </div>
                                         ))

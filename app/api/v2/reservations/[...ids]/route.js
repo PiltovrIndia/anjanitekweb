@@ -79,7 +79,7 @@ export async function GET(request,{params}) {
                     if(params.ids[4] == undefined || params.ids[4] == 'GlobalAdmin'){
 
                         // lets update the query to add user table as well to get user details
-                        var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                        var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 ORDER BY r."'+params.ids[6]+'" DESC LIMIT 20 OFFSET '+params.ids[3];
                         var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0';
 
                         // if status is provided then filter by status as well
@@ -90,14 +90,14 @@ export async function GET(request,{params}) {
                             //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                             // }
                             // else
-                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" ORDER BY r."'+params.ids[6]+'" DESC LIMIT 20 OFFSET '+params.ids[3];
                             queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'"';
                         }
                     }
                     else {
                         // if(params.ids[4] != 'SuperAdmin'){
                             // lets update the query to add user table as well to get user details
-                            var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") AND r.isDeleted = 0 ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                            var query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") AND r.isDeleted = 0 ORDER BY r."'+params.ids[6]+'" DESC LIMIT 20 OFFSET '+params.ids[3];
                             var queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") AND r.isDeleted = 0';
 
                             // if status is provided then filter by status as well
@@ -108,7 +108,7 @@ export async function GET(request,{params}) {
                                 //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                                 // }
                                 // else
-                                query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                                query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") ORDER BY r."'+params.ids[6]+'" DESC LIMIT 20 OFFSET '+params.ids[3];
                                 queryCount = 'SELECT count(*) as count from reservations r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%")';
                             }
                         // }
@@ -194,18 +194,19 @@ export async function GET(request,{params}) {
                     
                     // if status is 'approved', lets minus the approvedQty from the respective design stock
                     if(params.ids[3] == 'Approved' && reservationRows.length > 0 && nextDesign){
+                        const isProduction = reservationRows[0].isProduction;
                         const stockType = reservationRows[0].stockType;
                         const approvedQty = Number(params.ids[4]);
 
                         // update the stock directly based on stockType
                         // var availableStock = -1;
-                        if(stockType == 'std'){
+                        if(stockType == 'std' && isProduction == 0){
                             // get the updated stock value after minus operation to send in notification
                             await connection.execute('UPDATE products1 SET std = std - ? WHERE design = ? and std >= ?', [approvedQty, nextDesign, approvedQty]);
                             // const [results] = await connection.execute('UPDATE products1 SET std = std - ? WHERE design = ? and std >= ?; SELECT std AS availableStock', [approvedQty, nextDesign, approvedQty]);
                             // availableStock = results[1][0].availableStock;
                         }
-                        else if(stockType == 'prm'){
+                        else if(stockType == 'prm' && isProduction == 0){
                             await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ? and prm >= ?', [approvedQty, nextDesign, approvedQty]);
                             // const [results] = await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ? and prm >= ?; SELECT prm AS availableStock', [approvedQty, nextDesign, approvedQty]);
                             // availableStock = results[1][0].availableStock;
@@ -261,6 +262,7 @@ export async function GET(request,{params}) {
                     const nextDesign = decodeURIComponent(params.ids[7] || previousReservation?.design || '');
                     const previousDesign = previousReservation?.design;
                     const stockType = previousReservation?.stockType;
+                    const isProduction = previousReservation?.isProduction;
                     const previousApprovedQty = Number(previousReservation?.approvedQty || 0);
                     const nextApprovedQty = Number(params.ids[4] || 0);
                     const previousStatus = previousReservation?.status;
@@ -288,10 +290,10 @@ export async function GET(request,{params}) {
                     // if status is 'approved', lets minus the approvedQty from the respective design stock
                     if(params.ids[3] == 'Modified' && reservationRows.length > 0 && nextDesign){
                         // update the stock directly based on stockType
-                        if(stockType == 'std'){
+                        if(stockType == 'std' && isProduction == 0){
                             await connection.execute('UPDATE products1 SET std = std - ? WHERE design = ? and std >= ?', [nextApprovedQty, nextDesign, nextApprovedQty]);
                         }
-                        else if(stockType == 'prm'){
+                        else if(stockType == 'prm' && isProduction == 0){
                             await connection.execute('UPDATE products1 SET prm = prm - ? WHERE design = ? and prm >= ?', [nextApprovedQty, nextDesign, nextApprovedQty]);
                         }
                     }
@@ -398,7 +400,7 @@ export async function GET(request,{params}) {
             // SOFT delete a reservation
             else if(params.ids[1] == 'U5'){
                 try {
-                    const [rows, fields] = await connection.execute('UPDATE reservations SET isDeleted = 1 WHERE id="'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('UPDATE reservations SET status="Deleted", isDeleted = 1 WHERE id="'+params.ids[2]+'"');
                     connection.release();
 
                     if(rows.affectedRows > 0){
@@ -508,12 +510,29 @@ export async function POST(request, {params}) {
 
                     let insertedCount = 0;
 
+                    // 1. get the next cart ID for the given dealerId
+                    const [rows] = await connection.execute(
+                        `SELECT COALESCE(
+                            CONCAT(
+                                LEFT(MAX(cartId), 1), 
+                                LPAD(CAST(SUBSTRING(MAX(cartId), 2) AS UNSIGNED) + 1, 6, '0')
+                            ),
+                            'O000001'
+                        ) AS nextCartId 
+                        FROM reservations 
+                        WHERE dealerId = ?`,
+                        [designs[0].dealerId]
+                    );
+
+                    // 2. Store the calculated ID in a variable
+                    const nextCartId = rows[0].nextCartId;
+
                     for (const item of designs) {
                         const { cartId, serialId, dealerId, design, quantity, stockType, isProduction } = item;
                         isProductionOrder = isProduction
                         await connection.execute(
                             'INSERT INTO reservations (userId, dealerId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, isProduction, serialId, cartId) VALUES (?, ?, ?, ?, "Submitted", 0, ?, ?, NULL, NULL, ?, ?, ?)',
-                            [userId, dealerId, design, quantity, stockType, createdOn, isProduction ? 1 : 0, serialId, cartId]
+                            [userId, dealerId, design, quantity, stockType, createdOn, isProduction ? 1 : 0, serialId, nextCartId]
                         );
                         insertedCount++;
                     }

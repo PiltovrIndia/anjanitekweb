@@ -775,12 +775,12 @@ return (
           </div>
 
           
-          <Tabs defaultValue="allProducts" className="">
+          {/* <Tabs defaultValue="allProducts" className="">
             <TabsList className="w-fit bg-slate-100 p-1 border border-slate-300">
               <TabsTrigger value="allProducts" className="w-1/2">All Designs</TabsTrigger>
               <TabsTrigger value="reservations" className="w-1/2" onClick={()=>getReservations('All', 0)}>Reservations</TabsTrigger>
             </TabsList>
-            <TabsContent value="allProducts" className="w-full">
+            <TabsContent value="allProducts" className="w-full"> */}
               {/* Content for all products */}
               <span className='text-sm text-slate-500'>{allProducts.length} Designs in total</span>
 
@@ -1427,158 +1427,7 @@ return (
 
         
         </div>
-            </TabsContent>
-            <TabsContent value="reservations" className="w-full">
-                <div className="flex flex-row justify-between items-center py-4">
-                    <span className='text-sm text-slate-500'>{totalReservations} Reservations found</span>
-                    <div className="flex flex-row items-center gap-3">
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search dealer ID or design"
-                                value={resSearch}
-                                onChange={e => setResSearch(e.target.value)}
-                                className="pl-8 w-56"
-                            />
-                        </div>
-                        <Select value={resStatus} onValueChange={(val) => { setResStatus(val); getReservations(val, 0); }}>
-                            <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Filter by status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Status</SelectItem>
-                                <SelectItem value="Submitted">Pending</SelectItem>
-                                <SelectItem value="Approved">Approved</SelectItem>
-                                <SelectItem value="Rejected">Rejected</SelectItem>
-                                <SelectItem value="Modified">Modified</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Popover open={showDownloadPopover} onOpenChange={setShowDownloadPopover}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" disabled={downloadingReservations}>
-                                    <ArrowDown className="mr-2 h-4 w-4" />
-                                    {downloadingReservations ? 'Downloading...' : 'Download Reservations'}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-72 p-4" align="end">
-                                <p className="text-sm font-semibold mb-3">Select date range</p>
-                                <div className="flex flex-col gap-3">
-                                    <div className="flex flex-col gap-1">
-                                        <Label className="text-xs text-muted-foreground">From</Label>
-                                        <Input
-                                            type="date"
-                                            value={downloadFromDate}
-                                            onChange={e => setDownloadFromDate(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <Label className="text-xs text-muted-foreground">To</Label>
-                                        <Input
-                                            type="date"
-                                            value={downloadToDate}
-                                            onChange={e => setDownloadToDate(e.target.value)}
-                                        />
-                                    </div>
-                                    <Button
-                                        className="w-full mt-1"
-                                        onClick={downloadReservationsNow}
-                                        disabled={!downloadFromDate || !downloadToDate}
-                                    >
-                                        <ArrowDown className="mr-2 h-4 w-4" />
-                                        Download
-                                    </Button>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                </div>
-
-                <Card>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>User ID</TableHead>
-                                <TableHead>Design</TableHead>
-                                <TableHead className="text-right">Requested</TableHead>
-                                <TableHead className="text-right">Approved</TableHead>
-                                <TableHead>Stock</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Request Type</TableHead>
-                                <TableHead>Submitted On</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {resLoading ? (
-                                <TableRow><TableCell colSpan={9} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
-                            ) : reservations.length === 0 ? (
-                                <TableRow><TableCell colSpan={9} className="text-center py-10">No reservations found</TableCell></TableRow>
-                            ) : reservations
-                            .filter(res => {
-                                if (!resSearch.trim()) return true
-                                const q = resSearch.trim().toLowerCase()
-                                return (
-                                    (res.dealer || '').toLowerCase().includes(q) ||
-                                    String(res.userId || '').toLowerCase().includes(q) ||
-                                    (res.design || '').toLowerCase().includes(q)
-                                )
-                            })
-                            .map((res) => (
-                                <TableRow key={res.id} className="hover:bg-gray-50 text-sm">
-                                    <TableCell className="py-4">
-                                        <span className='font-medium  '>{res.dealer}</span><br/>
-                                        <span className='text-xs text-slate-500'>{res.userId}</span>
-                                    </TableCell>
-                                    <TableCell>
-                                        {res.design}<br/>
-                                        <span className='text-xs text-slate-500'>{res.name}</span>
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
-                                    <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
-                                    <TableCell>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${res.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : res.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
-                                            {res.stockType}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell>
-                                        <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                                            {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${(res.isProduction == 1) ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-                                            {(res.isProduction == 1) ? 'Production request' : 'Reserved'}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className='font-mono'>{dayjs(res.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            {res.status === 'Submitted' && (
-                                                <div className='flex flex-row items-center gap-2'>
-                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
-                                                {/* <Button size="sm" variant="outline" className="text-red-600 border-red-600" onClick={() => handleUpdateStatus(res)}>Reject</Button> */}
-                                                </div>
-                                            )}
-                                            {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected') && (
-                                                <div className='flex flex-row items-center gap-2'>
-                                                <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(res)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
-                                                {/* <Button size="sm" variant="outline" className="text-red-600 border-red-600" onClick={() => handleUpdateStatus(res)}>Reject</Button> */}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </Card>
-                
-                <div className="flex items-center justify-end space-x-2 py-4">
-                    <Button variant="outline" size="sm" onClick={() => { const next = Math.max(0, resOffset - 10); setResOffset(next); getReservations(resStatus, next); }} disabled={resOffset === 0}>Previous</Button>
-                    <Button variant="outline" size="sm" onClick={() => { const next = resOffset + 10; setResOffset(next); getReservations(resStatus, next); }} disabled={reservations.length < 10}>Next</Button>
-                </div>
-            </TabsContent>
-          </Tabs>
+            
           
           {/* Approval Confirmation Dialog */}
           <Dialog open={isActionDialogOpen} onOpenChange={setIsActionDialogOpen}>
