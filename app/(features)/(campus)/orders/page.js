@@ -32,6 +32,8 @@ import StockOrderDialog from '../products/stock_order_dialog'
 const xlsx = require('xlsx');
 // Child references can also take paths delimited by '/'
 
+const ORDER_PAGE_SIZE = 20;
+
 
 // get tags for the products
 const getTags = async (pass) => 
@@ -107,9 +109,9 @@ const updateUploadStockData = async (pass, items1, adminId) =>
     });
 
 
-// get reservations
-const getReservationsAPI = async (pass, type, offset, isProduction) => 
-fetch("/api/v2/reservations/"+pass+"/U0.1/"+type+"/"+offset+"/"+isProduction, {
+// get orders
+const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction) => 
+fetch("/api/v2/orders/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -117,8 +119,8 @@ fetch("/api/v2/reservations/"+pass+"/U0.1/"+type+"/"+offset+"/"+isProduction, {
     },
 });
 
-const getReservationsByDateAPI = async (pass, type, fromDate, toDate, isProduction) =>
-fetch("/api/v2/reservations/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction, {
+const getDesignOrdersAPI = async (pass, type, page, role, userId, sortBy) =>
+fetch("/api/v2/orders/"+pass+"/U00.1/"+type+"/"+page+"/"+role+"/"+userId+"/"+sortBy, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -126,9 +128,37 @@ fetch("/api/v2/reservations/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDa
     },
 });
 
-// update reservation status
-const updateReservationStatusAPI = async (pass, path, reservationId, status, qty, userId, actionDate, design) => 
-fetch("/api/v2/reservations/"+pass+"/"+path+"/"+reservationId+"/"+status+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design), {
+const getDesignOrderItemsAPI = async (pass, design, stockType = 'All') =>
+fetch("/api/v2/orders/"+pass+"/U00.2/"+encodeURIComponent(design)+"/"+stockType, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction) =>
+fetch("/api/v2/orders/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+const getOrdersByDesignAPI = async (pass, design, signal) =>
+fetch("/api/v2/orders/"+pass+"/U2/"+encodeURIComponent(design), {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+    signal,
+});
+
+// update order status
+const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate, design) => 
+fetch("/api/v2/orders/"+pass+"/"+path+"/"+orderId+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -137,7 +167,7 @@ fetch("/api/v2/reservations/"+pass+"/"+path+"/"+reservationId+"/"+status+"/"+qty
 });
 
 // pass state variable and the method to update state variable
-export default function Reservations() {
+export default function Orders() {
     
     const { toast } = useToast();
     const router = useRouter();
@@ -158,12 +188,13 @@ export default function Reservations() {
     const [offerCreationLoading, setOfferCreationLoading] = useState(false);
     const [tagUpdateKey, setTagUpdateKey] = useState(0);
 
-    // Reservations State
-    const [totalReservations, setTotalReservations] = useState([]);
-    const [reservations, setReservations] = useState([]);
+    // Orders State
+    const [totalOrders, setTotalOrders] = useState(0);
+    const [orders, setOrders] = useState([]);
     const [resLoading, setResLoading] = useState(false);
     const [isProduction, setisProduction] = useState('All');
-    const [downloadingReservations, setDownloadingReservations] = useState(false);
+    const [activeOrdersTab, setActiveOrdersTab] = useState('Orders');
+    const [downloadingOrders, setDownloadingOrders] = useState(false);
     const [resOffset, setResOffset] = useState(0);
     const [resStatus, setResStatus] = useState('All');
     const [resSearch, setResSearch] = useState('');
@@ -172,6 +203,13 @@ export default function Reservations() {
     const [showDownloadPopover, setShowDownloadPopover] = useState(false);
     const [stockOrderOpen, setStockOrderOpen] = useState(false);
     const [expandedCartGroups, setExpandedCartGroups] = useState({});
+    const [designOrders, setDesignOrders] = useState([]);
+    const [totalDesignOrders, setTotalDesignOrders] = useState(0);
+    const [designOrdersPage, setDesignOrdersPage] = useState(1);
+    const [designOrdersLoading, setDesignOrdersLoading] = useState(false);
+    const [expandedDesignRows, setExpandedDesignRows] = useState({});
+    const [designOrderItems, setDesignOrderItems] = useState({});
+    const [loadingDesignOrderItems, setLoadingDesignOrderItems] = useState({});
 
     // Approval Dialog State
     const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
@@ -182,6 +220,11 @@ export default function Reservations() {
     const [searchingReviewDesigns, setSearchingReviewDesigns] = useState(false)
     const [showReviewDesignDrop, setShowReviewDesignDrop] = useState(false)
     const [selectedReviewDesign, setSelectedReviewDesign] = useState(null)
+    const [designOrderHistory, setDesignOrderHistory] = useState([])
+    const [loadingDesignOrderHistory, setLoadingDesignOrderHistory] = useState(false)
+    const [designOrderHistoryError, setDesignOrderHistoryError] = useState('')
+    const [isEditingOrderItem, setIsEditingOrderItem] = useState(false)
+    const [showDesignOrderHistory, setShowDesignOrderHistory] = useState(false)
     const reviewDesignTimer = useRef(null)
     const reviewDesignRef = useRef(null)
 
@@ -199,8 +242,10 @@ export default function Reservations() {
 
     // user state and requests variable
     const [user, setUser] = useState();
+    const [userId, setUserId] = useState();
+    const [role, setRole] = useState();
     const [offset, setOffset] = useState(0);
-    const [offsetReservations, setOffsetReservations] = useState(0);
+    const [offsetOrders, setOffsetOrders] = useState(0);
     const [searching, setSearching] = useState(false);
     const [searchingTags, setSearchingTags] = useState(false);
 
@@ -219,7 +264,9 @@ export default function Reservations() {
 
                 // set the user state variable
                 setUser(obj);
-                getReservations(resStatus, 0); // fetch reservations on load with default status and offset
+                setUserId(obj['id']);
+                setRole(obj['role']);
+                getOrders(resStatus, 0, obj); // fetch orders on load with default status and offset
             }
             else{
                 console.log('Not found')
@@ -245,43 +292,208 @@ export default function Reservations() {
             setShowReviewDesignDrop(false)
             setSearchingReviewDesigns(false)
             setSelectedReviewDesign(null)
+            setDesignOrderHistory([])
+            setLoadingDesignOrderHistory(false)
+            setDesignOrderHistoryError('')
+            setIsEditingOrderItem(false)
+            setShowDesignOrderHistory(false)
         }
     }, [isActionDialogOpen])
 
+    useEffect(() => {
+        if (!isActionDialogOpen || !showDesignOrderHistory || !selectedReviewDesign?.design) {
+            setDesignOrderHistory([])
+            setLoadingDesignOrderHistory(false)
+            setDesignOrderHistoryError('')
+            return
+        }
+
+        const controller = new AbortController()
+
+        async function fetchDesignOrderHistory() {
+            setLoadingDesignOrderHistory(true)
+            setDesignOrderHistoryError('')
+
+            try {
+                const result = await getOrdersByDesignAPI(
+                    process.env.NEXT_PUBLIC_API_PASS,
+                    selectedReviewDesign.design,
+                    controller.signal
+                )
+                const queryResult = await result.json()
+
+                if (controller.signal.aborted) {
+                    return
+                }
+
+                if (queryResult.status === 200 && Array.isArray(queryResult.data)) {
+                    setDesignOrderHistory(queryResult.data.filter((order) => String(order.id) !== String(selectedRes?.id)))
+                } else {
+                    setDesignOrderHistory([])
+                }
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    setDesignOrderHistory([])
+                    setDesignOrderHistoryError('Could not load previous orders')
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setLoadingDesignOrderHistory(false)
+                }
+            }
+        }
+
+        fetchDesignOrderHistory()
+
+        return () => controller.abort()
+    }, [isActionDialogOpen, showDesignOrderHistory, selectedReviewDesign?.design, selectedRes?.id])
+
     // useEffect(() => {
     //         if (user && user.id) {
-    //             getReservations(); // Fetch reservations on load
+    //             getOrders(); // Fetch orders on load
     //         }
     //     }, [user]);
 
     
-    // fetch the reservations
-    async function getReservations(val, offsetR, productionFilter = isProduction){
+    // fetch the orders
+    function normalizeCartOrders(data = []) {
+        if (!Array.isArray(data)) {
+            return []
+        }
+
+        const hasCartGroups = data.some((order) => Array.isArray(order.items))
+
+        if (hasCartGroups) {
+            return data.map((order) => {
+                const rows = Array.isArray(order.items)
+                    ? order.items.map((item) => ({
+                        ...item,
+                        cartId: order.cartId,
+                        userId: order.userId,
+                        dealerId: order.dealerId,
+                        orderedBy: order.orderedBy,
+                        dealer: order.dealer,
+                        mobile: order.mobile,
+                        mapTo: order.mapTo,
+                        isProduction: Number(item.productionQty || 0) > 0 ? 1 : 0,
+                    }))
+                    : []
+
+                return {
+                    ...order,
+                    rows,
+                    first: rows[0] || order,
+                    requestedQty: Number(order.totalRequestedQty || 0),
+                    approvedQty: Number(order.totalApprovedQty || 0),
+                    productionQty: Number(order.totalProductionQty || 0),
+                    waitlistItems: Number(order.waitlistItems || 0),
+                    stockTypes: [...new Set(rows.map((item) => item.stockType).filter(Boolean))],
+                    requestTypes: [...new Set(rows.map((item) => Number(item.productionQty || 0) > 0 ? 'Production' : 'Current'))],
+                    statuses: order.orderStatus
+                        ? [{ label: order.orderStatus, count: 1 }]
+                        : getStatusCounts(rows),
+                }
+            })
+        }
+
+        const groupMap = new Map()
+        data.forEach((order) => {
+            const groupKey = order.cartId || `single-${order.id}`
+            if (!groupMap.has(groupKey)) {
+                groupMap.set(groupKey, {
+                    cartId: groupKey,
+                    rows: [],
+                })
+            }
+            groupMap.get(groupKey).rows.push(order)
+        })
+
+        return Array.from(groupMap.values()).map((group) => {
+            const rows = group.rows
+            const first = rows[0] || {}
+
+            return {
+                ...group,
+                ...first,
+                first,
+                totalDesigns: rows.length,
+                totalRequestedQty: rows.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0),
+                totalApprovedQty: rows.reduce((sum, item) => sum + Number(item.approvedQty || 0), 0),
+                totalProductionQty: rows.reduce((sum, item) => sum + Number(item.productionQty || 0), 0),
+                requestedQty: rows.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0),
+                approvedQty: rows.reduce((sum, item) => sum + Number(item.approvedQty || 0), 0),
+                waitlistItems: rows.filter((item) => hasWaitlistPosition(item.waitlistPosition)).length,
+                stockTypes: [...new Set(rows.map((item) => item.stockType).filter(Boolean))],
+                requestTypes: [...new Set(rows.map((item) => item.isProduction == 1 || Number(item.productionQty || 0) > 0 ? 'Production' : 'Current'))],
+                statuses: getStatusCounts(rows),
+            }
+        })
+    }
+
+    function getStatusCounts(rows = []) {
+        const statusCounts = rows.reduce((counts, item) => {
+            if (!item.status) {
+                return counts
+            }
+
+            counts.set(item.status, (counts.get(item.status) || 0) + 1)
+            return counts
+        }, new Map())
+
+        return Array.from(statusCounts.entries()).map(([label, count]) => ({
+            label,
+            count,
+        }))
+    }
+
+    function hasWaitlistPosition(value) {
+        return value !== null && value !== undefined && value !== '' && !Number.isNaN(Number(value))
+    }
+
+    function getOrderStatusClass(status) {
+        if (status === 'Approved') return 'bg-green-100 text-green-700'
+        if (status === 'Rejected') return 'bg-red-100 text-red-700'
+        if (status === 'Modified') return 'bg-yellow-100 text-yellow-700'
+        if (status === 'OutOfStock') return 'bg-orange-100 text-orange-700'
+        return 'bg-gray-100 text-gray-700'
+    }
+
+    function getOrderStatusLabel(status) {
+        return status === 'Submitted' ? 'Pending' : status || '-'
+    }
+
+    async function getOrders(val, offsetR, userObj = user, productionFilter = isProduction){
         
         
         setResLoading(true);
         // setOffset(offset+0); // update the offset for every call
+        
+
+        if (!userObj?.role || !userObj?.id) {
+            setResLoading(false);
+            return;
+        }
 
         try {    
-            const result  = await getReservationsAPI(process.env.NEXT_PUBLIC_API_PASS,val, offsetR, productionFilter) 
+            const result  = await getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS,val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter) 
             const queryResult = await result.json() // get data
 
             // check for the status
             if(queryResult.status == 200){
 
                 // check if data exits
-                if(queryResult.data.length > 0){
+                if(Array.isArray(queryResult.data) && queryResult.data.length > 0){
                     
-                    setReservations(queryResult.data);
-                    setTotalReservations(queryResult.count);
+                    setOrders(normalizeCartOrders(queryResult.data));
+                    setTotalOrders(queryResult.totalOrders ?? queryResult.count ?? queryResult.data.length);
                         
                         setResLoading(false);
                     // }
                     
                 }
                 else {
-                    setReservations([]);
-                    setTotalReservations(0);
+                    setOrders([]);
+                    setTotalOrders(0);
                 }
 
                 setResLoading(false);
@@ -291,7 +503,7 @@ export default function Reservations() {
                 setResLoading(false);
             }
             else if(queryResult.status == 404 || queryResult.status == 201) {
-                setReservations([]);
+                setOrders([]);
                 setResLoading(false);
             }
         }
@@ -300,17 +512,90 @@ export default function Reservations() {
             toast({
                 description: "Issue loading, try again later!",
               })
+            setResLoading(false);
         }
     }
 
-    async function downloadReservationsNow() {
+    async function getDesignOrders(val, page = 1, userObj = user) {
+        setDesignOrdersLoading(true);
+
+        if (!userObj?.role || !userObj?.id) {
+            setDesignOrdersLoading(false);
+            return;
+        }
+
+        try {
+            const result = await getDesignOrdersAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                val,
+                page,
+                userObj.role,
+                userObj.id,
+                'createdOn'
+            );
+            const queryResult = await result.json();
+
+            if (queryResult.status === 200 && Array.isArray(queryResult.data)) {
+                setDesignOrders(queryResult.data);
+                setTotalDesignOrders(queryResult.totalDesigns ?? queryResult.data.length);
+                setDesignOrdersPage(queryResult.page ?? page);
+            } else {
+                setDesignOrders([]);
+                setTotalDesignOrders(0);
+            }
+        } catch (e) {
+            toast({ description: "Issue loading designs, try again later!" });
+        } finally {
+            setDesignOrdersLoading(false);
+        }
+    }
+
+    async function getDesignOrderItems(design, stockType = 'All') {
+        if (!design || designOrderItems[design]) {
+            return;
+        }
+
+        setLoadingDesignOrderItems((prev) => ({
+            ...prev,
+            [design]: true,
+        }));
+
+        try {
+            const result = await getDesignOrderItemsAPI(process.env.NEXT_PUBLIC_API_PASS, design, stockType);
+            const queryResult = await result.json();
+
+            setDesignOrderItems((prev) => ({
+                ...prev,
+                [design]: queryResult.status === 200 && Array.isArray(queryResult.data)
+                    ? queryResult.data.map((item) => ({
+                        ...item,
+                        waitlistPosition: item.waitlistPosition ?? item.waitlistSequence,
+                        isProduction: Number(item.productionQty || 0) > 0 ? 1 : 0,
+                    }))
+                    : [],
+            }));
+        } catch (e) {
+            toast({ description: "Issue loading design orders, try again later!" });
+            setDesignOrderItems((prev) => ({
+                ...prev,
+                [design]: [],
+            }));
+        } finally {
+            setLoadingDesignOrderItems((prev) => ({
+                ...prev,
+                [design]: false,
+            }));
+        }
+    }
+
+    async function downloadOrdersNow() {
         const statusToDownload = resStatus || 'All';
 
-        setDownloadingReservations(true);
+        setDownloadingOrders(true);
         setShowDownloadPopover(false);
 
         try {
-            const result = await getReservationsByDateAPI(
+            const result = await getOrdersByDateAPI(
                 process.env.NEXT_PUBLIC_API_PASS,
                 statusToDownload,
                 downloadFromDate,
@@ -320,18 +605,32 @@ export default function Reservations() {
             const queryResult = await result.json();
 
             if (queryResult.status !== 200) {
-                throw new Error(queryResult.message || 'Failed to download reservations');
+                throw new Error(queryResult.message || 'Failed to download orders');
             }
 
-            const allReservations = Array.isArray(queryResult.data) ? queryResult.data : [];
+            const allOrdersRaw = Array.isArray(queryResult.data) ? queryResult.data : [];
+            const allOrders = allOrdersRaw.flatMap((order) => (
+                Array.isArray(order.items)
+                    ? order.items.map((item) => ({
+                        ...item,
+                        cartId: order.cartId,
+                        userId: order.userId,
+                        dealerId: order.dealerId,
+                        orderedBy: order.orderedBy,
+                        dealer: order.dealer,
+                        mobile: order.mobile,
+                        mapTo: order.mapTo,
+                    }))
+                    : [order]
+            ));
 
-            if (allReservations.length === 0) {
-                toast({ description: 'No reservations available to download' });
+            if (allOrders.length === 0) {
+                toast({ description: 'No orders available to download' });
                 return;
             }
 
-            const reservationRows = allReservations.map((res) => ({
-                // reservationId: res.id,
+            const orderRows = allOrders.map((res) => ({
+                // orderId: res.id,
                 dealerName: res.dealer || '-',
                 orderedBy: res.orderedBy || '-',
                 userId: res.userId || '-',
@@ -348,19 +647,19 @@ export default function Reservations() {
                 submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
                 approvedOn: res.approvedOn ? dayjs(res.approvedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
                 modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
-                requestType: res.isProduction == 1 ? 'Production' : 'Current',
+                requestType: res.isProduction == 1 || Number(res.productionQty || 0) > 0 ? 'Production' : 'Current',
             }));
 
-            const worksheet = xlsx.utils.json_to_sheet(reservationRows);
+            const worksheet = xlsx.utils.json_to_sheet(orderRows);
             const workbook = xlsx.utils.book_new();
-            xlsx.utils.book_append_sheet(workbook, worksheet, 'Reservations');
-            xlsx.writeFile(workbook, `reservations${isProduction != 'All' ? (isProduction == 1 ? '_Production' : '_Current') : ''}_${statusToDownload.toLowerCase()}_${downloadFromDate}_to_${downloadToDate}.xlsx`);
+            xlsx.utils.book_append_sheet(workbook, worksheet, 'Orders');
+            xlsx.writeFile(workbook, `orders${isProduction != 'All' ? (isProduction == 1 ? '_Production' : '_Current') : ''}_${statusToDownload.toLowerCase()}_${downloadFromDate}_to_${downloadToDate}.xlsx`);
 
-            toast({ description: `Downloaded ${reservationRows.length} reservations` });
+            toast({ description: `Downloaded ${orderRows.length} orders` });
         } catch (e) {
-            toast({ description: e.message || 'Failed to download reservations' });
+            toast({ description: e.message || 'Failed to download orders' });
         } finally {
-            setDownloadingReservations(false);
+            setDownloadingOrders(false);
         }
     }
 
@@ -484,6 +783,10 @@ export default function Reservations() {
         setReviewDesignQuery('')
         setReviewDesignResults([])
         setShowReviewDesignDrop(false)
+        setDesignOrderHistory([])
+        setDesignOrderHistoryError('')
+        setShowDesignOrderHistory(false)
+        setIsEditingOrderItem(res.status === 'Submitted')
         
             setIsActionDialogOpen(true);
         
@@ -520,6 +823,9 @@ export default function Reservations() {
         setReviewDesignQuery('')
         setReviewDesignResults([])
         setShowReviewDesignDrop(false)
+        setShowDesignOrderHistory(false)
+        setDesignOrderHistory([])
+        setDesignOrderHistoryError('')
     }
 
     async function submitApproval(status) {
@@ -529,21 +835,25 @@ export default function Reservations() {
         }
 
         if (!selectedReviewDesign?.design) {
-            toast({ description: "Please choose a design before updating this reservation" });
+            toast({ description: "Please choose a design before updating this order" });
             return;
         }
 
         setResLoading(true);
         try {
-            var path = 'U3';
+            var path = '';
             // check if the status is already approved, modified or rejected, if yes then update the record with modified status with modifiedOn value
-            if(selectedRes.status.toLowerCase() == 'approved' || selectedRes.status.toLowerCase() == 'modified' || selectedRes.status.toLowerCase() == 'rejected'){
-                path = 'U3.1';
+            if(selectedRes.status.toLowerCase() == 'submitted' || selectedRes.status.toLowerCase() == 'approved' || selectedRes.status.toLowerCase() == 'modified' || selectedRes.status.toLowerCase() == 'rejected'){
+                path = 'U0.2';
             }
-            const result = await updateReservationStatusAPI(
+            else if(selectedRes.status.toLowerCase() == 'rejected'){
+                path = 'U0.3';
+            }
+            console.log("/api/v2/orders/"+process.env.NEXT_PUBLIC_API_PASS+"/"+path+"/"+selectedRes.id+"/"+approvalQty+"/"+selectedRes.userId+"/"+dayjs().format('YYYY-MM-DD HH:mm:ss')+"/"+encodeURIComponent(selectedReviewDesign.design));
+            
+            const result = await updateOrderStatusAPI(
                 process.env.NEXT_PUBLIC_API_PASS, path,
                 selectedRes.id, 
-                status, 
                 approvalQty,
                 selectedRes.userId,
                 dayjs().format('YYYY-MM-DD HH:mm:ss'), // Set expiry to 7 days from now
@@ -551,14 +861,14 @@ export default function Reservations() {
             );
             const queryResult = await result.json();
             if (queryResult.status === 200) {
-                toast({ description: `Reservation marked as ${status.toLowerCase()}!` });
+                toast({ description: `Order marked as ${status.toLowerCase()}!` });
                 setIsActionDialogOpen(false);
-                getReservations(resStatus, resOffset); // Refresh list
+                getOrders(resStatus, resOffset, user); // Refresh list
             } else {
                 toast({ description: queryResult.message || `Failed to ${status.toLowerCase()}` });
             }
         } catch (e) {
-            toast({ description: "Error submitting approval" });
+            toast({ description: "Error submitting approval: " + e.message });
         } finally {
             setResLoading(false);
         }
@@ -571,67 +881,81 @@ export default function Reservations() {
         }))
     }
 
-    const filteredReservations = useMemo(() => {
-        return reservations.filter((res) => {
+    function toggleDesignRow(design) {
+        const nextExpanded = !expandedDesignRows[design];
+
+        setExpandedDesignRows((prev) => ({
+            ...prev,
+            [design]: nextExpanded,
+        }));
+
+        if (nextExpanded) {
+            getDesignOrderItems(design);
+        }
+    }
+
+    const filteredOrders = useMemo(() => {
+        return orders.filter((group) => {
             if (!resSearch.trim()) return true
             const q = resSearch.trim().toLowerCase()
+            const rows = Array.isArray(group.rows) ? group.rows : []
+
             return (
-                (res.dealer || '').toLowerCase().includes(q) ||
-                (res.orderedBy || '').toLowerCase().includes(q) ||
-                String(res.userId || '').toLowerCase().includes(q) ||
-                (res.design || '').toLowerCase().includes(q) ||
-                String(res.cartId || '').toLowerCase().includes(q)
+                (group.dealer || '').toLowerCase().includes(q) ||
+                (group.orderedBy || '').toLowerCase().includes(q) ||
+                String(group.userId || '').toLowerCase().includes(q) ||
+                String(group.cartId || '').toLowerCase().includes(q) ||
+                rows.some((res) => (
+                    (res.design || '').toLowerCase().includes(q) ||
+                    (res.name || '').toLowerCase().includes(q) ||
+                    (res.status || '').toLowerCase().includes(q)
+                ))
             )
         })
-    }, [reservations, resSearch])
+    }, [orders, resSearch])
 
-    const groupedReservations = useMemo(() => {
-        const groups = []
-        const groupMap = new Map()
+    const groupedOrders = useMemo(() => {
+        return filteredOrders
+    }, [filteredOrders])
 
-        filteredReservations.forEach((reservation) => {
-            const groupKey = reservation.cartId || `single-${reservation.id}`
-            if (!groupMap.has(groupKey)) {
-                const nextGroup = {
-                    cartId: groupKey,
-                    rows: [],
-                }
-                groupMap.set(groupKey, nextGroup)
-                groups.push(nextGroup)
-            }
-            groupMap.get(groupKey).rows.push(reservation)
-        })
+    const filteredDesignOrders = useMemo(() => {
+        if (!resSearch.trim()) {
+            return designOrders
+        }
 
-        return groups.map((group) => {
-            const first = group.rows[0]
-            const requestedQty = group.rows.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0)
-            const approvedQty = group.rows.reduce((sum, item) => sum + Number(item.approvedQty || 0), 0)
-            const requestTypes = [...new Set(group.rows.map((item) => item.isProduction == 1 ? 'Production' : 'Current'))]
-            const stockTypes = [...new Set(group.rows.map((item) => item.stockType).filter(Boolean))]
-            const statusCounts = group.rows.reduce((counts, item) => {
-                if (!item.status) {
-                    return counts
-                }
+        const q = resSearch.trim().toLowerCase()
+        return designOrders.filter((designOrder) => (
+            (designOrder.design || '').toLowerCase().includes(q) ||
+            (designOrder.name || '').toLowerCase().includes(q) ||
+            String(designOrder.productId || '').toLowerCase().includes(q) ||
+            (designOrder.designOrderStatus || '').toLowerCase().includes(q)
+        ))
+    }, [designOrders, resSearch])
 
-                counts.set(item.status, (counts.get(item.status) || 0) + 1)
-                return counts
-            }, new Map())
-            const statuses = Array.from(statusCounts.entries()).map(([label, count]) => ({
-                label,
-                count,
-            }))
+    function handleStatusChange(val) {
+        setResStatus(val);
+        setResOffset(0);
+        setDesignOrdersPage(1);
+        setExpandedCartGroups({});
+        setExpandedDesignRows({});
+        setDesignOrderItems({});
+        setLoadingDesignOrderItems({});
 
-            return {
-                ...group,
-                first,
-                requestedQty,
-                approvedQty,
-                requestTypes,
-                stockTypes,
-                statuses,
-            }
-        })
-    }, [filteredReservations])
+        if (activeOrdersTab === 'Designs') {
+            getDesignOrders(val, 1, user);
+        } else {
+            getOrders(val, 0, user);
+        }
+    }
+
+    function handleOrdersTabChange(val) {
+        setActiveOrdersTab(val);
+        setResSearch('');
+
+        if (val === 'Designs' && designOrders.length === 0) {
+            getDesignOrders(resStatus, designOrdersPage, user);
+        }
+    }
     
     
 return (
@@ -654,18 +978,18 @@ return (
             <div className="w-full">
                 <div className="flex flex-row justify-between items-center py-4">
                     
-                    <span className='text-sm text-slate-500'>{totalReservations} Reservations found</span>
+                    <span className='text-sm text-slate-500'>{activeOrdersTab === 'Designs' ? totalDesignOrders : totalOrders} {activeOrdersTab === 'Designs' ? 'Designs' : 'Orders'} found</span>
                     <div className="flex flex-row items-center gap-3">
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search dealer ID or design"
+                                placeholder={activeOrdersTab === 'Designs' ? 'Search design or product' : 'Search cart, dealer, or design'}
                                 value={resSearch}
                                 onChange={e => setResSearch(e.target.value)}
                                 className="pl-8 w-56"
                             />
                         </div>
-                        <Select value={resStatus} onValueChange={(val) => { setResStatus(val); getReservations(val, 0); }}>
+                        <Select value={resStatus} onValueChange={handleStatusChange}>
                             <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Filter by status" />
                             </SelectTrigger>
@@ -684,9 +1008,9 @@ return (
                             </Button>
                         <Popover open={showDownloadPopover} onOpenChange={setShowDownloadPopover}>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" disabled={downloadingReservations}>
+                                <Button variant="outline" disabled={downloadingOrders}>
                                     <ArrowDown className="mr-2 h-4 w-4" />
-                                    {downloadingReservations ? 'Downloading...' : 'Download Reservations'}
+                                    {downloadingOrders ? 'Downloading...' : 'Download Orders'}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-72 p-4" align="end">
@@ -710,7 +1034,7 @@ return (
                                     </div>
                                     <Button
                                         className="w-full mt-1"
-                                        onClick={downloadReservationsNow}
+                                        onClick={downloadOrdersNow}
                                         disabled={!downloadFromDate || !downloadToDate}
                                     >
                                         <ArrowDown className="mr-2 h-4 w-4" />
@@ -723,36 +1047,27 @@ return (
                 </div>
 
                 <Tabs
-                    value={isProduction}
-                    onValueChange={(val) => {
-                        setisProduction(val)
-                        setResOffset(0)
-                        getReservations(resStatus, 0, val)
-                    }}
+                    value={activeOrdersTab}
+                    onValueChange={handleOrdersTabChange}
                     className="mb-4"
                 >
-                    <TabsList className="grid w-full max-w-[360px] grid-cols-3 rounded-2xl bg-slate-100 p-1 shadow-sm">
+                    <TabsList className="grid w-full max-w-[260px] grid-cols-2 rounded-2xl bg-slate-100 p-1 shadow-sm">
                         <TabsTrigger
-                            value="All"
+                            value="Orders"
                             className="rounded-xl text-sm font-semibold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
                         >
-                            All
+                            Orders
                         </TabsTrigger>
                         <TabsTrigger
-                            value="1"
-                            className="rounded-xl text-sm font-semibold text-slate-600 data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm"
+                            value="Designs"
+                            className="rounded-xl text-sm font-semibold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
                         >
-                            Production
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="0"
-                            className="rounded-xl text-sm font-semibold text-slate-600 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm"
-                        >
-                            Current
+                            Designs
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>
 
+                {activeOrdersTab === 'Orders' ? (
                 <Card>
                     <Table>
                         <TableHeader>
@@ -762,6 +1077,8 @@ return (
                                 <TableHead>Design</TableHead>
                                 <TableHead className="text-right">Requested</TableHead>
                                 <TableHead className="text-right">Approved</TableHead>
+                                <TableHead className="text-right">Production</TableHead>
+                                <TableHead className="text-right">Waitlist</TableHead>
                                 <TableHead>Stock</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Request Type</TableHead>
@@ -771,12 +1088,12 @@ return (
                         </TableHeader>
                         <TableBody>
                             {resLoading ? (
-                                <TableRow><TableCell colSpan={9} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
-                            ) : groupedReservations.length === 0 ? (
-                                <TableRow><TableCell colSpan={9} className="text-center py-10">No reservations found</TableCell></TableRow>
-                            ) : groupedReservations.map((group) => {
+                                <TableRow><TableCell colSpan={12} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
+                            ) : groupedOrders.length === 0 ? (
+                                <TableRow><TableCell colSpan={12} className="text-center py-10">No orders found</TableCell></TableRow>
+                            ) : groupedOrders.map((group) => {
                                 const isExpanded = Boolean(expandedCartGroups[group.cartId])
-                                const hasMultipleRows = group.rows.length > 1
+                                const hasMultipleRows = group.rows.length > 0
 
                                 return (
                                     <React.Fragment key={group.cartId}>
@@ -803,14 +1120,14 @@ return (
                                                     <div>
                                                         <span className='font-medium'>{group.first.orderedBy}</span><br/>
                                                         <span className='text-xs text-slate-500'>{group.first.userId}</span>
-                                                        {/* <div className="mt-2 flex flex-wrap items-center gap-2"> */}
-                                                            {/* <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                            <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
                                                                 Cart {group.first.cartId || group.cartId}
-                                                            </span> */}
-                                                            {/* <span className="text-[11px] text-slate-500">
+                                                            </span>
+                                                            <span className="text-[11px] text-slate-500">
                                                                 {group.rows.length} item{group.rows.length > 1 ? 's' : ''}
-                                                            </span> */}
-                                                        {/* </div> */}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </TableCell>
@@ -820,7 +1137,7 @@ return (
                                             </TableCell>
                                             <TableCell>
                                                 <span className="font-medium text-slate-800">
-                                                    {hasMultipleRows ? `${group.rows.length} designs` : group.first.design}
+                                                    {`${group.totalDesigns || group.rows.length} design${Number(group.totalDesigns || group.rows.length) === 1 ? '' : 's'}`}
                                                 </span><br/>
                                                 {/* <span className='text-xs text-slate-500'>
                                                     {hasMultipleRows
@@ -830,6 +1147,16 @@ return (
                                             </TableCell>
                                             <TableCell className="text-right font-mono">{group.requestedQty}</TableCell>
                                             <TableCell className="text-right font-mono">{group.approvedQty}</TableCell>
+                                            <TableCell className="text-right font-mono">{group.productionQty}</TableCell>
+                                            <TableCell className="text-right">
+                                                {Number(group.waitlistItems || 0) > 0 ? (
+                                                    <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
+                                                        {group.waitlistItems}
+                                                    </span>
+                                                ) : (
+                                                    <span className="font-mono text-slate-400">0</span>
+                                                )}
+                                            </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-row gap-1">
                                                     {group.stockTypes.map((stockType) => (
@@ -842,7 +1169,7 @@ return (
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
                                                     {group.statuses.map((status) => (
-                                                        <span key={`${group.cartId}-${status.label}`} className={`px-2 py-1 rounded-full text-xs ${status.label === 'Approved' ? 'bg-green-100 text-green-700' : status.label === 'Rejected' ? 'bg-red-100 text-red-700' : status.label === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        <span key={`${group.cartId}-${status.label}`} className={`px-2 py-1 rounded-full text-xs ${status.label === 'Approved' || status.label === 'Fully Approved' ? 'bg-green-100 text-green-700' : status.label === 'Rejected' ? 'bg-red-100 text-red-700' : status.label === 'Modified' || status.label === 'Action Required' || status.label === 'Partially Approved' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
                                                             {status.label == 'Submitted' ? 'Pending' : status.label} {status.count > 1 ? `(${status.count})` : ''}
                                                         </span>
                                                     ))}
@@ -880,7 +1207,7 @@ return (
                                             </TableCell>
                                         </TableRow>
                                         {hasMultipleRows && isExpanded && group.rows.map((res) => (
-                                            <TableRow key={res.id} className="bg-white text-sm hover:bg-slate-50/80">
+                                            <TableRow key={`${group.cartId}-${res.id}`} className="bg-white text-sm hover:bg-slate-50/80">
                                                 <TableCell className="py-4 pl-16">
                                                     <span className='font-medium'>{res.orderedBy}</span><br/>
                                                     <span className='text-xs text-slate-500'>{res.userId}</span>
@@ -895,6 +1222,16 @@ return (
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
                                                 <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
+                                                <TableCell className="text-right font-mono">{res.productionQty}</TableCell>
+                                                <TableCell className="text-right">
+                                                    {hasWaitlistPosition(res.waitlistPosition) ? (
+                                                        <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
+                                                            #{res.waitlistPosition}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="font-mono text-slate-400">-</span>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell>
                                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${res.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : res.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
                                                         {res.stockType}
@@ -933,10 +1270,187 @@ return (
                         </TableBody>
                     </Table>
                 </Card>
+                ) : (
+                <Card>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Design</TableHead>
+                                <TableHead>Product</TableHead>
+                                <TableHead className="text-right">Orders</TableHead>
+                                <TableHead className="text-right">Requested</TableHead>
+                                <TableHead className="text-right">Approved</TableHead>
+                                <TableHead className="text-right">Production</TableHead>
+                                <TableHead className="text-right">Waitlist</TableHead>
+                                <TableHead>Stock</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Latest Order</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {designOrdersLoading ? (
+                                <TableRow><TableCell colSpan={10} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
+                            ) : filteredDesignOrders.length === 0 ? (
+                                <TableRow><TableCell colSpan={10} className="text-center py-10">No designs found</TableCell></TableRow>
+                            ) : filteredDesignOrders.map((designOrder) => {
+                                const isExpanded = Boolean(expandedDesignRows[designOrder.design])
+                                const childRows = designOrderItems[designOrder.design] || []
+                                const isLoadingItems = Boolean(loadingDesignOrderItems[designOrder.design])
+
+                                return (
+                                    <React.Fragment key={designOrder.design}>
+                                        <TableRow
+                                            className="cursor-pointer bg-slate-50/80 text-sm transition-colors hover:bg-slate-100/80"
+                                            onClick={() => toggleDesignRow(designOrder.design)}
+                                        >
+                                            <TableCell className="py-4">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="mt-0.5 rounded-md border border-slate-200 bg-white p-1 text-slate-500">
+                                                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-medium text-slate-900">{designOrder.design}</span><br/>
+                                                        <span className="text-xs text-slate-500">{designOrder.size || '-'}</span>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-4">
+                                                <span className="font-medium">{designOrder.name || '-'}</span><br/>
+                                                <span className="text-xs text-slate-500">{designOrder.productId || '-'}</span>
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono">{designOrder.totalOrders}</TableCell>
+                                            <TableCell className="text-right font-mono">{designOrder.totalRequestedQty}</TableCell>
+                                            <TableCell className="text-right font-mono">{designOrder.totalApprovedQty}</TableCell>
+                                            <TableCell className="text-right font-mono">{designOrder.totalProductionQty}</TableCell>
+                                            <TableCell className="text-right">
+                                                {Number(designOrder.waitlistItems || 0) > 0 ? (
+                                                    <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
+                                                        {designOrder.waitlistItems}
+                                                    </span>
+                                                ) : (
+                                                    <span className="font-mono text-slate-400">0</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-wrap gap-1">
+                                                    <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">PRM {Number(designOrder.prm || 0)}</span>
+                                                    <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">STD {Number(designOrder.std || 0)}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={`rounded-full px-2 py-1 text-xs ${designOrder.designOrderStatus === 'Fully Approved' ? 'bg-green-100 text-green-700' : designOrder.designOrderStatus === 'Rejected' ? 'bg-red-100 text-red-700' : designOrder.designOrderStatus === 'Action Required' || designOrder.designOrderStatus === 'Partially Approved' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                    {getOrderStatusLabel(designOrder.designOrderStatus)}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="font-mono text-xs text-slate-500">
+                                                {designOrder.latestCreatedOn ? dayjs(designOrder.latestCreatedOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A') : '-'}
+                                            </TableCell>
+                                        </TableRow>
+
+                                        {isExpanded && (
+                                            isLoadingItems ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={10} className="bg-white py-6 text-center text-sm text-slate-500">
+                                                        <SpinnerGap className="mr-2 inline-block h-4 w-4 animate-spin" />
+                                                        Loading order items...
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : childRows.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={10} className="bg-white py-6 text-center text-sm text-slate-500">
+                                                        No order items found
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : childRows.map((res) => (
+                                                <TableRow key={`${designOrder.design}-${res.id}`} className="bg-white text-sm hover:bg-slate-50/80">
+                                                    <TableCell className="py-4 pl-16">
+                                                        <span className="font-medium">{res.orderedBy || '-'}</span><br/>
+                                                        <span className="text-xs text-slate-500">{res.userId || '-'}</span>
+                                                    </TableCell>
+                                                    <TableCell className="py-4">
+                                                        <span className="font-medium">{res.dealer || '-'}</span><br/>
+                                                        <span className="text-xs text-slate-500">{res.dealerId || '-'}</span>
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
+                                                    <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
+                                                    <TableCell className="text-right font-mono">{res.productionQty}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        {hasWaitlistPosition(res.waitlistPosition) ? (
+                                                            <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
+                                                                #{res.waitlistPosition}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="font-mono text-slate-400">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={`rounded-full px-2 py-1 text-xs font-medium ${res.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : res.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                            {res.stockType || '-'}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={`rounded-full px-2 py-1 text-xs ${getOrderStatusClass(res.status)}`}>
+                                                            {getOrderStatusLabel(res.status)}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-xs text-slate-500">
+                                                        {res.createdOn ? dayjs(res.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A') : '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            {res.status === 'Submitted' && (
+                                                                <Button size="sm" variant="outline" className="bg-blue-600 shadow-md text-white hover:bg-blue-700 hover:text-white" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
+                                                            )}
+                                                            {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected') && (
+                                                                <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(res)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </React.Fragment>
+                                )
+                            })}
+                        </TableBody>
+                    </Table>
+                </Card>
+                )}
                 
                 <div className="flex items-center justify-end space-x-2 py-4">
-                    <Button variant="outline" size="sm" onClick={() => { const next = Math.max(0, resOffset - 10); setResOffset(next); getReservations(resStatus, next); }} disabled={resOffset === 0}>Previous</Button>
-                    <Button variant="outline" size="sm" onClick={() => { const next = resOffset + 10; setResOffset(next); getReservations(resStatus, next); }} disabled={reservations.length < 10}>Next</Button>
+                    {activeOrdersTab === 'Designs' ? (
+                        <>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const next = Math.max(1, designOrdersPage - 1);
+                                    setDesignOrdersPage(next);
+                                    getDesignOrders(resStatus, next, user);
+                                }}
+                                disabled={designOrdersPage === 1}
+                            >
+                                Previous
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const next = designOrdersPage + 1;
+                                    setDesignOrdersPage(next);
+                                    getDesignOrders(resStatus, next, user);
+                                }}
+                                disabled={(designOrdersPage * ORDER_PAGE_SIZE) >= totalDesignOrders}
+                            >
+                                Next
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button variant="outline" size="sm" onClick={() => { const next = Math.max(0, resOffset - ORDER_PAGE_SIZE); setResOffset(next); getOrders(resStatus, next, user); }} disabled={resOffset === 0}>Previous</Button>
+                            <Button variant="outline" size="sm" onClick={() => { const next = resOffset + ORDER_PAGE_SIZE; setResOffset(next); getOrders(resStatus, next, user); }} disabled={resOffset + orders.length >= totalOrders}>Next</Button>
+                        </>
+                    )}
                 </div>
             </div>
           
@@ -945,19 +1459,66 @@ return (
               onClose={() => setStockOrderOpen(false)}
               pass={process.env.NEXT_PUBLIC_API_PASS}
               role={user?.role}
-              onSuccess={(msg) => { toast({ description: msg }); getReservations(resStatus, resOffset); }}
+              onSuccess={(msg) => { toast({ description: msg }); getOrders(resStatus, resOffset, user); }}
           />
 
           {/* Approval Confirmation Dialog */}
           <Dialog open={isActionDialogOpen} onOpenChange={setIsActionDialogOpen}>
-            <DialogContent className="sm:max-w-[560px]">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[720px]">
                 <DialogHeader>
-                    <DialogTitle>Review Reservation</DialogTitle>
+                    <DialogTitle>Review Order</DialogTitle>
                     <DialogDescription>
                         for <b>{selectedRes?.dealer}</b>
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-5 py-4">
+                    {!isEditingOrderItem ? (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-semibold text-sm text-slate-900">{selectedRes?.design || '-'}</span>
+                                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${getOrderStatusClass(selectedRes?.status)}`}>
+                                        {getOrderStatusLabel(selectedRes?.status)}
+                                    </span>
+                                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${selectedRes?.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : selectedRes?.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                        {selectedRes?.stockType || '-'}
+                                    </span>
+                                    {hasWaitlistPosition(selectedRes?.waitlistPosition) ? (
+                                        <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
+                                            Waitlist #{selectedRes?.waitlistPosition}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-500">
+                                    {selectedRes?.name || 'Selected order item'} • Cart {selectedRes?.cartId || '-'}
+                                </div>
+                            </div>
+                            <div className="text-right text-xs text-slate-500">
+                                <div>{selectedRes?.createdOn ? dayjs(selectedRes.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A') : '-'}</div>
+                                <div>{selectedRes?.orderedBy || selectedRes?.userId || '-'} to {selectedRes?.dealer || selectedRes?.dealerId || '-'}</div>
+                            </div>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                            <div className="rounded-md bg-white px-2 py-1.5 ring-1 ring-slate-200">
+                                <div className="text-slate-500">Requested</div>
+                                <div className="font-mono font-medium text-slate-900">{Number(selectedRes?.requestedQty || 0)}</div>
+                            </div>
+                            <div className="rounded-md bg-white px-2 py-1.5 ring-1 ring-slate-200">
+                                <div className="text-slate-500">Reserved</div>
+                                <div className="font-mono font-medium text-slate-900">{Number(selectedRes?.approvedQty || 0)}</div>
+                            </div>
+                            <div className="rounded-md bg-white px-2 py-1.5 ring-1 ring-slate-200">
+                                <div className="text-slate-500">Production</div>
+                                <div className="font-mono font-medium text-slate-900">{Number(selectedRes?.productionQty || 0)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    ) : null}
+
+                    {isEditingOrderItem ? (
+                    <>
                     <div className="space-y-2" ref={reviewDesignRef}>
                         <Label>Requested Design: <span className="font-bold text-black uppercase">{selectedRes?.design}</span></Label>
                         {selectedReviewDesign?.design ? (
@@ -981,6 +1542,9 @@ return (
                                     onClick={() => {
                                         setSelectedReviewDesign(null)
                                         setReviewDesignQuery(selectedRes?.design || '')
+                                        setShowDesignOrderHistory(false)
+                                        setDesignOrderHistory([])
+                                        setDesignOrderHistoryError('')
                                     }}
                                 >
                                     Change
@@ -1029,7 +1593,7 @@ return (
                             )}
                         </div>
                         {/* <p className="text-xs text-slate-500">
-                            Current reservation: <span className="font-medium text-slate-700">{selectedRes?.design}</span>
+                            Current order: <span className="font-medium text-slate-700">{selectedRes?.design}</span>
                         </p> */}
                     </div>
                     
@@ -1049,44 +1613,137 @@ return (
                             <Label htmlFor="qty" className="text-right">{approvalQty}</Label>    
                         } */}
                     </div>
+                    </>
+                    ) : null}
+
+                    {(!isEditingOrderItem || selectedRes?.status === 'Submitted') ? (
+                    <div className="rounded-lg border border-slate-200 bg-white">
+                        <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                            <div>
+                                <div className="text-sm font-semibold text-slate-900">Other orders for design</div>
+                                <div className="text-xs text-slate-500">{selectedReviewDesign?.design || selectedRes?.design || '-'}</div>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setShowDesignOrderHistory((prev) => !prev)}
+                            >
+                                {showDesignOrderHistory ? 'Hide Orders' : 'View Orders'}
+                            </Button>
+                        </div>
+
+                        {showDesignOrderHistory ? (
+                            <>
+                                <div className="flex items-center justify-between border-y border-slate-200 bg-slate-50 px-3 py-2">
+                                    <span className="text-xs font-medium text-slate-600">Orders found</span>
+                                    <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                                        {designOrderHistory.length}
+                                    </span>
+                                </div>
+                                <div className="h-56 overflow-y-auto">
+                                    {loadingDesignOrderHistory ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                                            <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />
+                                            Loading orders...
+                                        </div>
+                                    ) : designOrderHistoryError ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-red-600">
+                                            {designOrderHistoryError}
+                                        </div>
+                                    ) : designOrderHistory.length === 0 ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                                            No other orders found
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y divide-slate-100">
+                                            {designOrderHistory.map((order) => (
+                                                <div key={order.id} className="px-3 py-3 hover:bg-slate-50">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className="font-medium text-sm text-slate-900">{order.cartId || `Order ${order.id}`}</span>
+                                                                <span className={`rounded-full px-2 py-1 text-xs ${getOrderStatusClass(order.status)}`}>
+                                                                    {getOrderStatusLabel(order.status)}
+                                                                </span>
+                                                                {hasWaitlistPosition(order.waitlistSequence ?? order.waitlistPosition) ? (
+                                                                    <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
+                                                                        Waitlist #{order.waitlistSequence ?? order.waitlistPosition}
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
+                                                            <div className="mt-1 text-xs text-slate-500">
+                                                                {order.userId || '-'} to {order.dealerId || '-'} • {order.createdOn ? dayjs(order.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A') : '-'}
+                                                            </div>
+                                                        </div>
+                                                        <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${order.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : order.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                            {order.stockType || '-'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                                                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                                                            <div className="text-slate-500">Requested</div>
+                                                            <div className="font-mono font-medium text-slate-900">{Number(order.requestedQty || 0)}</div>
+                                                        </div>
+                                                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                                                            <div className="text-slate-500">Reserved</div>
+                                                            <div className="font-mono font-medium text-slate-900">{Number(order.approvedQty || 0)}</div>
+                                                        </div>
+                                                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                                                            <div className="text-slate-500">Production</div>
+                                                            <div className="font-mono font-medium text-slate-900">{Number(order.productionQty || 0)}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        ) : null}
+                    </div>
+                    ) : null}
                 </div>
                 <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={() => setIsActionDialogOpen(false)}>Cancel</Button>
+                    {isEditingOrderItem ? (
+                        <>
+                            {selectedRes?.status === 'Submitted' ? (
+                                <Button variant="outline" onClick={() => setIsActionDialogOpen(false)} disabled={resLoading}>Close</Button>
+                            ) : (
+                                <Button variant="outline" onClick={() => setIsEditingOrderItem(false)} disabled={resLoading}>Cancel Edit</Button>
+                            )}
 
-                    {(selectedReviewDesign?.stockType == 'prm' && selectedReviewDesign?.prm === 0) 
-                    || (selectedReviewDesign?.stockType == 'std' && selectedReviewDesign?.std === 0) ?  
-                    
-                    (selectedRes?.isProduction == 1) ? 
-                        (<Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
-                                {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                                Approve
-                            </Button>)
-                        : null
-                    
-                    : 
-                    (<Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
-                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                            Approve
-                        </Button>)
-                    }
-                    
-                    
-                    
-                    {selectedRes?.isProduction == 0 ? 
-                        (<Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={resLoading}>
-                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                            Reject
-                        </Button>)
-                    : null
-                    }
+                            {(selectedReviewDesign?.stockType == 'std' && selectedReviewDesign?.std === 0) ?  
+                            null :
+                            
+                                (<Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
+                                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                        Approve
+                                    </Button>)
+                                }
+                           
+                            
+                            
+                            
+                            
+                                <Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={resLoading}>
+                                    {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                    Reject
+                                </Button>
 
-                    {selectedRes?.isProduction == 0 ? 
-                        (<Button className="bg-gray-600 text-white" onClick={() => submitApproval('OutOfStock')} disabled={resLoading}>
-                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                            Mark Out of Stock
-                        </Button>)
-                    : null
-                    }
+                            
+                                <Button className="bg-gray-600 text-white" onClick={() => submitApproval('OutOfStock')} disabled={resLoading}>
+                                    {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                    Mark Out of Stock
+                                </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button variant="outline" onClick={() => setIsActionDialogOpen(false)}>Close</Button>
+                            <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => { setShowDesignOrderHistory(false); setIsEditingOrderItem(true); }}>
+                                {selectedRes?.status === 'Submitted' ? 'Review Order' : 'Edit Order'}
+                            </Button>
+                        </>
+                    )}
                 </div>
             </DialogContent>
           </Dialog>
@@ -1094,4 +1751,3 @@ return (
     </div>
 );
 }
-
