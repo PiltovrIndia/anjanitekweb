@@ -232,6 +232,318 @@ export async function GET(request,{params}) {
                     });
                 }
             }
+            // get listing for admin group by designs
+            else if (params.ids[1] == "U00.1") {
+                try {
+                    // const status = params.ids[2]; // All / Submitted / Approved / Rejected
+                    // const search = params.ids[3] || "-";
+                    // const page = Number(params.ids[4] || 1);
+                    // const limit = Number(params.ids[5] || 20);
+
+                    const status = params.ids[2];          // All / Submitted / Approved
+                    const requestedPage = Number(params.ids[3]) || 1;
+                    const role = params.ids[4];            // GlobalAdmin
+                    const userId = params.ids[5];          // Test002
+                    const sortBy = params.ids[6] || "createdOn";
+                    const search = params.ids[7] || "";
+
+                    const pageNo = Math.max(requestedPage, 1);
+                    const pageLimit = 20;
+                    const offset = (pageNo - 1) * pageLimit;
+
+                    const where = ["o.isDeleted = 0"];
+                    const values = [];
+
+                    if (status && status !== "All") {
+                        where.push("o.status = ?");
+                        values.push(status);
+                    }
+
+                    // GlobalAdmin sees all.
+                    // Non-global admins see mapped users/dealers.
+                    if (role !== "GlobalAdmin" && userId) {
+                        where.push("(u.relatedTo LIKE ? OR u.id = ? OR o.userId = ? OR o.dealerId = ?)");
+                        values.push(`%${userId}%`, userId, userId, userId);
+                    }
+
+                    if (search && search !== "All" && search !== "0") {
+                        where.push("(o.design LIKE ? OR p.name LIKE ?)");
+                        values.push(`%${search}%`, `%${search}%`);
+                    }
+
+                    const whereSql = `WHERE ${where.join(" AND ")}`;
+
+                    const query = `
+                    SELECT
+                        o.design,
+
+                        MAX(o.createdOn) AS latestCreatedOn,
+                        MIN(o.createdOn) AS firstCreatedOn,
+
+                        COUNT(*) AS totalOrders,
+                        COUNT(DISTINCT o.cartId) AS totalBaskets,
+                        COUNT(DISTINCT o.dealerId) AS totalDealers,
+
+                        SUM(o.requestedQty) AS totalRequestedQty,
+                        SUM(o.approvedQty) AS totalApprovedQty,
+                        SUM(o.productionQty) AS totalProductionQty,
+
+                        SUM(CASE WHEN o.status = 'Submitted' THEN 1 ELSE 0 END) AS submittedItems,
+                        SUM(CASE WHEN o.status = 'Approved' THEN 1 ELSE 0 END) AS approvedItems,
+                        SUM(CASE WHEN o.status = 'Rejected' THEN 1 ELSE 0 END) AS rejectedItems,
+                        SUM(CASE WHEN o.productionQty > 0 THEN 1 ELSE 0 END) AS waitlistItems,
+
+                        p.productId,
+                        p.name,
+                        p.description,
+                        p.size,
+                        p.tags,
+                        p.media,
+                        p.prm,
+                        p.std,
+                        p.isActive,
+                        p.designType
+
+                    FROM orders o
+
+                    LEFT JOIN products1 p
+                        ON o.design = p.design
+
+                    LEFT JOIN user u
+                        ON o.userId = u.id
+
+                    ${whereSql}
+
+                    GROUP BY
+                        o.design,
+                        p.productId,
+                        p.name,
+                        p.description,
+                        p.size,
+                        p.tags,
+                        p.media,
+                        p.prm,
+                        p.std,
+                        p.isActive,
+                        p.designType
+
+                    ORDER BY latestCreatedOn DESC
+
+                    LIMIT ${pageLimit} OFFSET ${offset}
+                    `;
+
+                    const [rows] = await connection.execute(query, values);
+
+                    const countQuery = `
+                    SELECT COUNT(*) AS total
+                    FROM (
+                        SELECT o.design
+                        FROM orders o
+                        LEFT JOIN products1 p
+                        ON o.design = p.design
+                        LEFT JOIN user u ON o.userId = u.id
+                        ${whereSql}
+                        GROUP BY o.design
+                    ) t
+                    `;
+
+                    const [countRows] = await connection.execute(countQuery, values);
+                    const totalDesigns = Number(countRows[0]?.total || 0);
+
+                    const data = rows.map((row) => {
+                    const totalRequestedQty = Number(row.totalRequestedQty || 0);
+                    const totalApprovedQty = Number(row.totalApprovedQty || 0);
+                    const totalProductionQty = Number(row.totalProductionQty || 0);
+
+                    return {
+                        design: row.design,
+
+                        productId: row.productId,
+                        name: row.name,
+                        description: row.description,
+                        size: row.size,
+                        tags: row.tags,
+                        media: row.media,
+                        prm: Number(row.prm || 0),
+                        std: Number(row.std || 0),
+                        isActive: row.isActive,
+                        designType: row.designType,
+
+                        latestCreatedOn: row.latestCreatedOn,
+                        firstCreatedOn: row.firstCreatedOn,
+
+                        totalOrders: Number(row.totalOrders || 0),
+                        totalBaskets: Number(row.totalBaskets || 0),
+                        totalDealers: Number(row.totalDealers || 0),
+
+                        totalRequestedQty,
+                        totalApprovedQty,
+                        totalProductionQty,
+
+                        submittedItems: Number(row.submittedItems || 0),
+                        approvedItems: Number(row.approvedItems || 0),
+                        rejectedItems: Number(row.rejectedItems || 0),
+                        waitlistItems: Number(row.waitlistItems || 0),
+
+                        availabilityPercent:
+                        totalRequestedQty > 0
+                            ? Math.round((totalApprovedQty / totalRequestedQty) * 100)
+                            : 0,
+
+                        designOrderStatus: getDesignOrderStatus({
+                            totalRequestedQty,
+                            totalApprovedQty,
+                            totalProductionQty,
+                            submittedItems: Number(row.submittedItems || 0),
+                            rejectedItems: Number(row.rejectedItems || 0),
+                            totalOrders: Number(row.totalOrders || 0),
+                        }),
+                    };
+                    });
+
+                    return Response.json(
+                    {
+                        status: 200,
+                        success: true,
+                        message: "Design-wise orders fetched successfully",
+                        page: pageNo,
+                        limit: pageLimit,
+                        totalDesigns,
+                        totalPages: Math.ceil(totalDesigns / pageLimit),
+                        data,
+                    },
+                    { status: 200 }
+                    );
+                } catch (error) {
+                    return Response.json(
+                    {
+                        status: 500,
+                        success: false,
+                        message: "Failed to fetch design-wise orders " + error.message,
+                    },
+                    { status: 200 }
+                    );
+                } finally {
+                    connection.release();
+                }
+            }
+            // get list of order of single group of design
+            else if (params.ids[1] == "U00.2") {
+                try {
+                    const design = params.ids[2];
+                    const stockType = params.ids[3]; // All / prm / std
+
+                    const where = ["r.design = ?", "r.isDeleted = 0"];
+                    const values = [design];
+
+                    if (stockType && stockType !== "All") {
+                    where.push("r.stockType = ?");
+                    values.push(stockType);
+                    }
+
+                    const whereSql = `WHERE ${where.join(" AND ")}`;
+
+                    const [rows] = await connection.execute(
+                    `
+                    SELECT
+                        r.*,
+
+                        p.name,
+                        p.productId,
+                        p.description,
+                        p.size,
+                        p.tags,
+                        p.media,
+                        p.prm,
+                        p.std,
+                        p.isActive,
+                        p.designType,
+
+                        u.name AS orderedBy,
+                        u.mobile,
+                        u.mapTo,
+
+                        u_dealer.name AS dealer,
+
+                        CASE
+                        WHEN r.productionQty > 0 THEN (
+                            SELECT COUNT(*) + 1
+                            FROM orders x
+                            WHERE x.design = r.design
+                            AND x.stockType = r.stockType
+                            AND x.productionQty > 0
+                            AND x.isDeleted = 0
+                            AND x.status NOT IN ('Cancelled', 'Rejected')
+                            AND (
+                                x.createdOn < r.createdOn
+                                OR (
+                                x.createdOn = r.createdOn
+                                AND x.id < r.id
+                                )
+                            )
+                        )
+                        ELSE NULL
+                        END AS waitlistSequence,
+
+                        CASE
+                        WHEN r.requestedQty > 0 THEN ROUND((r.approvedQty / r.requestedQty) * 100)
+                        ELSE 0
+                        END AS availabilityPercent
+
+                    FROM orders r
+
+                    LEFT JOIN products1 p
+                        ON r.design = p.design
+
+                    LEFT JOIN user u
+                        ON r.userId = u.id
+
+                    LEFT JOIN user u_dealer
+                        ON r.dealerId = u_dealer.id
+
+                    ${whereSql}
+
+                    ORDER BY
+                        r.createdOn DESC,
+                        r.id DESC
+                    `,
+                    values
+                    );
+
+                    if (rows.length > 0) {
+                    return Response.json(
+                        {
+                        status: 200,
+                        success: true,
+                        message: "Design order items fetched successfully",
+                        data: rows,
+                        },
+                        { status: 200 }
+                    );
+                    }
+
+                    return Response.json(
+                    {
+                        status: 201,
+                        success: true,
+                        message: "No data found!",
+                        data: [],
+                    },
+                    { status: 200 }
+                    );
+                } catch (error) {
+                    return Response.json(
+                    {
+                        status: 404,
+                        success: false,
+                        message: "No Order found! " + error.message,
+                    },
+                    { status: 200 }
+                    );
+                } finally {
+                    connection.release();
+                }
+                }
             // Approve by admin for an order item
             else if(params.ids[1] == 'U0.2'){
                 // 1. Fail fast: Parse body and validate orderId before hitting the database
@@ -446,10 +758,10 @@ export async function GET(request,{params}) {
                     });
                 }
             }
-            // get listing for mobile by userId
+            // get listing for mobile by userId for dealer
             else if(params.ids[1] == 'U0'){
                 try {
-                    var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") AND r.isDeleted = 0';
+                    var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+params.ids[2]+'%" OR u.id LIKE "%'+params.ids[2]+'%") AND r.isDeleted = 0';
                     const query = `
                             SELECT
                                 o.id,
@@ -489,13 +801,13 @@ export async function GET(request,{params}) {
                                 END AS waitlistPosition
 
                             FROM orders o
-                            LEFT JOIN products1 p ON o.design = p.design LEFT JOIN user u ON o.userId = u.id LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id WHERE (u.relatedTo LIKE ? OR u.id LIKE ?) 
+                            LEFT JOIN products1 p ON o.design = p.design LEFT JOIN user u ON o.dealerId = u.id LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id WHERE (u.relatedTo LIKE ? OR u.id LIKE ?) 
                             
                                 AND o.isDeleted = 0
-                            ORDER BY o.`+params.ids[6]+` DESC, o.cartId DESC, o.serialId ASC
+                            ORDER BY o.`+params.ids[3]+` DESC, o.cartId DESC, o.serialId ASC
                             `;
 
-                            const [rows] = await pool.query(query, [`%${params.ids[5]}%`, `%${params.ids[5]}%`]);
+                            const [rows] = await pool.query(query, [`%${params.ids[2]}%`, `%${params.ids[2]}%`]);
 
                             const groupedOrders = groupOrdersByCart(rows);
 
@@ -655,7 +967,7 @@ export async function GET(request,{params}) {
                 } finally {
                     connection.release();
                 }
-                }
+            }
             else  if(params.ids[1] == 'report'){
                 try {
 
@@ -1096,4 +1408,40 @@ function getStockColumn(stockType) {
   if (stockType === "std") return "std";
 
   throw new Error("Invalid stockType");
+}
+
+
+function getDesignOrderStatus({
+  totalRequestedQty,
+  totalApprovedQty,
+  totalProductionQty,
+  submittedItems,
+  rejectedItems,
+  totalOrders,
+}) {
+  if (totalOrders === 0) {
+    return "No Orders";
+  }
+
+  if (rejectedItems === totalOrders) {
+    return "Rejected";
+  }
+
+  if (submittedItems > 0) {
+    return "Action Required";
+  }
+
+  if (totalRequestedQty > 0 && totalApprovedQty === totalRequestedQty && totalProductionQty === 0) {
+    return "Fully Approved";
+  }
+
+  if (totalApprovedQty > 0 && totalProductionQty > 0) {
+    return "Partially Approved";
+  }
+
+  if (totalApprovedQty === 0 && totalProductionQty > 0) {
+    return "Production Pending";
+  }
+
+  return "In Progress";
 }
