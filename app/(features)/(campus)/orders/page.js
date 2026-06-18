@@ -119,6 +119,7 @@ fetch("/api/v2/orders/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+so
     },
 });
 
+// get design grouped orders
 const getDesignOrdersAPI = async (pass, type, page, role, userId, sortBy) =>
 fetch("/api/v2/orders/"+pass+"/U00.1/"+type+"/"+page+"/"+role+"/"+userId+"/"+sortBy, {
     method: "GET",
@@ -128,6 +129,7 @@ fetch("/api/v2/orders/"+pass+"/U00.1/"+type+"/"+page+"/"+role+"/"+userId+"/"+sor
     },
 });
 
+// get design group specific order items
 const getDesignOrderItemsAPI = async (pass, design, stockType = 'All') =>
 fetch("/api/v2/orders/"+pass+"/U00.2/"+encodeURIComponent(design)+"/"+stockType, {
     method: "GET",
@@ -137,6 +139,7 @@ fetch("/api/v2/orders/"+pass+"/U00.2/"+encodeURIComponent(design)+"/"+stockType,
     },
 });
 
+// get report specific listing
 const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction) =>
 fetch("/api/v2/orders/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction, {
     method: "GET",
@@ -145,6 +148,7 @@ fetch("/api/v2/orders/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+",
         Accept: "application/json",
     },
 });
+
 
 const getOrdersByDesignAPI = async (pass, design, signal) =>
 fetch("/api/v2/orders/"+pass+"/U2/"+encodeURIComponent(design), {

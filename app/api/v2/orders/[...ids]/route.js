@@ -15,7 +15,7 @@ export async function GET(request,{params}) {
 
             // get the list of orders ordered by createdOn and by selected status
             
-            // get listing for admins
+            // get listing for admins on web
             // /U0/$selectedStatus/$offset/$role/$id/$sortBy
             if (params.ids[1] == "U0.1") {
                 try {
@@ -37,8 +37,8 @@ export async function GET(request,{params}) {
                     const queryParams = [];
 
                     if (status && status !== "All") {
-                    where.push("o.status = ?");
-                    queryParams.push(status);
+                        where.push("o.status = ?");
+                        queryParams.push(status);
                     }
 
                     /**
@@ -760,9 +760,22 @@ export async function GET(request,{params}) {
                 }
             }
             // get listing for mobile by userId for dealer
+            // /U0.1/$selectedStatus/$offset/$role/$id/$sortBy - lets follow this for admins and dealers
+            // /U0/$id/$sortBy - currently used for dealers 2-id = 5, 3-soryBy = 6
             else if(params.ids[1] == 'U0'){
+                const status = params.ids[2];      // All / Submitted / Approved / etc.
+                const offset = params.ids[3];        // GlobalAdmin
+                const role = params.ids[4];        // GlobalAdmin
+                const userId = params.ids[5];      // Test002
+                const sortBy = params.ids[6] || "createdOn";
+
+                var statusCond = '';
+                if(status != 'All'){
+                    statusCond = ` AND o.status = '`+status+`' `
+                }
+
                 try {
-                    var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+params.ids[2]+'%" OR u.id LIKE "%'+params.ids[2]+'%") AND r.isDeleted = 0';
+                    var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+userId+'%" OR u.id LIKE "%'+userId+'%") AND r.isDeleted = 0';
                     const query = `
                             SELECT
                                 o.id,
@@ -802,13 +815,16 @@ export async function GET(request,{params}) {
                                 END AS waitlistPosition
 
                             FROM orders o
-                            LEFT JOIN products1 p ON o.design = p.design LEFT JOIN user u ON o.dealerId = u.id LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id WHERE (u.relatedTo LIKE ? OR u.id LIKE ?) 
-                            
+                            LEFT JOIN products1 p ON o.design = p.design 
+                            LEFT JOIN user u ON o.dealerId = u.id 
+                            LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id 
+                            WHERE (u.relatedTo LIKE ? OR u.id LIKE ?) 
+                                ${statusCond}
                                 AND o.isDeleted = 0
-                            ORDER BY o.`+params.ids[3]+` DESC, o.cartId DESC, o.serialId ASC
+                            ORDER BY o.`+sortBy+` DESC, o.cartId DESC, o.serialId ASC
                             `;
 
-                            const [rows] = await pool.query(query, [`%${params.ids[2]}%`, `%${params.ids[2]}%`]);
+                            const [rows] = await pool.query(query, [`%${userId}%`, `%${userId}%`]);
 
                             const groupedOrders = groupOrdersByCart(rows);
 
