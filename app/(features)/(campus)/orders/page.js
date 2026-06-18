@@ -642,11 +642,12 @@ export default function Orders() {
                 requestedQty: Number(res.requestedQty || 0),
                 approvedQty: Number(res.approvedQty || 0),
                 stockType: res.stockType || '-',
+                waitlistPosition: res.waitlistPosition || '-',
                 size: res.size || '-',
                 status: res.status || '-',
-                submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
-                approvedOn: res.approvedOn ? dayjs(res.approvedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
-                modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                submittedOn: res.createdOn ? dayjs(res.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('YYYY-MM-DD HH:mm:ss') : '-',
+                approvedOn: res.approvedOn ? dayjs(res.approvedOn).subtract(5, 'hours').subtract(30, 'minutes').format('YYYY-MM-DD HH:mm:ss') : '-',
+                modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).subtract(5, 'hours').subtract(30, 'minutes').format('YYYY-MM-DD HH:mm:ss') : '-',
                 requestType: res.isProduction == 1 || Number(res.productionQty || 0) > 0 ? 'Production' : 'Current',
             }));
 
@@ -956,6 +957,10 @@ export default function Orders() {
             getDesignOrders(resStatus, designOrdersPage, user);
         }
     }
+
+    // const percentage = getPercentageCompletion((res) => {
+    //     return res.totalApprovedQty == 0 ? 0.0 : res.totalApprovedQty / res.totalRequestedQty
+    // })
     
     
 return (
@@ -1078,6 +1083,7 @@ return (
                                 <TableHead className="text-right">Requested</TableHead>
                                 <TableHead className="text-right">Approved</TableHead>
                                 <TableHead className="text-right">Production</TableHead>
+                                <TableHead className="text-right">%</TableHead>
                                 <TableHead className="text-right">Waitlist</TableHead>
                                 <TableHead>Stock</TableHead>
                                 <TableHead>Status</TableHead>
@@ -1094,6 +1100,11 @@ return (
                             ) : groupedOrders.map((group) => {
                                 const isExpanded = Boolean(expandedCartGroups[group.cartId])
                                 const hasMultipleRows = group.rows.length > 0
+
+                                const percentage1 = ((group.totalApprovedQty === 0 ? 0 : group.totalApprovedQty / group.totalRequestedQty) * 100)
+                                const percentage = percentage1 > 0 ? percentage1.toFixed(1) : 0
+                                const textColor = percentage < 50 ? 'text-red-500' : 'text-green-600'; // Red if < 50%, Green otherwise
+
 
                                 return (
                                     <React.Fragment key={group.cartId}>
@@ -1122,11 +1133,13 @@ return (
                                                         <span className='text-xs text-slate-500'>{group.first.userId}</span>
                                                         <div className="mt-2 flex flex-wrap items-center gap-2">
                                                             <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
-                                                                Cart {group.first.cartId || group.cartId}
+                                                                #{group.first.cartId || group.cartId}
+
                                                             </span>
-                                                            <span className="text-[11px] text-slate-500">
+                                                            {/* <span className={textColor}>{percentage}%</span> */}
+                                                            {/* <span className="text-[11px] text-slate-500">
                                                                 {group.rows.length} item{group.rows.length > 1 ? 's' : ''}
-                                                            </span>
+                                                            </span> */}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1148,6 +1161,7 @@ return (
                                             <TableCell className="text-right font-mono">{group.requestedQty}</TableCell>
                                             <TableCell className="text-right font-mono">{group.approvedQty}</TableCell>
                                             <TableCell className="text-right font-mono">{group.productionQty}</TableCell>
+                                            <TableCell className="text-right font-mono"><span className={textColor}>{percentage}%</span></TableCell>
                                             <TableCell className="text-right">
                                                 {Number(group.waitlistItems || 0) > 0 ? (
                                                     <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
@@ -1207,6 +1221,7 @@ return (
                                             </TableCell>
                                         </TableRow>
                                         {hasMultipleRows && isExpanded && group.rows.map((res) => (
+                                            
                                             <TableRow key={`${group.cartId}-${res.id}`} className="bg-white text-sm hover:bg-slate-50/80">
                                                 <TableCell className="py-4 pl-16">
                                                     <span className='font-medium'>{res.orderedBy}</span><br/>
@@ -1223,6 +1238,7 @@ return (
                                                 <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
                                                 <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
                                                 <TableCell className="text-right font-mono">{res.productionQty}</TableCell>
+                                                <TableCell className="text-right font-mono"><span className={((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1) > 50 ? 'text-green-600' : 'text-red-500'}>{((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1)}%</span></TableCell>
                                                 <TableCell className="text-right">
                                                     {hasWaitlistPosition(res.waitlistPosition) ? (
                                                         <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">

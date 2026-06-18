@@ -141,6 +141,7 @@ export async function GET(request,{params}) {
                         o.modifiedOn,
 
                         p.name,
+                        p.productId,
                         p.description,
                         p.size,
                         p.tags,
