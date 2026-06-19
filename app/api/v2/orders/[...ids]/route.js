@@ -816,7 +816,7 @@ export async function GET(request,{params}) {
 
                             FROM orders o
                             LEFT JOIN products1 p ON o.design = p.design 
-                            LEFT JOIN user u ON o.userId = u.id 
+                            LEFT JOIN user u ON o.dealerId = u.id 
                             LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id 
                             WHERE (u.relatedTo LIKE ? OR u.id LIKE ?) 
                                 ${statusCond}
