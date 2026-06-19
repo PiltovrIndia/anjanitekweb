@@ -215,6 +215,12 @@ export default function Orders() {
     const [designOrderItems, setDesignOrderItems] = useState({});
     const [loadingDesignOrderItems, setLoadingDesignOrderItems] = useState({});
 
+    // Sort state
+    const [ordersSortKey, setOrdersSortKey] = useState(null);
+    const [ordersSortDir, setOrdersSortDir] = useState(null);
+    const [designsSortKey, setDesignsSortKey] = useState(null);
+    const [designsSortDir, setDesignsSortDir] = useState(null);
+
     // Approval Dialog State
     const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
     const [selectedRes, setSelectedRes] = useState(null);
@@ -529,6 +535,7 @@ export default function Orders() {
         }
 
         try {
+            
             const result = await getDesignOrdersAPI(
                 process.env.NEXT_PUBLIC_API_PASS,
                 val,
@@ -920,22 +927,81 @@ export default function Orders() {
     }, [orders, resSearch])
 
     const groupedOrders = useMemo(() => {
-        return filteredOrders
-    }, [filteredOrders])
+        if (!ordersSortKey || !ordersSortDir) return filteredOrders;
+        return [...filteredOrders].sort((a, b) => {
+            let aVal, bVal;
+            if (ordersSortKey === 'designs') {
+                aVal = Number(a.totalDesigns || a.rows?.length || 0);
+                bVal = Number(b.totalDesigns || b.rows?.length || 0);
+            } else if (ordersSortKey === 'requested') {
+                aVal = Number(a.requestedQty || 0);
+                bVal = Number(b.requestedQty || 0);
+            } else if (ordersSortKey === 'approved') {
+                aVal = Number(a.approvedQty || 0);
+                bVal = Number(b.approvedQty || 0);
+            } else if (ordersSortKey === 'production') {
+                aVal = Number(a.productionQty || 0);
+                bVal = Number(b.productionQty || 0);
+            } else if (ordersSortKey === 'percent') {
+                aVal = Number(a.totalApprovedQty || 0) === 0 ? 0 : Number(a.totalApprovedQty) / Number(a.totalRequestedQty);
+                bVal = Number(b.totalApprovedQty || 0) === 0 ? 0 : Number(b.totalApprovedQty) / Number(b.totalRequestedQty);
+            } else if (ordersSortKey === 'submittedOn') {
+                aVal = new Date(a.first?.createdOn || 0).getTime();
+                bVal = new Date(b.first?.createdOn || 0).getTime();
+            } else {
+                return 0;
+            }
+            if (aVal < bVal) return ordersSortDir === 'asc' ? -1 : 1;
+            if (aVal > bVal) return ordersSortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [filteredOrders, ordersSortKey, ordersSortDir])
 
     const filteredDesignOrders = useMemo(() => {
-        if (!resSearch.trim()) {
-            return designOrders
+        let result = designOrders;
+        if (resSearch.trim()) {
+            const q = resSearch.trim().toLowerCase();
+            result = result.filter((designOrder) => (
+                (designOrder.design || '').toLowerCase().includes(q) ||
+                (designOrder.name || '').toLowerCase().includes(q) ||
+                String(designOrder.productId || '').toLowerCase().includes(q) ||
+                (designOrder.designOrderStatus || '').toLowerCase().includes(q)
+            ));
         }
-
-        const q = resSearch.trim().toLowerCase()
-        return designOrders.filter((designOrder) => (
-            (designOrder.design || '').toLowerCase().includes(q) ||
-            (designOrder.name || '').toLowerCase().includes(q) ||
-            String(designOrder.productId || '').toLowerCase().includes(q) ||
-            (designOrder.designOrderStatus || '').toLowerCase().includes(q)
-        ))
-    }, [designOrders, resSearch])
+        if (designsSortKey && designsSortDir) {
+            result = [...result].sort((a, b) => {
+                let aVal, bVal;
+                if (designsSortKey === 'designs') {
+                    aVal = (a.design || '').toLowerCase();
+                    bVal = (b.design || '').toLowerCase();
+                    if (aVal < bVal) return designsSortDir === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return designsSortDir === 'asc' ? 1 : -1;
+                    return 0;
+                } else if (designsSortKey === 'requested') {
+                    aVal = Number(a.totalRequestedQty || 0);
+                    bVal = Number(b.totalRequestedQty || 0);
+                } else if (designsSortKey === 'approved') {
+                    aVal = Number(a.totalApprovedQty || 0);
+                    bVal = Number(b.totalApprovedQty || 0);
+                } else if (designsSortKey === 'production') {
+                    aVal = Number(a.totalProductionQty || 0);
+                    bVal = Number(b.totalProductionQty || 0);
+                } else if (designsSortKey === 'percent') {
+                    aVal = Number(a.totalApprovedQty || 0) === 0 ? 0 : Number(a.totalApprovedQty) / Number(a.totalRequestedQty);
+                    bVal = Number(b.totalApprovedQty || 0) === 0 ? 0 : Number(b.totalApprovedQty) / Number(b.totalRequestedQty);
+                } else if (designsSortKey === 'latestOrder') {
+                    aVal = new Date(a.latestCreatedOn || 0).getTime();
+                    bVal = new Date(b.latestCreatedOn || 0).getTime();
+                } else {
+                    return 0;
+                }
+                if (aVal < bVal) return designsSortDir === 'asc' ? -1 : 1;
+                if (aVal > bVal) return designsSortDir === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return result;
+    }, [designOrders, resSearch, designsSortKey, designsSortDir])
 
     function handleStatusChange(val) {
         setResStatus(val);
@@ -962,11 +1028,36 @@ export default function Orders() {
         }
     }
 
-    // const percentage = getPercentageCompletion((res) => {
-    //     return res.totalApprovedQty == 0 ? 0.0 : res.totalApprovedQty / res.totalRequestedQty
-    // })
-    
-    
+    function handleOrdersSort(key) {
+        if (ordersSortKey !== key) {
+            setOrdersSortKey(key);
+            setOrdersSortDir('asc');
+        } else if (ordersSortDir === 'asc') {
+            setOrdersSortDir('desc');
+        } else {
+            setOrdersSortKey(null);
+            setOrdersSortDir(null);
+        }
+    }
+
+    function handleDesignsSort(key) {
+        if (designsSortKey !== key) {
+            setDesignsSortKey(key);
+            setDesignsSortDir('asc');
+        } else if (designsSortDir === 'asc') {
+            setDesignsSortDir('desc');
+        } else {
+            setDesignsSortKey(null);
+            setDesignsSortDir(null);
+        }
+    }
+
+    const sortIcon = (key, activeKey, dir) => {
+        if (key !== activeKey || !dir) return <span className="ml-1 opacity-30 text-xs">↕</span>;
+        return <span className="ml-1 text-xs">{dir === 'asc' ? '↑' : '↓'}</span>;
+    };
+
+
 return (
 
     // <div className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px', overflow:'scroll'}}>
@@ -1083,16 +1174,28 @@ return (
                             <TableRow>
                                 <TableHead>Ordered by</TableHead>
                                 <TableHead>Dealer</TableHead>
-                                <TableHead>Design</TableHead>
-                                <TableHead className="text-right">Requested</TableHead>
-                                <TableHead className="text-right">Approved</TableHead>
-                                <TableHead className="text-right">Production</TableHead>
-                                <TableHead className="text-right">%</TableHead>
+                                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('designs')}>
+                                    <span className="flex items-center">Designs{sortIcon('designs', ordersSortKey, ordersSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('requested')}>
+                                    <span className="flex items-center justify-end">Requested{sortIcon('requested', ordersSortKey, ordersSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('approved')}>
+                                    <span className="flex items-center justify-end">Approved{sortIcon('approved', ordersSortKey, ordersSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('production')}>
+                                    <span className="flex items-center justify-end">Production{sortIcon('production', ordersSortKey, ordersSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('percent')}>
+                                    <span className="flex items-center justify-end">%{sortIcon('percent', ordersSortKey, ordersSortDir)}</span>
+                                </TableHead>
                                 <TableHead className="text-right">Waitlist</TableHead>
                                 <TableHead>Stock</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Request Type</TableHead>
-                                <TableHead>Submitted On</TableHead>
+                                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('submittedOn')}>
+                                    <span className="flex items-center">Submitted On{sortIcon('submittedOn', ordersSortKey, ordersSortDir)}</span>
+                                </TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -1154,7 +1257,7 @@ return (
                                             </TableCell>
                                             <TableCell>
                                                 <span className="font-medium text-slate-800">
-                                                    {`${group.totalDesigns || group.rows.length} design${Number(group.totalDesigns || group.rows.length) === 1 ? '' : 's'}`}
+                                                    {`${group.totalDesigns || group.rows.length}`}
                                                 </span><br/>
                                                 {/* <span className='text-xs text-slate-500'>
                                                     {hasMultipleRows
@@ -1187,7 +1290,7 @@ return (
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
                                                     {group.statuses.map((status) => (
-                                                        <span key={`${group.cartId}-${status.label}`} className={`px-2 py-1 rounded-full text-xs ${status.label === 'Approved' || status.label === 'Fully Approved' ? 'bg-green-100 text-green-700' : status.label === 'Rejected' ? 'bg-red-100 text-red-700' : status.label === 'Modified' || status.label === 'Action Required' || status.label === 'Partially Approved' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        <span key={`${group.cartId}-${status.label}`} className={`uppercase font-medium px-2 py-1 rounded-full text-xs ${status.label === 'Approved' || status.label === 'Fully Approved' ? 'bg-green-100 text-green-700' : status.label === 'Rejected' ? 'bg-red-100 text-red-700' : status.label === 'Modified' || status.label === 'Action Required' || status.label === 'Partially Approved' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
                                                             {status.label == 'Submitted' ? 'Pending' : status.label} {status.count > 1 ? `(${status.count})` : ''}
                                                         </span>
                                                     ))}
@@ -1196,7 +1299,7 @@ return (
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
                                                     {group.requestTypes.map((requestType) => (
-                                                        <span key={`${group.cartId}-${requestType}`} className={`px-2 py-1 rounded-full text-xs font-medium ${requestType === 'Production' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        <span key={`${group.cartId}-${requestType}`} className={`uppercase font-medium px-2 py-1 rounded-full text-xs font-medium ${requestType === 'Production' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
                                                             {requestType}
                                                         </span>
                                                     ))}
@@ -1295,16 +1398,29 @@ return (
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Design</TableHead>
+                                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('designs')}>
+                                    <span className="flex items-center">Design{sortIcon('designs', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
                                 <TableHead>Product</TableHead>
                                 <TableHead className="text-right">Orders</TableHead>
-                                <TableHead className="text-right">Requested</TableHead>
-                                <TableHead className="text-right">Approved</TableHead>
-                                <TableHead className="text-right">Production</TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('requested')}>
+                                    <span className="flex items-center justify-end">Requested{sortIcon('requested', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('approved')}>
+                                    <span className="flex items-center justify-end">Approved{sortIcon('approved', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('production')}>
+                                    <span className="flex items-center justify-end">Production{sortIcon('production', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('percent')}>
+                                    <span className="flex items-center justify-end">%{sortIcon('percent', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
                                 <TableHead className="text-right">Waitlist</TableHead>
                                 <TableHead>Stock</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Latest Order</TableHead>
+                                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('latestOrder')}>
+                                    <span className="flex items-center">Latest Order{sortIcon('latestOrder', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1316,6 +1432,11 @@ return (
                                 const isExpanded = Boolean(expandedDesignRows[designOrder.design])
                                 const childRows = designOrderItems[designOrder.design] || []
                                 const isLoadingItems = Boolean(loadingDesignOrderItems[designOrder.design])
+
+                                const percentage1 = ((designOrder.totalApprovedQty === 0 ? 0 : designOrder.totalApprovedQty / designOrder.totalRequestedQty) * 100)
+                                const percentage = percentage1 > 0 ? percentage1.toFixed(1) : 0
+                                const textColor = percentage < 50 ? 'text-red-500' : 'text-green-600'; // Red if < 50%, Green otherwise
+
 
                                 return (
                                     <React.Fragment key={designOrder.design}>
@@ -1342,6 +1463,7 @@ return (
                                             <TableCell className="text-right font-mono">{designOrder.totalRequestedQty}</TableCell>
                                             <TableCell className="text-right font-mono">{designOrder.totalApprovedQty}</TableCell>
                                             <TableCell className="text-right font-mono">{designOrder.totalProductionQty}</TableCell>
+                                            <TableCell className="text-right font-mono"><span className={textColor}>{percentage}%</span></TableCell>
                                             <TableCell className="text-right">
                                                 {Number(designOrder.waitlistItems || 0) > 0 ? (
                                                     <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
@@ -1358,7 +1480,7 @@ return (
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <span className={`rounded-full px-2 py-1 text-xs ${designOrder.designOrderStatus === 'Fully Approved' ? 'bg-green-100 text-green-700' : designOrder.designOrderStatus === 'Rejected' ? 'bg-red-100 text-red-700' : designOrder.designOrderStatus === 'Action Required' || designOrder.designOrderStatus === 'Partially Approved' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                <span className={`uppercase font-medium rounded-full px-2 py-1 text-xs ${designOrder.designOrderStatus === 'Fully Approved' ? 'bg-green-100 text-green-700' : designOrder.designOrderStatus === 'Rejected' ? 'bg-red-100 text-red-700' : designOrder.designOrderStatus === 'Action Required' || designOrder.designOrderStatus === 'Partially Approved' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
                                                     {getOrderStatusLabel(designOrder.designOrderStatus)}
                                                 </span>
                                             </TableCell>

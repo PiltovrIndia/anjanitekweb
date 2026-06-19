@@ -262,7 +262,7 @@ export async function GET(request,{params}) {
 
                     // GlobalAdmin sees all.
                     // Non-global admins see mapped users/dealers.
-                    if (role !== "GlobalAdmin" && userId) {
+                    if ((role !== "GlobalAdmin" && role !== "SuperAdmin") && userId) {
                         where.push("(u.relatedTo LIKE ? OR u.id = ? OR o.userId = ? OR o.dealerId = ?)");
                         values.push(`%${userId}%`, userId, userId, userId);
                     }
@@ -816,12 +816,13 @@ export async function GET(request,{params}) {
 
                             FROM orders o
                             LEFT JOIN products1 p ON o.design = p.design 
-                            LEFT JOIN user u ON o.dealerId = u.id 
+                            LEFT JOIN user u ON o.userId = u.id 
                             LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id 
                             WHERE (u.relatedTo LIKE ? OR u.id LIKE ?) 
                                 ${statusCond}
                                 AND o.isDeleted = 0
-                            ORDER BY o.`+sortBy+` DESC, o.cartId DESC, o.serialId ASC
+                            ORDER BY o.`+sortBy+` DESC, o.cartId DESC, o.serialId ASC 
+                            LIMIT 20 OFFSET `+offset+`
                             `;
 
                             const [rows] = await pool.query(query, [`%${userId}%`, `%${userId}%`]);
