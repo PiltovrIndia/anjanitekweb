@@ -622,7 +622,7 @@ export async function GET(request,{params}) {
             AND isDeleted = 0
             AND status NOT IN ('Cancelled', 'Rejected')
             ORDER BY
-            createdOn ASC,
+            COALESCE(modifiedOn, approvedOn, createdOn) ASC,
             id ASC
             FOR UPDATE
             `,

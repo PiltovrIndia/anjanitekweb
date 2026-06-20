@@ -237,6 +237,10 @@ export default function Orders() {
     const [showDesignOrderHistory, setShowDesignOrderHistory] = useState(false)
     const reviewDesignTimer = useRef(null)
     const reviewDesignRef = useRef(null)
+    const ordersEndRef = useRef(null)
+    const designsEndRef = useRef(null)
+    const loadMoreOrdersRef = useRef(null)
+    const loadMoreDesignsRef = useRef(null)
 
     // var groupedTags = [];
     const [imgSrc, setImgSrc] = useState(``);
@@ -358,6 +362,28 @@ export default function Orders() {
         return () => controller.abort()
     }, [isActionDialogOpen, showDesignOrderHistory, selectedReviewDesign?.design, selectedRes?.id])
 
+    useEffect(() => {
+        if (activeOrdersTab !== 'Orders') return;
+        const sentinel = ordersEndRef.current;
+        if (!sentinel) return;
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) loadMoreOrdersRef.current?.();
+        }, { threshold: 0 });
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [activeOrdersTab]);
+
+    useEffect(() => {
+        if (activeOrdersTab !== 'Designs') return;
+        const sentinel = designsEndRef.current;
+        if (!sentinel) return;
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) loadMoreDesignsRef.current?.();
+        }, { threshold: 0 });
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [activeOrdersTab]);
+
     // useEffect(() => {
     //         if (user && user.id) {
     //             getOrders(); // Fetch orders on load
@@ -472,7 +498,7 @@ export default function Orders() {
         return status === 'Submitted' ? 'Pending' : status || '-'
     }
 
-    async function getOrders(val, offsetR, userObj = user, productionFilter = isProduction){
+    async function getOrders(val, offsetR, userObj = user, productionFilter = isProduction, append = false){
         
         
         setResLoading(true);
@@ -493,17 +519,13 @@ export default function Orders() {
 
                 // check if data exits
                 if(Array.isArray(queryResult.data) && queryResult.data.length > 0){
-                    
-                    setOrders(normalizeCartOrders(queryResult.data));
+                    const normalized = normalizeCartOrders(queryResult.data);
+                    append ? setOrders(prev => [...prev, ...normalized]) : setOrders(normalized);
                     setTotalOrders(queryResult.totalOrders ?? queryResult.count ?? queryResult.data.length);
-                        
-                        setResLoading(false);
-                    // }
-                    
+                    setResLoading(false);
                 }
                 else {
-                    setOrders([]);
-                    setTotalOrders(0);
+                    if (!append) { setOrders([]); setTotalOrders(0); }
                 }
 
                 setResLoading(false);
@@ -526,7 +548,7 @@ export default function Orders() {
         }
     }
 
-    async function getDesignOrders(val, page = 1, userObj = user) {
+    async function getDesignOrders(val, page = 1, userObj = user, append = false) {
         setDesignOrdersLoading(true);
 
         if (!userObj?.role || !userObj?.id) {
@@ -547,12 +569,11 @@ export default function Orders() {
             const queryResult = await result.json();
 
             if (queryResult.status === 200 && Array.isArray(queryResult.data)) {
-                setDesignOrders(queryResult.data);
+                append ? setDesignOrders(prev => [...prev, ...queryResult.data]) : setDesignOrders(queryResult.data);
                 setTotalDesignOrders(queryResult.totalDesigns ?? queryResult.data.length);
                 setDesignOrdersPage(queryResult.page ?? page);
             } else {
-                setDesignOrders([]);
-                setTotalDesignOrders(0);
+                if (!append) { setDesignOrders([]); setTotalDesignOrders(0); }
             }
         } catch (e) {
             toast({ description: "Issue loading designs, try again later!" });
@@ -656,9 +677,9 @@ export default function Orders() {
                 waitlistPosition: res.waitlistPosition || '-',
                 size: res.size || '-',
                 status: res.status || '-',
-                submittedOn: res.createdOn ? dayjs(res.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('YYYY-MM-DD HH:mm:ss') : '-',
-                approvedOn: res.approvedOn ? dayjs(res.approvedOn).subtract(5, 'hours').subtract(30, 'minutes').format('YYYY-MM-DD HH:mm:ss') : '-',
-                modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).subtract(5, 'hours').subtract(30, 'minutes').format('YYYY-MM-DD HH:mm:ss') : '-',
+                submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                approvedOn: res.approvedOn ? dayjs(res.approvedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
                 requestType: res.isProduction == 1 || Number(res.productionQty || 0) > 0 ? 'Production' : 'Current',
             }));
 
@@ -1057,6 +1078,17 @@ export default function Orders() {
         return <span className="ml-1 text-xs">{dir === 'asc' ? '↑' : '↓'}</span>;
     };
 
+    loadMoreOrdersRef.current = () => {
+        if (resLoading || orders.length >= totalOrders) return;
+        const next = resOffset + ORDER_PAGE_SIZE;
+        setResOffset(next);
+        getOrders(resStatus, next, user, isProduction, true);
+    };
+
+    loadMoreDesignsRef.current = () => {
+        if (designOrdersLoading || designOrders.length >= totalDesignOrders) return;
+        getDesignOrders(resStatus, designOrdersPage + 1, user, true);
+    };
 
 return (
 
@@ -1167,7 +1199,7 @@ return (
                     </TabsList>
                 </Tabs>
 
-                {activeOrdersTab === 'Orders' ? (
+                {activeOrdersTab === 'Orders' ? (<>
                 <Card>
                     <Table>
                         <TableHeader>
@@ -1305,7 +1337,7 @@ return (
                                                     ))}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className='font-mono text-xs text-slate-500'>{dayjs(group.first.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A')}</TableCell>
+                                            <TableCell className='font-mono text-xs text-slate-500'>{dayjs(group.first.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
                                             <TableCell className="text-right">
                                                 {hasMultipleRows ? (
                                                     <span className="text-xs font-medium text-slate-500">
@@ -1362,7 +1394,7 @@ return (
                                                 </TableCell>
                                                 <TableCell>
                                                     <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                        {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY') : ''}
+                                                        {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell>
@@ -1370,7 +1402,7 @@ return (
                                                         {(res.isProduction == 1) ? 'Production' : 'Current'}
                                                     </span>
                                                 </TableCell>
-                                                <TableCell className='font-mono text-xs text-slate-500'>{dayjs(res.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A')}</TableCell>
+                                                <TableCell className='font-mono text-xs text-slate-500'>{dayjs(res.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-2">
                                                         {res.status === 'Submitted' && (
@@ -1393,7 +1425,11 @@ return (
                         </TableBody>
                     </Table>
                 </Card>
-                ) : (
+                <div ref={ordersEndRef} className="py-3 text-center text-sm text-slate-400">
+                    {resLoading && orders.length > 0 && <><SpinnerGap className="animate-spin inline-block mr-2 h-4 w-4" />Loading more orders...</>}
+                    {!resLoading && orders.length > 0 && orders.length >= totalOrders && <span>All {totalOrders} orders loaded</span>}
+                </div>
+                </>) : (<>
                 <Card>
                     <Table>
                         <TableHeader>
@@ -1485,7 +1521,7 @@ return (
                                                 </span>
                                             </TableCell>
                                             <TableCell className="font-mono text-xs text-slate-500">
-                                                {designOrder.latestCreatedOn ? dayjs(designOrder.latestCreatedOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A') : '-'}
+                                                {designOrder.latestCreatedOn ? dayjs(designOrder.latestCreatedOn).format('DD/MM/YYYY hh:mm A') : '-'}
                                             </TableCell>
                                         </TableRow>
 
@@ -1513,9 +1549,11 @@ return (
                                                         <span className="font-medium">{res.dealer || '-'}</span><br/>
                                                         <span className="text-xs text-slate-500">{res.dealerId || '-'}</span>
                                                     </TableCell>
+                                                    <TableCell className="text-right font-mono"> </TableCell>
                                                     <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
                                                     <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
                                                     <TableCell className="text-right font-mono">{res.productionQty}</TableCell>
+                                                    <TableCell className="text-right font-mono"><span className={((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1) > 50 ? 'text-green-600' : 'text-red-500'}>{((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1)}%</span></TableCell>
                                                     <TableCell className="text-right">
                                                         {hasWaitlistPosition(res.waitlistPosition) ? (
                                                             <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
@@ -1536,7 +1574,7 @@ return (
                                                         </span>
                                                     </TableCell>
                                                     <TableCell className="font-mono text-xs text-slate-500">
-                                                        {res.createdOn ? dayjs(res.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A') : '-'}
+                                                        {res.createdOn ? dayjs(res.createdOn).format('DD/MM/YYYY hh:mm A') : '-'}
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <div className="flex justify-end gap-2">
@@ -1557,43 +1595,11 @@ return (
                         </TableBody>
                     </Table>
                 </Card>
-                )}
-                
-                <div className="flex items-center justify-end space-x-2 py-4">
-                    {activeOrdersTab === 'Designs' ? (
-                        <>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    const next = Math.max(1, designOrdersPage - 1);
-                                    setDesignOrdersPage(next);
-                                    getDesignOrders(resStatus, next, user);
-                                }}
-                                disabled={designOrdersPage === 1}
-                            >
-                                Previous
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    const next = designOrdersPage + 1;
-                                    setDesignOrdersPage(next);
-                                    getDesignOrders(resStatus, next, user);
-                                }}
-                                disabled={(designOrdersPage * ORDER_PAGE_SIZE) >= totalDesignOrders}
-                            >
-                                Next
-                            </Button>
-                        </>
-                    ) : (
-                        <>
-                            <Button variant="outline" size="sm" onClick={() => { const next = Math.max(0, resOffset - ORDER_PAGE_SIZE); setResOffset(next); getOrders(resStatus, next, user); }} disabled={resOffset === 0}>Previous</Button>
-                            <Button variant="outline" size="sm" onClick={() => { const next = resOffset + ORDER_PAGE_SIZE; setResOffset(next); getOrders(resStatus, next, user); }} disabled={resOffset + orders.length >= totalOrders}>Next</Button>
-                        </>
-                    )}
+                <div ref={designsEndRef} className="py-3 text-center text-sm text-slate-400">
+                    {designOrdersLoading && designOrders.length > 0 && <><SpinnerGap className="animate-spin inline-block mr-2 h-4 w-4" />Loading more designs...</>}
+                    {!designOrdersLoading && designOrders.length > 0 && designOrders.length >= totalDesignOrders && <span>All {totalDesignOrders} designs loaded</span>}
                 </div>
+                </>)}
             </div>
           
           <StockOrderDialog
@@ -1637,7 +1643,7 @@ return (
                                 </div>
                             </div>
                             <div className="text-right text-xs text-slate-500">
-                                <div>{selectedRes?.createdOn ? dayjs(selectedRes.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A') : '-'}</div>
+                                <div>{selectedRes?.createdOn ? dayjs(selectedRes.createdOn).format('DD/MM/YYYY hh:mm A') : '-'}</div>
                                 <div>{selectedRes?.orderedBy || selectedRes?.userId || '-'} to {selectedRes?.dealer || selectedRes?.dealerId || '-'}</div>
                             </div>
                         </div>
@@ -1814,7 +1820,7 @@ return (
                                                                 ) : null}
                                                             </div>
                                                             <div className="mt-1 text-xs text-slate-500">
-                                                                {order.userId || '-'} to {order.dealerId || '-'} • {order.createdOn ? dayjs(order.createdOn).subtract(5, 'hours').subtract(30, 'minutes').format('DD/MM/YYYY hh:mm A') : '-'}
+                                                                {order.userId || '-'} to {order.dealerId || '-'} • {order.createdOn ? dayjs(order.createdOn).format('DD/MM/YYYY hh:mm A') : '-'}
                                                             </div>
                                                         </div>
                                                         <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${order.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : order.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>

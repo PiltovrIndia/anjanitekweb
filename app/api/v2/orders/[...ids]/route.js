@@ -167,9 +167,9 @@ export async function GET(request,{params}) {
                                 AND x.isDeleted = 0
                                 AND x.status NOT IN ('Cancelled', 'Rejected')
                                 AND (
-                                    x.createdOn < o.createdOn
+                                    COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
                                     OR (
-                                    x.createdOn = o.createdOn
+                                    COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
                                     AND x.id < o.id
                                     )
                                 )
@@ -476,9 +476,10 @@ export async function GET(request,{params}) {
                             AND x.isDeleted = 0
                             AND x.status NOT IN ('Cancelled', 'Rejected')
                             AND (
-                                x.createdOn < r.createdOn
+                                
+                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
                                 OR (
-                                x.createdOn = r.createdOn
+                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
                                 AND x.id < r.id
                                 )
                             )
@@ -553,6 +554,7 @@ export async function GET(request,{params}) {
                 var orderId = params.ids[2];
                 var toBeApprovedQty = params.ids[3];
                 var adminId = params.ids[4];
+                var actionDate = params.ids[5];
                 
                 if (!orderId) {
                     return Response.json({
@@ -571,7 +573,7 @@ export async function GET(request,{params}) {
                     // 3. Combined Query: Fetch both order and product in a single DB round-trip using FOR UPDATE
                     const [[order], [product]] = await Promise.all([
                     connection.query(
-                        `SELECT id, status, stockType, requestedQty, design, waitlistSequence 
+                        `SELECT id, status, stockType, requestedQty, approvedQty, productionQty, design, waitlistSequence 
                         FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`,
                         [orderId]
                     ).then(([rows]) => rows),
@@ -589,10 +591,10 @@ export async function GET(request,{params}) {
                     return Response.json({ status: 404, success: false, message: "Order item not found" });
                     }
 
-                    if (order.status === "Approved") {
-                    await connection.rollback();
-                    return Response.json({ status: 409, success: false, message: "Order item is already approved" });
-                    }
+                    // if (order.status === "Approved") {
+                    // await connection.rollback();
+                    // return Response.json({ status: 409, success: false, message: "Order item is already approved" });
+                    // }
 
                     if (["Rejected", "Cancelled"].includes(order.status)) {
                     await connection.rollback();
@@ -605,47 +607,112 @@ export async function GET(request,{params}) {
                     return Response.json({ status: 404, success: false, message: "Product not found" });
                     }
 
+                    if (order.status === "Approved") {
 
-                    // 6. Memory Math Calculations
-                    const stockColumn = getStockColumn(order.stockType);
-                    const availableStock = Number(product[stockColumn] || 0);
-                    const requestedQty = Number(order.requestedQty || 0);
+                        // const oldRequestedQty = Number(order.requestedQty || 0); // requestedQty – old requestedQty = 30
+                        const newRequestedQty = Number(toBeApprovedQty || 0); // toBeApprovedQty – new requestedQty = 28
+                        const oldApprovedQty = Number(order.approvedQty || 0); // approvedQty – old approvedQty = 10
 
-                    const approvedQty = Math.min(toBeApprovedQty, availableStock);
-                    // const productionQty1 = (requestedQty - approvedQty) > 0 ? 0 : (availableStock - approvedQty) * -1; // If approvedQty exhausts stock, then production is 0, else it's the remaining qty that needs production
-                    const productionQty = (approvedQty - availableStock) >= 0 ? (toBeApprovedQty - availableStock) : 0;
-                    const remainingStock = approvedQty - availableStock >= 0 ? 0 : availableStock - toBeApprovedQty;
-                    
-                    // const approvedQty = Math.min(requestedQty, availableStock);
-                    // const productionQty = requestedQty - approvedQty;
-                    // const remainingStock = availableStock - approvedQty;
+                        const stockWeGetBack = oldApprovedQty; // If we reduce approved qty, we get back that stock to the available pool
+                        
+                        let availableStock = Number(product[getStockColumn(order.stockType)] || 0) + stockWeGetBack;
 
-                    // 7. Parallel Writes: Execute both UPDATE statements concurrently
-                    await Promise.all([
-                    connection.query(
-                        `UPDATE orders SET approvedQty = ?, productionQty = ?, 
-                                status = 'Approved', approvedOn = NOW(), modifiedOn = NOW()
-                        WHERE id = ?`,
-                        [approvedQty, productionQty, orderId]
-                    ),
-                    connection.query(
-                        `UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`,
-                        [remainingStock, order.design]
-                    )
-                    ]);
+                        // const newApprovedQty = Math.min(newRequestedQty, Number(product[getStockColumn(order.stockType)] || 0)); // approvedQty – new approvedQty = min(28, 20) = 20
+                        
+                        // let newProductionQty = 0;
+                        // if(oldProductionQty > 0){
+                        //     newProductionQty = Math.max(0, oldProductionQty - (oldRequestedQty - newRequestedQty)); // productionQty - new productionQty = 20 - (10 - 28) = 2
+                        // }
+                        const newApprovedQty = Math.min(newRequestedQty, availableStock); // approvedQty – new approvedQty = min(28, 20 + 2) = 22
+                        const newProductionQty = Math.max(0, (newRequestedQty - newApprovedQty));
+                        const newAvailableStock = availableStock - newApprovedQty;
+                        // const stockDifference = newApprovedQty - oldApprovedQty; // 28 - 10 = 18
+                        // const newAvailableStock = Number(product[getStockColumn(order.stockType)] || 0) - stockDifference; // availableStock - stockDifference = 20 - 18 = 2
+                        
+                        const stockColumn = getStockColumn(order.stockType);
+                        
+                        // const requestedQty = Number(order.requestedQty || 0);
 
-                    await connection.commit();
+                        // const approvedQty = Math.min(toBeApprovedQty, availableStock);
 
-                    return Response.json({
-                    status: 200,
-                    success: true,
-                    message: "Order item approved successfully",
-                    data: {
-                        orderId, design: order.design, stockType: order.stockType,
-                        requestedQty, approvedQty, productionQty,
-                        previousStock: availableStock, remainingStock,
-                    },
-                    });
+                        // // as it is already approved, we will only update the stock based on the difference of new approved qty and old approved qty
+                        // const previousApprovedQty = Number(order.approvedQty || 0);
+                        // const previousProductionQty = Number(order.productionQty || 0);
+                        // const productionQty = (approvedQty - availableStock) >= 0 ? (approvedQty - availableStock) : 0;
+                        // const remainingStock = approvedQty - availableStock >= 0 ? 0 : availableStock - approvedQty;
+
+                        
+
+                        await Promise.all([
+                            connection.query(
+                                `UPDATE orders SET requestedQty = ?, approvedQty = ?, productionQty = ?, 
+                                        modifiedOn = ?
+                                WHERE id = ?`,
+                                [newRequestedQty, newApprovedQty, newProductionQty, actionDate, orderId]
+                            ),
+                            connection.query(
+                                `UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`,
+                                [newAvailableStock, order.design]
+                            )
+                        ]);
+
+                        await connection.commit();
+
+                        return Response.json({
+                            status: 200,
+                            success: true,
+                            message: "Order item updated successfully",
+                            data: {
+                                orderId, design: order.design, stockType: order.stockType,
+                                newRequestedQty, newApprovedQty, newProductionQty,
+                                previousStock: availableStock, newAvailableStock,
+                            },
+                        });
+                    }
+                    else {
+                        // 6. Memory Math Calculations
+                        const stockColumn = getStockColumn(order.stockType);
+                        const availableStock = Number(product[stockColumn] || 0);
+                        const requestedQty = Number(order.requestedQty || 0);
+
+                        const approvedQty = Math.min(toBeApprovedQty, availableStock);
+                        // const productionQty1 = (requestedQty - approvedQty) > 0 ? 0 : (availableStock - approvedQty) * -1; // If approvedQty exhausts stock, then production is 0, else it's the remaining qty that needs production
+                        const productionQty = (approvedQty - availableStock) >= 0 ? (toBeApprovedQty - availableStock) : 0;
+                        const remainingStock = approvedQty - availableStock >= 0 ? 0 : availableStock - toBeApprovedQty;
+                        
+                        // const approvedQty = Math.min(requestedQty, availableStock);
+                        // const productionQty = requestedQty - approvedQty;
+                        // const remainingStock = availableStock - approvedQty;
+
+                        // 7. Parallel Writes: Execute both UPDATE statements concurrently
+                        await Promise.all([
+                        connection.query(
+                            `UPDATE orders SET approvedQty = ?, productionQty = ?, 
+                                    status = 'Approved', approvedOn = ?, modifiedOn = ?
+                            WHERE id = ?`,
+                            [approvedQty, productionQty, actionDate, actionDate, orderId]
+                        ),
+                        connection.query(
+                            `UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`,
+                            [remainingStock, order.design]
+                        )
+                        ]);
+
+                        await connection.commit();
+
+                        return Response.json({
+                            status: 200,
+                            success: true,
+                            message: "Order item approved successfully",
+                            data: {
+                                orderId, design: order.design, stockType: order.stockType,
+                                requestedQty, approvedQty, productionQty,
+                                previousStock: availableStock, remainingStock,
+                            },
+                        });
+                    }
+
+
                 } catch (error) {
                     await connection.rollback();
                     return Response.json({
@@ -663,6 +730,7 @@ export async function GET(request,{params}) {
             else if (params.ids[1] === "U0.3") {
                 try {
                     var orderId = params.ids[2];
+                    var actionDate = params.ids[5];
 
                     if (!orderId) {
                     return Response.json({
@@ -678,12 +746,12 @@ export async function GET(request,{params}) {
                     SET
                         status = 'Rejected',
                         productionQty = 0,
-                        modifiedOn = NOW()
+                        modifiedOn = ? 
                     WHERE id = ?
                         AND isDeleted = 0
                         AND status NOT IN ('Approved', 'Cancelled', 'Rejected')
                     `,
-                    [orderId]
+                    [actionDate, orderId]
                     );
 
                     if (result.affectedRows === 0) {
@@ -713,6 +781,7 @@ export async function GET(request,{params}) {
             else if (params.ids[1] === "U0.4") {
                 try {
                     var orderId = params.ids[2];
+                    var actionDate = params.ids[3];
 
                     if (!orderId) {
                     return Response.json({
@@ -728,12 +797,12 @@ export async function GET(request,{params}) {
                     SET
                         status = 'Deleted',
                         isDeleted = 1,
-                        modifiedOn = NOW()
+                        modifiedOn = ? 
                     WHERE id = ?
                         AND isDeleted = 0
                         AND status NOT IN ('Approved', 'Deleted')
                     `,
-                    [orderId]
+                    [actionDate, orderId]
                     );
 
                     if (result.affectedRows === 0) {
@@ -774,6 +843,15 @@ export async function GET(request,{params}) {
                     statusCond = ` AND o.status = '`+status+`' `
                 }
 
+                // based on the role, manage the join condition to filter orders by userId or dealerId
+                var joinCond = '';
+                if(role == 'dealer' || role == 'Dealer'){
+                    joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
+                }
+                else {
+                    joinCond += ` LEFT JOIN user u ON o.userId = u.id `
+                }
+
                 try {
                     var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+userId+'%" OR u.id LIKE "%'+userId+'%") AND r.isDeleted = 0';
                     const query = `
@@ -804,11 +882,11 @@ export async function GET(request,{params}) {
                                         AND x.isDeleted = 0
                                         AND x.status NOT IN ('Cancelled', 'Rejected')
                                         AND (
-                                        x.createdOn < o.createdOn
-                                        OR (
-                                            x.createdOn = o.createdOn
+                                        COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
+                                            OR (
+                                            COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
                                             AND x.id < o.id
-                                        )
+                                            )
                                         )
                                     )
                                     ELSE NULL
@@ -816,7 +894,8 @@ export async function GET(request,{params}) {
 
                             FROM orders o
                             LEFT JOIN products1 p ON o.design = p.design 
-                            LEFT JOIN user u ON o.dealerId = u.id 
+                            
+                            ${joinCond}
                             LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id 
                             WHERE (u.relatedTo LIKE ? OR u.id LIKE ?) 
                                 ${statusCond}
@@ -926,11 +1005,11 @@ export async function GET(request,{params}) {
                             AND x.isDeleted = 0
                             AND x.status NOT IN ('Cancelled', 'Rejected')
                             AND (
-                                x.createdOn < r.createdOn
-                                OR (
-                                x.createdOn = r.createdOn
-                                AND x.id < r.id
-                                )
+                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
+                                    OR (
+                                    COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
+                                    AND x.id < o.id
+                                    )
                             )
                         )
                         ELSE NULL
@@ -951,7 +1030,7 @@ export async function GET(request,{params}) {
 
                     ORDER BY
                         CASE WHEN r.productionQty > 0 THEN 0 ELSE 1 END,
-                        r.createdOn ASC,
+                        COALESCE(r.modifiedOn, r.approvedOn, r.createdOn) ASC,
                         r.id ASC
                     `,
                     [designSearch]
