@@ -26,12 +26,17 @@ export async function GET(request,{params}) {
                     const sortBy = params.ids[6] || "createdOn";
 
                     const search = "";
-                    const page = 1;
+                    // const page = 1;
+                    const page = params.ids[3];
                     const limit = 20;
 
                     const pageNo = Math.max(Number(page), 1);
-                    const pageLimit = Math.min(Math.max(Number(limit), 1), 100);
-                    const offset = (pageNo - 1) * pageLimit;
+                    // const pageLimit = Math.min(Math.max(Number(limit), 1), 100);
+                    // const offset = (pageNo - 1) * pageLimit;
+                    const pageLimit = 20;
+                    // offset value to be integer
+                    const offset = parseInt(params.ids[3]);
+                    
 
                     const where = ["o.isDeleted = 0"];
                     const queryParams = [];
@@ -76,8 +81,8 @@ export async function GET(request,{params}) {
 
                     const orderBySql =
                     sortBy === "createdOn"
-                        ? "createdOn ASC"
-                        : "createdOn ASC";
+                        ? "createdOn DESC"
+                        : "createdOn DESC";
 
                     /**
                      * Step 1:
@@ -93,8 +98,7 @@ export async function GET(request,{params}) {
                     ${whereSql}
                     GROUP BY o.cartId
                     ORDER BY ${orderBySql}
-                    LIMIT ? OFFSET ?
-                    `;
+                    LIMIT ? OFFSET ?`;
 
                     const [cartRows] = await pool.query(cartQuery, [
                     ...queryParams,
@@ -188,7 +192,9 @@ export async function GET(request,{params}) {
                     WHERE o.cartId IN (${placeholders})
                         AND o.isDeleted = 0
 
-                    ORDER BY o.createdOn ASC, o.cartId DESC, o.serialId ASC, o.id ASC
+                    ORDER BY o.createdOn DESC, o.cartId DESC, o.serialId ASC, o.id ASC
+
+                    
                     `;
 
                     const [itemRows] = await pool.query(itemsQuery, cartIds);
@@ -1030,7 +1036,7 @@ export async function GET(request,{params}) {
 
                     ORDER BY
                         CASE WHEN r.productionQty > 0 THEN 0 ELSE 1 END,
-                        COALESCE(r.modifiedOn, r.approvedOn, r.createdOn) ASC,
+                        COALESCE(r.modifiedOn, r.approvedOn, r.createdOn) DESC,
                         r.id ASC
                     `,
                     [designSearch]
@@ -1366,6 +1372,7 @@ function groupAdminOrders(rows) {
 
     if (!map.has(cartId)) {
       map.set(cartId, {
+        id: row.id,
         cartId,
         userId: row.userId,
         dealerId: row.dealerId,

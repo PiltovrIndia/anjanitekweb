@@ -32,82 +32,7 @@ import StockOrderDialog from '../products/stock_order_dialog'
 const xlsx = require('xlsx');
 // Child references can also take paths delimited by '/'
 
-const ORDER_PAGE_SIZE = 20;
-
-
-// get tags for the products
-const getTags = async (pass) => 
-    fetch("/api/v2/products/"+pass+"/U0/", {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-    });
-
-// get products
-const getProducts = async (pass, role, offset) => 
-fetch("/api/v2/products/"+pass+"/U1.1/"+role+"/"+offset, {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-// update product
-const upateProduct = async (pass, productId, tags, size) => 
-fetch("/api/v2/products/"+pass+"/U5/"+productId+"/"+tags+"/"+size, {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-// update product name
-const updateProductName = async (pass, productId, name) => 
-fetch("/api/v2/products/"+pass+"/U10/"+productId+"/"+encodeURIComponent(name), {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-// design of the day
-const designOfTheDay = async (pass, productData) => 
-fetch("/api/v2/products/"+pass+"/U8/"+productData, {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-// create product
-const createProductAPI = async (pass, productData) => 
-fetch("/api/v2/products/"+pass+"/U7/"+productData, {
-    method: "GET",
-    headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-    },
-});
-
-
-// upload invoices data
-const updateUploadStockData = async (pass, items1, adminId) => 
-    
-    fetch("/api/v2/products/"+pass+"/U0/"+adminId+"/-", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-        body: JSON.stringify(items1),
-    });
-
+const ORDER_PAGE_SIZE = 0;
 
 // get orders
 const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction) => 
@@ -1080,7 +1005,9 @@ export default function Orders() {
 
     loadMoreOrdersRef.current = () => {
         if (resLoading || orders.length >= totalOrders) return;
-        const next = resOffset + ORDER_PAGE_SIZE;
+        // const next = resOffset + ORDER_PAGE_SIZE;
+        const next = resOffset + 20;
+        
         setResOffset(next);
         getOrders(resStatus, next, user, isProduction, true);
     };
@@ -1243,10 +1170,10 @@ return (
                                 const percentage1 = ((group.totalApprovedQty === 0 ? 0 : group.totalApprovedQty / group.totalRequestedQty) * 100)
                                 const percentage = percentage1 > 0 ? percentage1.toFixed(1) : 0
                                 const textColor = percentage < 50 ? 'text-red-500' : 'text-green-600'; // Red if < 50%, Green otherwise
-
+console.log(groupedOrders.length);
 
                                 return (
-                                    <React.Fragment key={group.cartId}>
+                                    <React.Fragment key={group.id}>
                                         <TableRow
                                             className={`text-sm transition-colors ${hasMultipleRows ? 'cursor-pointer bg-slate-50/80 hover:bg-slate-100/80' : 'bg-slate-50/40 hover:bg-slate-100/60'}`}
                                             onClick={hasMultipleRows ? () => toggleCartGroup(group.cartId) : undefined}
@@ -1435,9 +1362,9 @@ return (
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('designs')}>
-                                    <span className="flex items-center">Design{sortIcon('designs', designsSortKey, designsSortDir)}</span>
+                                    <span className="flex items-center">Design Id{sortIcon('designs', designsSortKey, designsSortDir)}</span>
                                 </TableHead>
-                                <TableHead>Product</TableHead>
+                                <TableHead>Design</TableHead>
                                 <TableHead className="text-right">Orders</TableHead>
                                 <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('requested')}>
                                     <span className="flex items-center justify-end">Requested{sortIcon('requested', designsSortKey, designsSortDir)}</span>
