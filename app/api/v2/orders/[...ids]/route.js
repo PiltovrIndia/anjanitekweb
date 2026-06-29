@@ -578,18 +578,9 @@ export async function GET(request,{params}) {
 
                     // 3. Combined Query: Fetch both order and product in a single DB round-trip using FOR UPDATE
                     const [[order], [product]] = await Promise.all([
-                    connection.query(
-                        `SELECT id, status, stockType, requestedQty, approvedQty, productionQty, design, waitlistSequence 
-                        FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`,
-                        [orderId]
-                    ).then(([rows]) => rows),
+                    connection.query(`SELECT id, status, stockType, requestedQty, approvedQty, productionQty, design, waitlistSequence FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]).then(([rows]) => rows),
                     
-                    connection.query(
-                        `SELECT productId, design, prm, std 
-                        FROM products1 WHERE design = (SELECT design FROM orders WHERE id = ? AND isDeleted = 0) FOR UPDATE`,
-                        [orderId]
-                    ).then(([rows]) => rows)
-                    ]);
+                    connection.query(`SELECT productId, design, prm, std FROM products1 WHERE design = (SELECT design FROM orders WHERE id = ? AND isDeleted = 0) FOR UPDATE`, [orderId]).then(([rows]) => rows)]);
 
                     // 4. Validate Order existence and state
                     if (!order) {
@@ -618,49 +609,30 @@ export async function GET(request,{params}) {
                         // const oldRequestedQty = Number(order.requestedQty || 0); // requestedQty – old requestedQty = 30
                         const newRequestedQty = Number(toBeApprovedQty || 0); // toBeApprovedQty – new requestedQty = 28
                         const oldApprovedQty = Number(order.approvedQty || 0); // approvedQty – old approvedQty = 10
-
                         const stockWeGetBack = oldApprovedQty; // If we reduce approved qty, we get back that stock to the available pool
                         
                         let availableStock = Number(product[getStockColumn(order.stockType)] || 0) + stockWeGetBack;
 
-                        // const newApprovedQty = Math.min(newRequestedQty, Number(product[getStockColumn(order.stockType)] || 0)); // approvedQty – new approvedQty = min(28, 20) = 20
-                        
-                        // let newProductionQty = 0;
-                        // if(oldProductionQty > 0){
-                        //     newProductionQty = Math.max(0, oldProductionQty - (oldRequestedQty - newRequestedQty)); // productionQty - new productionQty = 20 - (10 - 28) = 2
-                        // }
                         const newApprovedQty = Math.min(newRequestedQty, availableStock); // approvedQty – new approvedQty = min(28, 20 + 2) = 22
                         const newProductionQty = Math.max(0, (newRequestedQty - newApprovedQty));
                         const newAvailableStock = availableStock - newApprovedQty;
-                        // const stockDifference = newApprovedQty - oldApprovedQty; // 28 - 10 = 18
-                        // const newAvailableStock = Number(product[getStockColumn(order.stockType)] || 0) - stockDifference; // availableStock - stockDifference = 20 - 18 = 2
                         
                         const stockColumn = getStockColumn(order.stockType);
-                        
-                        // const requestedQty = Number(order.requestedQty || 0);
 
-                        // const approvedQty = Math.min(toBeApprovedQty, availableStock);
+                        // Write all parameters to the log for debugging
+                        console.log("New requested qty:", newRequestedQty);
+                        console.log("Old approved qty:", oldApprovedQty);
+                        console.log("Stock we get back:", stockWeGetBack);
+                        console.log("Available stock:", availableStock);
+                        console.log("New approved qty:", newApprovedQty);
+                        console.log("New production qty:", newProductionQty);
+                        console.log("New available stock:", newAvailableStock);
 
-                        // // as it is already approved, we will only update the stock based on the difference of new approved qty and old approved qty
-                        // const previousApprovedQty = Number(order.approvedQty || 0);
-                        // const previousProductionQty = Number(order.productionQty || 0);
-                        // const productionQty = (approvedQty - availableStock) >= 0 ? (approvedQty - availableStock) : 0;
-                        // const remainingStock = approvedQty - availableStock >= 0 ? 0 : availableStock - approvedQty;
+                        await connection.query(`UPDATE orders SET requestedQty = ?, approvedQty = ?, productionQty = ?, modifiedOn = ? WHERE id = ?`, [newRequestedQty, newApprovedQty, newProductionQty, actionDate, orderId]);
 
-                        
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, order.design, order.stockType, newAvailableStock);
 
-                        await Promise.all([
-                            connection.query(
-                                `UPDATE orders SET requestedQty = ?, approvedQty = ?, productionQty = ?, 
-                                        modifiedOn = ?
-                                WHERE id = ?`,
-                                [newRequestedQty, newApprovedQty, newProductionQty, actionDate, orderId]
-                            ),
-                            connection.query(
-                                `UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`,
-                                [newAvailableStock, order.design]
-                            )
-                        ]);
+                        await connection.query(`UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
 
                         await connection.commit();
 
@@ -672,6 +644,9 @@ export async function GET(request,{params}) {
                                 orderId, design: order.design, stockType: order.stockType,
                                 newRequestedQty, newApprovedQty, newProductionQty,
                                 previousStock: availableStock, newAvailableStock,
+                                waitlistAllocations: allocations,
+                                totalAllocatedQty,
+                                stockAfterAllocation,
                             },
                         });
                     }
@@ -682,27 +657,25 @@ export async function GET(request,{params}) {
                         const requestedQty = Number(order.requestedQty || 0);
 
                         const approvedQty = Math.min(toBeApprovedQty, availableStock);
-                        // const productionQty1 = (requestedQty - approvedQty) > 0 ? 0 : (availableStock - approvedQty) * -1; // If approvedQty exhausts stock, then production is 0, else it's the remaining qty that needs production
                         const productionQty = (approvedQty - availableStock) >= 0 ? (toBeApprovedQty - availableStock) : 0;
                         const remainingStock = approvedQty - availableStock >= 0 ? 0 : availableStock - toBeApprovedQty;
-                        
-                        // const approvedQty = Math.min(requestedQty, availableStock);
-                        // const productionQty = requestedQty - approvedQty;
-                        // const remainingStock = availableStock - approvedQty;
 
-                        // 7. Parallel Writes: Execute both UPDATE statements concurrently
-                        await Promise.all([
-                        connection.query(
-                            `UPDATE orders SET approvedQty = ?, productionQty = ?, 
-                                    status = 'Approved', approvedOn = ?, modifiedOn = ?
-                            WHERE id = ?`,
+                        // Write all parameters to the log for debugging
+                        console.log("Stock column:", stockColumn);
+                        console.log("Available stock:", availableStock);
+                        console.log("Requested qty:", requestedQty);
+                        console.log("Approved qty:", approvedQty);
+                        console.log("Production qty:", productionQty);
+                        console.log("Remaining stock:", remainingStock);
+
+                        await connection.query(`UPDATE orders SET approvedQty = ?, productionQty = ?, status = 'Approved', approvedOn = ?, modifiedOn = ? WHERE id = ?`,
                             [approvedQty, productionQty, actionDate, actionDate, orderId]
-                        ),
-                        connection.query(
-                            `UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`,
-                            [remainingStock, order.design]
-                        )
-                        ]);
+                        );
+
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, order.design, order.stockType, remainingStock);
+
+                        await connection.query(`UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]
+                        );
 
                         await connection.commit();
 
@@ -714,6 +687,9 @@ export async function GET(request,{params}) {
                                 orderId, design: order.design, stockType: order.stockType,
                                 requestedQty, approvedQty, productionQty,
                                 previousStock: availableStock, remainingStock,
+                                waitlistAllocations: allocations,
+                                totalAllocatedQty,
+                                stockAfterAllocation,
                             },
                         });
                     }
@@ -746,40 +722,62 @@ export async function GET(request,{params}) {
                     });
                     }
 
-                    const [result] = await pool.query(
-                    `
-                    UPDATE orders
-                    SET
-                        status = 'Rejected',
-                        productionQty = 0,
-                        modifiedOn = ? 
-                    WHERE id = ?
-                        AND isDeleted = 0
-                        AND status NOT IN ('Approved', 'Cancelled', 'Rejected')
-                    `,
-                    [actionDate, orderId]
-                    );
+                    // if existing status is Approved or Cancelled or Rejected, then update modifiedOn column else update approvedOn column
+                    const [existingOrder] = await pool.query(`SELECT * FROM orders WHERE id = ? AND isDeleted = 0`, [orderId]);
 
-                    if (result.affectedRows === 0) {
+                    if (existingOrder.length === 0) {
                     return Response.json({
-                        status: 409,
+                        status: 404,
                         success: false,
-                        message: "Order item could not be rejected or is already processed",
+                        message: "Order item not found",
                     });
                     }
 
+                    const currentStatus = existingOrder[0].status;
+
+                    var [result] = [];
+                    if (["Approved"].includes(currentStatus)) {
+                    
+                        [result] = await pool.query(`UPDATE orders SET status = 'Rejected', productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
+
+                        console.log(existingOrder[0]);
+                        console.log(existingOrder[0].approvedQty);
+                        console.log(currentStatus);
+                        
+                        
+
+                        // if approvedQty > 0, then add that qty back to stock
+                        if (existingOrder[0].approvedQty > 0 && currentStatus === "Approved") {
+                            const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, existingOrder[0].design, existingOrder[0].stockType, existingOrder[0].approvedQty);
+
+                            const stockColumn = getStockColumn(existingOrder[0].stockType);
+                            await pool.query(`UPDATE products1 SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [existingOrder[0].approvedQty, existingOrder[0].design]);
+                        }
+                    }
+                    else {
+                        [result] = await pool.query(`UPDATE orders SET status = 'Rejected', productionQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
+                    }
+
+                    if (result.affectedRows === 0) {
+                        return Response.json({
+                            status: 409,
+                            success: false,
+                            message: "Order item could not be rejected or is already processed",
+                        });
+                    }
+
                     return Response.json({
-                    status: 200,
-                    success: true,
-                    message: "Order item rejected successfully",
-                    data: { orderId },
+                        status: 200,
+                        success: true,
+                        message: "Order item rejected successfully",
+                        data: { orderId },
                     });
                 } catch (error) {
                     return Response.json({
-                    status: 500,
-                    success: false,
-                    message: "Failed to reject order item",
-                    error: error.message,
+                        status: 500,
+                        success: false,
+                        message: "Failed to reject order item"+error.message,
+                        error: error.message,
                     });
                 }
             }
@@ -806,7 +804,7 @@ export async function GET(request,{params}) {
                         modifiedOn = ? 
                     WHERE id = ?
                         AND isDeleted = 0
-                        AND status NOT IN ('Approved', 'Deleted')
+                        AND status NOT IN ('Approved', 'Deleted', 'Rejected', 'Cancelled')
                     `,
                     [actionDate, orderId]
                     );
@@ -1514,6 +1512,82 @@ function getStockColumn(stockType) {
   throw new Error("Invalid stockType");
 }
 
+
+/**
+ * Lock pending order rows in waitlist order and allocate available stock.
+ * Returns the allocations made, total allocated qty, and remaining stock after allocation.
+ */
+async function allocateStockToWaitlist(connection, design, stockType, remainingStock) {
+    const [pendingRows] = await connection.query(
+        `
+        SELECT
+        id,
+        cartId,
+        dealerId,
+        design,
+        stockType,
+        requestedQty,
+        approvedQty,
+        productionQty,
+        createdOn
+        FROM orders
+        WHERE design = ?
+        AND stockType = ?
+        AND productionQty > 0
+        AND isDeleted = 0
+        AND status NOT IN ('Cancelled', 'Rejected')
+        ORDER BY
+        COALESCE(modifiedOn, approvedOn, createdOn) ASC,
+        id ASC
+        FOR UPDATE
+        `,
+        [design, stockType]
+    );
+
+    const allocations = [];
+    let totalAllocatedQty = 0;
+
+    for (const order of pendingRows) {
+        if (remainingStock <= 0) break;
+
+        const pendingQty = Number(order.productionQty || 0);
+
+        if (pendingQty <= 0) continue;
+
+        const allocateQty = Math.min(remainingStock, pendingQty);
+
+        const newApprovedQty = Number(order.approvedQty || 0) + allocateQty;
+        const newProductionQty = pendingQty - allocateQty;
+
+        await connection.query(
+            `
+            UPDATE orders
+            SET
+                approvedQty = ?,
+                productionQty = ?,
+                modifiedOn = NOW()
+            WHERE id = ?
+            `,
+            [newApprovedQty, newProductionQty, order.id]
+        );
+
+        remainingStock -= allocateQty;
+        totalAllocatedQty += allocateQty;
+
+        allocations.push({
+            orderId: order.id,
+            cartId: order.cartId,
+            dealerId: order.dealerId,
+            design: order.design,
+            stockType: order.stockType,
+            allocatedQty: allocateQty,
+            approvedQty: newApprovedQty,
+            productionQty: newProductionQty,
+        });
+    }
+
+    return { allocations, totalAllocatedQty, remainingStock };
+}
 
 function getDesignOrderStatus({
   totalRequestedQty,

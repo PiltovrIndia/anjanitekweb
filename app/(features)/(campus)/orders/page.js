@@ -801,27 +801,88 @@ export default function Orders() {
         try {
             var path = '';
             // check if the status is already approved, modified or rejected, if yes then update the record with modified status with modifiedOn value
-            if(selectedRes.status.toLowerCase() == 'submitted' || selectedRes.status.toLowerCase() == 'approved' || selectedRes.status.toLowerCase() == 'modified' || selectedRes.status.toLowerCase() == 'rejected'){
+            if(status.toLowerCase() == 'submitted' || status.toLowerCase() == 'approved' || status.toLowerCase() == 'modified'){
                 path = 'U0.2';
             }
-            else if(selectedRes.status.toLowerCase() == 'rejected'){
+            else if(status.toLowerCase() == 'rejected'){
                 path = 'U0.3';
             }
-            console.log("/api/v2/orders/"+process.env.NEXT_PUBLIC_API_PASS+"/"+path+"/"+selectedRes.id+"/"+approvalQty+"/"+selectedRes.userId+"/"+dayjs().format('YYYY-MM-DD HH:mm:ss')+"/"+encodeURIComponent(selectedReviewDesign.design));
+            // console.log("/api/v2/orders/"+process.env.NEXT_PUBLIC_API_PASS+"/"+path+"/"+selectedRes.id+"/"+approvalQty+"/"+selectedRes.userId+"/"+dayjs().format('YYYY-MM-DD HH:mm:ss')+"/"+encodeURIComponent(selectedReviewDesign.design));
             
             const result = await updateOrderStatusAPI(
                 process.env.NEXT_PUBLIC_API_PASS, path,
                 selectedRes.id, 
                 approvalQty,
                 selectedRes.userId,
-                dayjs().format('YYYY-MM-DD HH:mm:ss'), // Set expiry to 7 days from now
+                dayjs().format('YYYY-MM-DD HH:mm:ss'),
                 selectedReviewDesign.design,
             );
             const queryResult = await result.json();
+
             if (queryResult.status === 200) {
                 toast({ description: `Order marked as ${status.toLowerCase()}!` });
                 setIsActionDialogOpen(false);
-                getOrders(resStatus, resOffset, user); // Refresh list
+
+                const data = queryResult.data;
+                if (data?.orderId) {
+                    // Normalize field names — first-approval uses approvedQty, re-approval uses newApprovedQty
+                    const mainPatch = {
+                        approvedQty: data.newApprovedQty ?? data.approvedQty,
+                        productionQty: data.newProductionQty ?? data.productionQty,
+                        requestedQty: data.newRequestedQty ?? data.requestedQty,
+                        status: status === 'Rejected' ? 'Rejected' : 'Approved',
+                    };
+
+                    // Build id→patch map for the main order + every waitlist allocation
+                    const updates = new Map([[String(data.orderId), mainPatch]]);
+                    for (const alloc of (data.waitlistAllocations ?? [])) {
+                        updates.set(String(alloc.orderId), {
+                            approvedQty: alloc.approvedQty,
+                            productionQty: alloc.productionQty,
+                        });
+                    }
+
+                    // Patch the orders list in place
+                    setOrders(prev => prev.map(group => {
+                        if (!group.rows.some(row => updates.has(String(row.id)))) return group;
+
+                        const updatedRows = group.rows.map(row => {
+                            const patch = updates.get(String(row.id));
+                            return patch ? { ...row, ...patch } : row;
+                        });
+
+                        const totalRequestedQty  = updatedRows.reduce((s, r) => s + Number(r.requestedQty  || 0), 0);
+                        const totalApprovedQty   = updatedRows.reduce((s, r) => s + Number(r.approvedQty   || 0), 0);
+                        const totalProductionQty = updatedRows.reduce((s, r) => s + Number(r.productionQty || 0), 0);
+                        const waitlistItems      = updatedRows.filter(r => Number(r.productionQty || 0) > 0).length;
+
+                        return {
+                            ...group,
+                            rows: updatedRows,
+                            totalRequestedQty, totalApprovedQty, totalProductionQty,
+                            requestedQty: totalRequestedQty,
+                            approvedQty: totalApprovedQty,
+                            productionQty: totalProductionQty,
+                            waitlistItems,
+                        };
+                    }));
+
+                    // Patch designOrderItems if the panel for this design is open
+                    if (data.design) {
+                        setDesignOrderItems(prev => {
+                            if (!prev[data.design]) return prev;
+                            return {
+                                ...prev,
+                                [data.design]: prev[data.design].map(item => {
+                                    const patch = updates.get(String(item.id));
+                                    return patch ? { ...item, ...patch } : item;
+                                }),
+                            };
+                        });
+                    }
+                } else {
+                    getOrders(resStatus, resOffset, user);
+                }
             } else {
                 toast({ description: queryResult.message || `Failed to ${status.toLowerCase()}` });
             }
