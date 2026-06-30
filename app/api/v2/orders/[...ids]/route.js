@@ -578,7 +578,7 @@ export async function GET(request,{params}) {
 
                     // 3. Combined Query: Fetch both order and product in a single DB round-trip using FOR UPDATE
                     const [[order], [product]] = await Promise.all([
-                    connection.query(`SELECT id, status, stockType, requestedQty, approvedQty, productionQty, design, waitlistSequence FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]).then(([rows]) => rows),
+                    connection.query(`SELECT id, status, stockType, requestedQty, approvedQty, productionQty, design, modifiedOn, waitlistSequence FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]).then(([rows]) => rows),
                     
                     connection.query(`SELECT productId, design, prm, std FROM products1 WHERE design = (SELECT design FROM orders WHERE id = ? AND isDeleted = 0) FOR UPDATE`, [orderId]).then(([rows]) => rows)]);
 
@@ -606,7 +606,7 @@ export async function GET(request,{params}) {
 
                     if (order.status === "Approved") {
 
-                        // const oldRequestedQty = Number(order.requestedQty || 0); // requestedQty – old requestedQty = 30
+                        const oldRequestedQty = Number(order.requestedQty || 0); // requestedQty – old requestedQty = 30
                         const newRequestedQty = Number(toBeApprovedQty || 0); // toBeApprovedQty – new requestedQty = 28
                         const oldApprovedQty = Number(order.approvedQty || 0); // approvedQty – old approvedQty = 10
                         const stockWeGetBack = oldApprovedQty; // If we reduce approved qty, we get back that stock to the available pool
@@ -620,21 +620,48 @@ export async function GET(request,{params}) {
                         const stockColumn = getStockColumn(order.stockType);
 
                         // Write all parameters to the log for debugging
-                        console.log("New requested qty:", newRequestedQty);
-                        console.log("Old approved qty:", oldApprovedQty);
-                        console.log("Stock we get back:", stockWeGetBack);
-                        console.log("Available stock:", availableStock);
-                        console.log("New approved qty:", newApprovedQty);
-                        console.log("New production qty:", newProductionQty);
-                        console.log("New available stock:", newAvailableStock);
+                        // console.log("New requested qty:", newRequestedQty);
+                        // console.log("Old approved qty:", oldApprovedQty);
+                        // console.log("Stock we get back:", stockWeGetBack);
+                        // console.log("Available stock:", availableStock);
+                        // console.log("New approved qty:", newApprovedQty);
+                        // console.log("New production qty:", newProductionQty);
+                        // console.log("New available stock:", newAvailableStock);
 
-                        await connection.query(`UPDATE orders SET requestedQty = ?, approvedQty = ?, productionQty = ?, modifiedOn = ? WHERE id = ?`, [newRequestedQty, newApprovedQty, newProductionQty, actionDate, orderId]);
+                        // compare the new requestedQty to oldRequestedQty, if decrease and productionQty > 0, then avoid modifiedOn update.
+                        const shouldUpdateModifiedOn = newRequestedQty >= oldRequestedQty || newProductionQty === 0;
+                        await connection.query(`UPDATE orders SET requestedQty = ?, approvedQty = ?, productionQty = ?, modifiedOn = ? WHERE id = ?`, [newRequestedQty, newApprovedQty, newProductionQty, shouldUpdateModifiedOn ? actionDate : order.modifiedOn, orderId]);
 
                         const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, order.design, order.stockType, newAvailableStock);
 
                         await connection.query(`UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
 
                         await connection.commit();
+
+                        
+                        // send notification
+                        const [nrows1] = await connection.execute(`SELECT id, relatedTo FROM user where mapTo ='${order.dealerId}'`);
+                        connection.release();
+
+                        var gcmIds = [];
+                        // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
+                        if(nrows1.length > 0){
+                            for (let index = 0; index < nrows1.length; index++) {
+                                const element = nrows1[index];
+                                gcmIds.push(element.id);
+                                if(element.relatedTo){
+                                    const relatedIds = element.relatedTo.split(',');
+                                    for (let index = 0; index < relatedIds.length; index++) {
+                                        const relatedId = relatedIds[index];
+                                        gcmIds.push(relatedId);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // send the notification
+                        gcmIds.length > 0 ? await send_notification(`Order is Approved ${params.ids[3]}`, gcmIds, 'Multiple') : null;
+
 
                         return Response.json({
                             status: 200,
@@ -661,13 +688,14 @@ export async function GET(request,{params}) {
                         const remainingStock = approvedQty - availableStock >= 0 ? 0 : availableStock - toBeApprovedQty;
 
                         // Write all parameters to the log for debugging
-                        console.log("Stock column:", stockColumn);
-                        console.log("Available stock:", availableStock);
-                        console.log("Requested qty:", requestedQty);
-                        console.log("Approved qty:", approvedQty);
-                        console.log("Production qty:", productionQty);
-                        console.log("Remaining stock:", remainingStock);
+                        // console.log("Stock column:", stockColumn);
+                        // console.log("Available stock:", availableStock);
+                        // console.log("Requested qty:", requestedQty);
+                        // console.log("Approved qty:", approvedQty);
+                        // console.log("Production qty:", productionQty);
+                        // console.log("Remaining stock:", remainingStock);
 
+                        // compare the new requestedQty to oldRequestedQty, if decrease and productionQty > 0, then avoid modifiedOn update.
                         await connection.query(`UPDATE orders SET approvedQty = ?, productionQty = ?, status = 'Approved', approvedOn = ?, modifiedOn = ? WHERE id = ?`,
                             [approvedQty, productionQty, actionDate, actionDate, orderId]
                         );
@@ -781,6 +809,78 @@ export async function GET(request,{params}) {
                     });
                 }
             }
+            // Mark as Out of Stock by Admin
+            else if (params.ids[1] === "U0.31") {
+                try {
+                    var orderId = params.ids[2];
+                    var actionDate = params.ids[5];
+
+                    if (!orderId) {
+                    return Response.json({
+                        status: 400,
+                        success: false,
+                        message: "orderId is required",
+                    });
+                    }
+
+                    // if existing status is Approved or Cancelled or Rejected, then update modifiedOn column else update approvedOn column
+                    const [existingOrder] = await pool.query(`SELECT * FROM orders WHERE id = ? AND isDeleted = 0`, [orderId]);
+
+                    if (existingOrder.length === 0) {
+                    return Response.json({
+                        status: 404,
+                        success: false,
+                        message: "Order item not found",
+                    });
+                    }
+
+                    const currentStatus = existingOrder[0].status;
+
+                    var [result] = [];
+                    if (["Approved"].includes(currentStatus)) {
+                    
+                        [result] = await pool.query(`UPDATE orders SET status = 'OutOfStock', productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
+
+                        console.log(existingOrder[0]);
+                        console.log(existingOrder[0].approvedQty);
+                        console.log(currentStatus);
+                        
+
+                        // if approvedQty > 0, then add that qty back to stock
+                        if (existingOrder[0].approvedQty > 0 && currentStatus === "Approved") {
+                            const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, existingOrder[0].design, existingOrder[0].stockType, existingOrder[0].approvedQty);
+
+                            const stockColumn = getStockColumn(existingOrder[0].stockType);
+                            await pool.query(`UPDATE products1 SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [existingOrder[0].approvedQty, existingOrder[0].design]);
+                        }
+                    }
+                    else {
+                        [result] = await pool.query(`UPDATE orders SET status = 'OutOfStock', productionQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
+                    }
+
+                    if (result.affectedRows === 0) {
+                        return Response.json({
+                            status: 409,
+                            success: false,
+                            message: "Order item could not be made Out of Stock",
+                        });
+                    }
+
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        message: "Order item is Out of Stock",
+                        data: { orderId },
+                    });
+                } catch (error) {
+                    return Response.json({
+                        status: 500,
+                        success: false,
+                        message: "Failed to mark order item"+error.message,
+                        error: error.message,
+                    });
+                }
+            }
             // soft delete
             else if (params.ids[1] === "U0.4") {
                 try {
@@ -854,6 +954,28 @@ export async function GET(request,{params}) {
                 }
                 else {
                     joinCond += ` LEFT JOIN user u ON o.userId = u.id `
+
+                    // get the relatedTo of the userId and split it into an array and then add it to the where condition to filter the orders by userId or relatedTo
+                    const [userRows] = await pool.query('SELECT relatedTo FROM user WHERE id = ?', [userId]);
+                    if(userRows.length > 0){
+                        const relatedTo = userRows[0].relatedTo;
+                        if(relatedTo){
+                            const relatedToArray = relatedTo.split(',');
+                            if(relatedToArray.length > 0){
+                                var relatedToCond = '';
+                                for (let index = 0; index < relatedToArray.length; index++) {
+                                    const element = relatedToArray[index];
+                                    if(index == 0){
+                                        relatedToCond += ` u.id LIKE "%`+element+`%" `
+                                    }
+                                    else {
+                                        relatedToCond += ` OR u.id LIKE "%`+element+`%" `
+                                    }
+                                }
+                                statusCond += ` OR (`+relatedToCond+` OR u.id LIKE "%`+userId+`%") `
+                            }
+                        }
+                    }
                 }
 
                 try {
@@ -1323,7 +1445,7 @@ function groupOrdersByCart(rows) {
 
 function getBasketStatus(items) {
   const activeItems = items.filter(
-    (item) => !["Cancelled", "Rejected"].includes(item.status)
+    (item) => !["Cancelled", "Rejected","OutOfStock"].includes(item.status)
   );
 
   if (activeItems.length === 0) return "Closed";

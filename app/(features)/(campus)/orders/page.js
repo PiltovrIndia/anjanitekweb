@@ -807,6 +807,9 @@ export default function Orders() {
             else if(status.toLowerCase() == 'rejected'){
                 path = 'U0.3';
             }
+            else if(status.toLowerCase() == 'outofstock'){
+                path = 'U0.31';
+            }
             // console.log("/api/v2/orders/"+process.env.NEXT_PUBLIC_API_PASS+"/"+path+"/"+selectedRes.id+"/"+approvalQty+"/"+selectedRes.userId+"/"+dayjs().format('YYYY-MM-DD HH:mm:ss')+"/"+encodeURIComponent(selectedReviewDesign.design));
             
             const result = await updateOrderStatusAPI(
@@ -830,7 +833,7 @@ export default function Orders() {
                         approvedQty: data.newApprovedQty ?? data.approvedQty,
                         productionQty: data.newProductionQty ?? data.productionQty,
                         requestedQty: data.newRequestedQty ?? data.requestedQty,
-                        status: status === 'Rejected' ? 'Rejected' : 'Approved',
+                        status: status === 'Rejected' ? 'Rejected' : status === 'OutOfStock' ? 'OutOfStock' : 'Approved',
                     };
 
                     // Build id→patch map for the main order + every waitlist allocation
@@ -1231,7 +1234,7 @@ return (
                                 const percentage1 = ((group.totalApprovedQty === 0 ? 0 : group.totalApprovedQty / group.totalRequestedQty) * 100)
                                 const percentage = percentage1 > 0 ? percentage1.toFixed(1) : 0
                                 const textColor = percentage < 50 ? 'text-red-500' : 'text-green-600'; // Red if < 50%, Green otherwise
-console.log(groupedOrders.length);
+
 
                                 return (
                                     <React.Fragment key={group.id}>
@@ -1735,19 +1738,42 @@ console.log(groupedOrders.length);
                     
                     
                     <div className="flex flex-col gap-4">
-                        <Label htmlFor="qty" className="text-left mt-4">Requested <span className={`font-bold ${selectedReviewDesign?.stockType == 'prm' ? 'text-violet-600' : 'text-blue-600'} uppercase`}>{selectedReviewDesign?.stockType}</span> Quantity</Label>
-                        {/* <Label htmlFor="qty" className="text-right">Requested Quantity</Label> */}
-                        {/* {(selectedRes?.status === 'Submitted' || selectedRes?.status === 'Approved') ? */}
-                            <Input
-                                id="qty"
-                                type="number"
-                                value={approvalQty}
-                                onChange={(e) => setApprovalQty(e.target.value)}
-                                className="col-span-3"
-                            />
-                            {/* :
-                            <Label htmlFor="qty" className="text-right">{approvalQty}</Label>    
-                        } */}
+                        <Label htmlFor="qty" className="text-left mt-4">Requested <span className={`font-bold ${selectedRes?.stockType == 'prm' ? 'text-violet-600' : 'text-blue-600'} uppercase`}>{selectedRes?.stockType}</span> Quantity</Label>
+                        {(() => {
+                            const isStdType   = selectedRes?.stockType === 'std';
+                            const availableStd = Number(selectedRes?.requestedQty + selectedReviewDesign?.std || 0);
+                            const maxQty      = isStdType ? availableStd : undefined;
+                            return (
+                                <>
+                                    <Input
+                                        id="qty"
+                                        type="number"
+                                        value={approvalQty}
+                                        max={maxQty}
+                                        onChange={(e) => {
+                                            const newVal = Number(e.target.value) >= 0 ? Number(e.target.value) : 0;
+                                            if (isStdType) {
+                                                if (availableStd === 0) {
+                                                    if (newVal > Number(approvalQty)) return;
+                                                } else if (newVal > availableStd) {
+                                                    setApprovalQty(String(availableStd));
+                                                    return;
+                                                }
+                                            }
+                                            setApprovalQty(String(newVal));
+                                        }}
+                                        className="col-span-3"
+                                    />
+                                    {isStdType && (
+                                        <p className={`text-xs -mt-2 ${availableStd === 0 ? 'text-red-500' : 'text-slate-500'}`}>
+                                            {availableStd === 0
+                                                ? 'No STD stock available — cannot increase quantity'
+                                                : `Max STD available: ${availableStd}`}
+                                        </p>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
                     </>
                     ) : null}
@@ -1848,14 +1874,16 @@ console.log(groupedOrders.length);
                                 <Button variant="outline" onClick={() => setIsEditingOrderItem(false)} disabled={resLoading}>Cancel Edit</Button>
                             )}
 
-                            {(selectedReviewDesign?.stockType == 'std' && selectedReviewDesign?.std === 0) ?  
+                            {/* {(selectedRes?.stockType === 'std' && Number(selectedReviewDesign?.std || 0) === 0) ?
                             null :
                             
-                                (<Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
+                                ( */}
+                                <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
                                         {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
                                         Approve
-                                    </Button>)
-                                }
+                                    </Button>
+                                    {/* )
+                                } */}
                            
                             
                             
