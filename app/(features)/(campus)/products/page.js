@@ -729,6 +729,7 @@ return (
                                     )}
 
                                     <StockOrderDialog
+                                    id={user.id}
                                         isOpen={stockOrderOpen}
                                         onClose={() => setStockOrderOpen(false)}
                                         pass={process.env.NEXT_PUBLIC_API_PASS}

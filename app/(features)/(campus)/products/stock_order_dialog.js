@@ -14,7 +14,7 @@ import { Card } from '@/app/components/ui/card'
 import { SpinnerGap, X, ShoppingCart } from 'phosphor-react'
 import { Search, Trash2, AlertCircle, Info } from 'lucide-react'
 
-export default function StockOrderDialog({ isOpen, onClose, pass, role, onSuccess }) {
+export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSuccess }) {
 
     // ── Dealer search ─────────────────────────────────────────────────────
     const [dealerQuery, setDealerQuery] = useState('')
@@ -149,11 +149,11 @@ export default function StockOrderDialog({ isOpen, onClose, pass, role, onSucces
             const availPrm = Number(item.product.prm) || 0
             if (item.stockType === 'prm' && qty > availPrm) {
                 if (availPrm > 0) {
-                    designs.push({ serialId: serialId++, productId: item.product.productId, design: item.product.design, quantity: availPrm, stockType: 'prm', isProduction: false })
+                    designs.push({ serialId: serialId++, dealerId: selectedDealer.id, productId: item.product.productId, design: item.product.design, quantity: availPrm, stockType: 'prm', isProduction: false })
                 }
-                designs.push({ serialId: serialId++, productId: item.product.productId, design: item.product.design, quantity: qty - availPrm, stockType: 'prm', isProduction: true })
+                designs.push({ serialId: serialId++, dealerId: selectedDealer.id, productId: item.product.productId, design: item.product.design, quantity: qty - availPrm, stockType: 'prm', isProduction: true })
             } else {
-                designs.push({ serialId: serialId++, productId: item.product.productId, design: item.product.design, quantity: qty, stockType: item.stockType, isProduction: false })
+                designs.push({ serialId: serialId++, dealerId: selectedDealer.id, productId: item.product.productId, design: item.product.design, quantity: qty, stockType: item.stockType, isProduction: false })
             }
         }
         return designs
@@ -173,13 +173,13 @@ export default function StockOrderDialog({ isOpen, onClose, pass, role, onSucces
             const createdOn = `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`
 
             const body = {
-                userId: selectedDealer.id,
+                userId: id,
                 cartId: `C${Date.now()}`,
                 designs: buildDesignsArray(),
                 createdOn,
             }
 
-            const res = await fetch(`/api/v2/reservations/${pass}/U4`, {
+            const res = await fetch(`/api/v2/orders/${pass}/U4`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
