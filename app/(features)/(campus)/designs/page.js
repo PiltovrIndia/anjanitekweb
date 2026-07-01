@@ -591,7 +591,7 @@ export default function Products() {
                                 if (allowed.includes(key)) out[key] = row[k];
                             });
                             return {
-                                design: out['DESIGN'] ? String(out['DESIGN']).trim().replace('-', '').replace('ATL', '').trim() : '',
+                                design: out['DESIGN'] ? String(out['DESIGN']).trim().replace(/-/g, '').replace('ATL', '').trim() : '',
                                 prm: out['PRM'] != null && out['PRM'] !== '' ? (isNaN(Number(out['PRM'])) ? out['PRM'] : Number(out['PRM'])) : null,
                                 std: out['STD'] != null && out['STD'] !== '' ? (isNaN(Number(out['STD'])) ? out['STD'] : Number(out['STD'])) : null,
                                 createdOn: dayjs().format('YYYY-MM-DD HH:mm:ss'),
@@ -640,7 +640,6 @@ export default function Products() {
         setUploadProgress(true);
         console.log("Started");
         
-        
         try {    
             const result  = await updateUploadStockData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id)
             const queryResult = await result.json() // get data
@@ -648,20 +647,18 @@ export default function Products() {
             
             // check for the status
             if(queryResult.status == 200){
-
-
                 setUploadProgress(false);
-                toast({description: "Upload success. Refresh to view updated data"});
-
-                // getAllInvoices('','');
-
-                // toast("Event has been created.")
-
+                const summary = queryResult.data || [];
+                const succeeded = summary.filter(r => r.success).length;
+                const failed = summary.filter(r => !r.success).length;
+                const msg = failed > 0
+                    ? `Updated ${succeeded} of ${summary.length} designs (${failed} not found). Refresh to view.`
+                    : "Stock uploaded successfully. Refresh to view updated data.";
+                toast({description: msg});
             }
             else {
-                
                 setUploadProgress(false);
-                toast({description: "Upload success. Refresh to view updated data"});
+                toast({description: queryResult.message || "Upload failed. Please try again!"});
             }
         }
         catch (e){
@@ -1219,7 +1216,7 @@ return (
                                                                                   {selectedTags.map((tagId) => {
                                                                                     const tag = tagsList.find((t) => t.tagId === tagId);
                                                                                     return (
-                                                                                        <span key={tagId} className="flex items-center gap-1 bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-700 dark:text-green-400 border border-green-400">
+                                                                                        <span key={product.id+"-"+tagId} className="flex items-center gap-1 bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-sm dark:bg-gray-700 dark:text-green-400 border border-green-400">
                                                                                             {tag?.name}
                                                                                             <X size={14} className="cursor-pointer" onClick={() => handleRemoveTag(tagId)} />
                                                                                         </span>
@@ -1231,11 +1228,11 @@ return (
                                                                                 {/* <div className="max-h-64 max-w-4xl overflow-x-auto border p-2 rounded-md flex gap-4"> */}
                                                                                 <div className="flex-1 flex flex-wrap overflow-y-auto border p-2 rounded-md gap-8">
                                                                                   {Object.entries(groupedTags).map(([type, groupTags]) => (
-                                                                                    <div key={type} className="flex-1 min-w-[200px]">
+                                                                                    <div key={product.id+"-"+type} className="flex-1 min-w-[200px]">
                                                                                       <h3 className="text-md font-semibold mb-2">{type}</h3>
                                                                                       <div className="flex flex-col gap-2">
                                                                                         {groupTags.map((tag) => (
-                                                                                          <label key={tag.tagId} className="flex items-center gap-2">
+                                                                                          <label key={product.id+"-"+tag.tagId} className="flex items-center gap-2">
                                                                                             <Checkbox
                                                                                               checked={selectedTags.includes(tag.tagId)}
                                                                                               onCheckedChange={() => handleTagChange(tag.tagId, type)}

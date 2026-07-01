@@ -736,6 +736,7 @@ export default function Orders() {
 
     async function handleUpdateStatus(res) {
         setSelectedRes(res);
+
         setApprovalQty(res.requestedQty); // Default to requested quantity
         setSelectedReviewDesign(res)
         setReviewDesignQuery('')
@@ -745,9 +746,23 @@ export default function Orders() {
         setDesignOrderHistoryError('')
         setShowDesignOrderHistory(false)
         setIsEditingOrderItem(res.status === 'Submitted')
-        
-            setIsActionDialogOpen(true);
-        
+
+        setIsActionDialogOpen(true);
+
+        // Fetch fresh stock for this design in the background
+        if (res.design) {
+            fetch(`/api/v2/products/${process.env.NEXT_PUBLIC_API_PASS}/U4/${encodeURIComponent(res.design)}/0`, {
+                headers: { 'Content-Type': 'application/json' },
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 200 && data.data?.length) {
+                    const match = data.data.find(p => p.design === res.design) || data.data[0];
+                    setSelectedReviewDesign(match);
+                }
+            })
+            .catch(() => {});
+        }
     }
 
     const handleReviewDesignSearch = (value) => {
@@ -1649,10 +1664,12 @@ return (
                                 <div className="text-slate-500">Reserved</div>
                                 <div className="font-mono font-medium text-slate-900">{Number(selectedRes?.approvedQty || 0)}</div>
                             </div>
+                            {selectedRes?.stockType === 'prm' ? (
                             <div className="rounded-md bg-white px-2 py-1.5 ring-1 ring-slate-200">
                                 <div className="text-slate-500">Production</div>
                                 <div className="font-mono font-medium text-slate-900">{Number(selectedRes?.productionQty || 0)}</div>
                             </div>
+                            ) : null}
                         </div>
                     </div>
                     ) : null}
@@ -1742,8 +1759,32 @@ return (
                         <Label htmlFor="qty" className="text-left mt-4">Requested <span className={`font-bold ${selectedRes?.stockType == 'prm' ? 'text-violet-600' : 'text-blue-600'} uppercase`}>{selectedRes?.stockType}</span> Quantity</Label>
                         {(() => {
                             const isStdType   = selectedRes?.stockType === 'std';
-                            const availableStd = Number(selectedRes?.requestedQty + selectedReviewDesign?.std || 0);
+                            const availableStd = 
+                            selectedRes?.status == 'Approved' ? Number(selectedRes?.requestedQty + selectedReviewDesign?.std || 0) :
+                            selectedRes?.status == 'Submitted' ? (selectedReviewDesign?.std >= selectedRes?.requestedQty) ? Number(selectedRes?.requestedQty) : selectedReviewDesign?.std : 0;
                             const maxQty      = isStdType ? availableStd : undefined;
+
+
+                            if (isStdType) {
+                                if (selectedRes.status == 'Submitted' && availableStd === 0) {
+                                    setApprovalQty(0);
+                                }
+                                else if ((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd === 0) {
+                                    // do nothing
+                                    // setApprovalQty(approvalQty);
+                                }
+                                else if(selectedRes.status == 'Submitted' && availableStd > 0 && Number(approvalQty) > availableStd) {
+                                    setApprovalQty(String(availableStd));
+                                }
+                                else if((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd > 0) {
+                                    // do nothing
+                                }
+                                //  else if (newVal > availableStd) {
+                                //     setApprovalQty(String(availableStd));
+                                // }
+                            }
+                            
+                            
                             return (
                                 <>
                                     <Input
@@ -1753,21 +1794,48 @@ return (
                                         max={maxQty}
                                         onChange={(e) => {
                                             const newVal = Number(e.target.value) >= 0 ? Number(e.target.value) : 0;
+                                            // if (isStdType) {
+                                            //     if (availableStd === 0) {
+                                            //         if (newVal > Number(approvalQty)) return;
+                                            //     } else if (newVal > availableStd) {
+                                            //         setApprovalQty(String(availableStd));
+                                            //         return;
+                                            //     }
+                                            // }
+                                            // setApprovalQty(String(newVal));
+
                                             if (isStdType) {
-                                                if (availableStd === 0) {
-                                                    if (newVal > Number(approvalQty)) return;
-                                                } else if (newVal > availableStd) {
-                                                    setApprovalQty(String(availableStd));
-                                                    return;
+                                                if (selectedRes.status == 'Submitted' && availableStd === 0) {
+                                                    setApprovalQty(0);
                                                 }
+                                                else if ((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd === 0) {
+                                                    // do nothing
+                                                    // setApprovalQty(approvalQty);
+                                                }
+                                                else if(selectedRes.status == 'Submitted' && availableStd > 0 && Number(newVal) > availableStd) {
+                                                    setApprovalQty(String(availableStd));
+                                                }
+                                                else if((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd > 0 && Number(newVal) <= availableStd) {
+                                                    // do nothing
+                                                    setApprovalQty(String(newVal));
+                                                }
+                                                else if((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd > 0 && Number(newVal) > availableStd) {
+                                                    // do nothing
+                                                    setApprovalQty(String(availableStd));
+                                                }
+                                                //  else if (newVal > availableStd) {
+                                                //     setApprovalQty(String(availableStd));
+                                                // }
                                             }
-                                            setApprovalQty(String(newVal));
+                                            else {
+                                                setApprovalQty(String(newVal));
+                                            }
                                         }}
                                         className="col-span-3"
                                     />
                                     {isStdType && (
-                                        <p className={`text-xs -mt-2 ${availableStd === 0 ? 'text-red-500' : 'text-slate-500'}`}>
-                                            {availableStd === 0
+                                        <p className={`text-xs -mt-2 ${(availableStd === 0 || availableStd <= selectedRes?.requestedQty) ? 'text-red-500' : 'text-slate-500'}`}>
+                                            {(availableStd === 0 || availableStd <= selectedRes?.requestedQty)
                                                 ? 'No STD stock available — cannot increase quantity'
                                                 : `Max STD available: ${availableStd}`}
                                         </p>
@@ -1851,10 +1919,12 @@ return (
                                                             <div className="text-slate-500">Reserved</div>
                                                             <div className="font-mono font-medium text-slate-900">{Number(order.approvedQty || 0)}</div>
                                                         </div>
+                                                        {order.stockType === 'prm' ? (
                                                         <div className="rounded-md bg-slate-50 px-2 py-1.5">
                                                             <div className="text-slate-500">Production</div>
                                                             <div className="font-mono font-medium text-slate-900">{Number(order.productionQty || 0)}</div>
                                                         </div>
+                                                        ) : null}
                                                     </div>
                                                 </div>
                                             ))}

@@ -839,11 +839,7 @@ export async function GET(request,{params}) {
                     var [result] = [];
                     if (["Approved"].includes(currentStatus)) {
                     
-                        [result] = await pool.query(`UPDATE orders SET status = 'OutOfStock', productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
-
-                        console.log(existingOrder[0]);
-                        console.log(existingOrder[0].approvedQty);
-                        console.log(currentStatus);
+                        [result] = await pool.query(`UPDATE orders SET status = 'OutOfStock', approvedQty = 0, productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
                         
 
                         // if approvedQty > 0, then add that qty back to stock
@@ -855,7 +851,7 @@ export async function GET(request,{params}) {
                         }
                     }
                     else {
-                        [result] = await pool.query(`UPDATE orders SET status = 'OutOfStock', productionQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
+                        [result] = await pool.query(`UPDATE orders SET status = 'OutOfStock', productionQty = 0, approvedQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
                     }
 
                     if (result.affectedRows === 0) {

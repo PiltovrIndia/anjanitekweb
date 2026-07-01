@@ -396,23 +396,19 @@ export async function GET(request,{params}) {
 //     }
 
   export async function POST(request, {params}) {
-      
+      let connection;
       try{
-        const connection = await pool.getConnection();
-  
+        connection = await pool.getConnection();
+
           // authorize secret key
           if(await Keyverify(params.ids[0])){
-            
-            
-              if(params.ids[1] == 'U0'){ // Upload invoices in bulk
-              
+
+
+              if(params.ids[1] == 'U0'){ // Upload stock in bulk
+
                     const items = await request.json();
 
                     const chunkSize = 200;
-
-                    try {
-                    await connection.beginTransaction();
-
                     const allocationSummary = [];
 
                     for (let i = 0; i < items.length; i += chunkSize) {
@@ -423,6 +419,9 @@ export async function GET(request,{params}) {
                         .filter(Boolean);
 
                         if (designs.length === 0) continue;
+
+                        try {
+                        await connection.beginTransaction();
 
                         /**
                          * Lock product rows first.
@@ -536,36 +535,30 @@ export async function GET(request,{params}) {
                             ...designAllocations,
                         });
                         }
-                    }
 
-                    await connection.commit();
+                        await connection.commit();
+
+                        } catch (chunkErr) {
+                        await connection.rollback();
+                        console.error(`Bulk stock update error at chunk index ${i}:`, chunkErr);
+                        allocationSummary.push({
+                            chunkStart: i,
+                            success: false,
+                            message: "Chunk failed: " + chunkErr.message,
+                        });
+                        }
+                    }
 
                     return Response.json(
                         {
                         status: 200,
                         success: true,
-                        message: "Stock details updated and pending orders allocated! ✅",
+                        message: "Stock upload complete.",
                         data: allocationSummary,
                         },
                         { status: 200 }
                     );
-                    } catch (err) {
-                    await connection.rollback();
 
-                    console.error("Bulk stock update error:", err);
-
-                    return Response.json(
-                        {
-                        status: 500,
-                        success: false,
-                        message: "Facing issues. Please try again! " + err.message,
-                        },
-                        { status: 500 }
-                    );
-                    } finally {
-                    connection.release();
-                    }
-  
               }
               else {
                   return Response.json({status: 404, message:'Not found!'}, {status: 200})
@@ -578,7 +571,10 @@ export async function GET(request,{params}) {
       }
       catch (err){
           // some error occured
-          return Response.json({status: 500, message:'Facing issues. Please try again!'+err}, {status: 200})
+          return Response.json({status: 500, message:'Facing issues. Please try again! ' + err.message}, {status: 200})
+      }
+      finally {
+          if (connection) connection.release();
       }
     }
 
