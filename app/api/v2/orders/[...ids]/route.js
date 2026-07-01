@@ -947,9 +947,14 @@ export async function GET(request,{params}) {
                 var joinCond = '';
                 if(role == 'dealer' || role == 'Dealer'){
                     joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
+                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
+                }
+                else if(role == 'globaladmin' || role == 'GlobalAdmin'){
+                    joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
                 }
                 else {
                     joinCond += ` LEFT JOIN user u ON o.userId = u.id `
+                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) `
 
                     // get the relatedTo of the userId and split it into an array and then add it to the where condition to filter the orders by userId or relatedTo
                     const [userRows] = await pool.query('SELECT relatedTo FROM user WHERE id = ?', [userId]);
@@ -968,7 +973,7 @@ export async function GET(request,{params}) {
                                         relatedToCond += ` OR u.id LIKE "%`+element+`%" `
                                     }
                                 }
-                                statusCond += ` OR (`+relatedToCond+` OR u.id LIKE "%`+userId+`%") `
+                                statusCond += ` OR (`+relatedToCond+` OR u.id LIKE "%`+userId+`%") AND `
                             }
                         }
                     }
@@ -1019,9 +1024,9 @@ export async function GET(request,{params}) {
                             
                             ${joinCond}
                             LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id 
-                            WHERE (u.relatedTo LIKE ? OR u.id LIKE ?) 
-                                ${statusCond}
-                                AND o.isDeleted = 0
+                            WHERE 
+                            ${statusCond}
+                                o.isDeleted = 0
                             ORDER BY o.`+sortBy+` DESC, o.cartId DESC, o.serialId ASC 
                             LIMIT 20 OFFSET `+offset+`
                             `;

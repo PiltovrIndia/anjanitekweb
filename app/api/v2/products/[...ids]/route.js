@@ -86,11 +86,11 @@ export async function GET(request,{params}) {
                 try {
                     var str = '';
                     if(params.ids[2].length > 0){
-                        str = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');
+                        str = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' OR ');
                     }
                     else {
                         str = 'FIND_IN_SET("39", tags)';
-                    }console.log(`SELECT * from products1 WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);;
+                    }
                     
                         // const conditions = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');                    
                         const [rows, fields] = await connection.execute(`SELECT * from products1 WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
