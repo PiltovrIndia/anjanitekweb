@@ -11,6 +11,7 @@ const pool = mysql.createPool({
     idleTimeout: 60000,
     queueLimit: 0,
 
+    dateStrings: true,
     timezone: '+05:30', // Tells the driver how to parse incoming dates
     afterConnect: (conn, finalize) => {
         // Forces the MySQL server session to run in +05:30 offset
