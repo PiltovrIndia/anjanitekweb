@@ -619,15 +619,6 @@ export async function GET(request,{params}) {
                         
                         const stockColumn = getStockColumn(order.stockType);
 
-                        // Write all parameters to the log for debugging
-                        // console.log("New requested qty:", newRequestedQty);
-                        // console.log("Old approved qty:", oldApprovedQty);
-                        // console.log("Stock we get back:", stockWeGetBack);
-                        // console.log("Available stock:", availableStock);
-                        // console.log("New approved qty:", newApprovedQty);
-                        // console.log("New production qty:", newProductionQty);
-                        // console.log("New available stock:", newAvailableStock);
-
                         // compare the new requestedQty to oldRequestedQty, if decrease and productionQty > 0, then avoid modifiedOn update.
                         const shouldUpdateModifiedOn = newRequestedQty >= oldRequestedQty || newProductionQty === 0;
                         await connection.query(`UPDATE orders SET requestedQty = ?, approvedQty = ?, productionQty = ?, modifiedOn = ? WHERE id = ?`, [newRequestedQty, newApprovedQty, newProductionQty, shouldUpdateModifiedOn ? actionDate : order.modifiedOn, orderId]);
@@ -640,7 +631,7 @@ export async function GET(request,{params}) {
 
                         
                         // send notification
-                        const [nrows1] = await connection.execute(`SELECT id, relatedTo FROM user where mapTo ='${order.dealerId}'`);
+                        const [nrows1] = await connection.execute(`SELECT id, name, relatedTo FROM user where mapTo ='${order.dealerId}'`);
                         connection.release();
 
                         var gcmIds = [];
@@ -660,7 +651,7 @@ export async function GET(request,{params}) {
                         }
                         
                         // send the notification
-                        gcmIds.length > 0 ? await send_notification(`Order is Approved ${params.ids[3]}`, gcmIds, 'Multiple') : null;
+                        gcmIds.length > 0 ? await send_notification(`Order is Approved for ${nrows1[0].name}`, gcmIds, 'Multiple') : null;
 
 
                         return Response.json({
@@ -686,14 +677,6 @@ export async function GET(request,{params}) {
                         const approvedQty = Math.min(toBeApprovedQty, availableStock);
                         const productionQty = (approvedQty - availableStock) >= 0 ? (toBeApprovedQty - availableStock) : 0;
                         const remainingStock = approvedQty - availableStock >= 0 ? 0 : availableStock - toBeApprovedQty;
-
-                        // Write all parameters to the log for debugging
-                        // console.log("Stock column:", stockColumn);
-                        // console.log("Available stock:", availableStock);
-                        // console.log("Requested qty:", requestedQty);
-                        // console.log("Approved qty:", approvedQty);
-                        // console.log("Production qty:", productionQty);
-                        // console.log("Remaining stock:", remainingStock);
 
                         // compare the new requestedQty to oldRequestedQty, if decrease and productionQty > 0, then avoid modifiedOn update.
                         await connection.query(`UPDATE orders SET approvedQty = ?, productionQty = ?, status = 'Approved', approvedOn = ?, modifiedOn = ? WHERE id = ?`,
@@ -793,6 +776,29 @@ export async function GET(request,{params}) {
                             message: "Order item could not be rejected or is already processed",
                         });
                     }
+
+                    // send notification
+                        const [nrows1] = await connection.execute(`SELECT u.id, u.name, u.relatedTo FROM user u JOIN orders o ON u.id = o.dealerId WHERE o.id ='${order.id}'`);
+                        connection.release();
+
+                        var gcmIds = [];
+                        // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
+                        if(nrows1.length > 0){
+                            for (let index = 0; index < nrows1.length; index++) {
+                                const element = nrows1[index];
+                                gcmIds.push(element.id);
+                                if(element.relatedTo){
+                                    const relatedIds = element.relatedTo.split(',');
+                                    for (let index = 0; index < relatedIds.length; index++) {
+                                        const relatedId = relatedIds[index];
+                                        gcmIds.push(relatedId);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // send the notification
+                        gcmIds.length > 0 ? await send_notification(`Order is Rejected for ${nrows1[0].name}`, gcmIds, 'Multiple') : null;
 
                     return Response.json({
                         status: 200,
@@ -1322,27 +1328,27 @@ export async function POST(request, {params}) {
                     const [nrows1] = await connection.execute(`SELECT id, relatedTo FROM user where mapTo ='${params.ids[5]}'`);
                     connection.release();
 
-                    // var gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
-                    // // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
-                    // if(nrows1.length > 0){
-                    //     for (let index = 0; index < nrows1.length; index++) {
-                    //         const element = nrows1[index];
-                    //         gcmIds.push(element.id);
-                    //         if(element.relatedTo){
-                    //             const relatedIds = element.relatedTo.split(',');
-                    //             for (let index = 0; index < relatedIds.length; index++) {
-                    //                 const relatedId = relatedIds[index];
-                    //                 gcmIds.push(relatedId);
-                    //             }
-                    //         }
-                    //     }
-                    // }
+                    var gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
+                    // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
+                    if(nrows1.length > 0){
+                        for (let index = 0; index < nrows1.length; index++) {
+                            const element = nrows1[index];
+                            gcmIds.push(element.id);
+                            if(element.relatedTo){
+                                const relatedIds = element.relatedTo.split(',');
+                                for (let index = 0; index < relatedIds.length; index++) {
+                                    const relatedId = relatedIds[index];
+                                    gcmIds.push(relatedId);
+                                }
+                            }
+                        }
+                    }
                     
-                    // // send the notification
-                    // const notificationResult = gcmIds.length > 0 ? await send_notification(`Stock request received`, gcmIds, 'Multiple') : null;
+                    // send the notification
+                    const notificationResult = gcmIds.length > 0 ? await send_notification(`Stock request received`, gcmIds, 'Multiple') : null;
 
 
-                    return Response.json({ status: 200, message: 'Success!', data: insertedCount }, { status: 200 });
+                    // return Response.json({ status: 200, message: 'Success!', data: insertedCount }, { status: 200 });
                     return Response.json({ status: 200, message: 'Success!', data: insertedCount, notification: notificationResult }, { status: 200 });
 
                 } catch (error) {
