@@ -908,7 +908,7 @@ return (
                                                         showHostelRooms(hostel);
                                                     } catch (e) {}
 
-                                                }} className='text-nowrap text-sm text-blue-600 hover:text-blue-800 cursor-pointer w-full py-4'>{product.name} 
+                                                }} className='text-nowrap text-sm text-blue-600 hover:text-blue-800 cursor-pointer w-full py-4 font-mono'>{product.name} 
                                                 
                                                 <span>{(product.favorite == product.design) ? <HeartIcon className='inline-block ml-2 text-red-500' size={14} /> : ''}</span>
                                                 </span>

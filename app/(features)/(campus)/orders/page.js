@@ -1139,7 +1139,7 @@ return (
                             />
                         </div>
                         <Select value={resStatus} onValueChange={handleStatusChange}>
-                            <SelectTrigger className="w-[180px]">
+                            <SelectTrigger className="w-[180px]  font-mono uppercase text-sm tracking-wider">
                                 <SelectValue placeholder="Filter by status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1151,13 +1151,13 @@ return (
                                 <SelectItem value="OutOfStock">OutofStock</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Button onClick={() => setStockOrderOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
+                        <Button onClick={() => setStockOrderOpen(true)} className="bg-green-600 hover:bg-green-700 text-white font-mono uppercase text-sm tracking-wider" >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Add Stock Order
                             </Button>
                         <Popover open={showDownloadPopover} onOpenChange={setShowDownloadPopover}>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" disabled={downloadingOrders}>
+                                <Button variant="outline" disabled={downloadingOrders} className=' font-mono uppercase text-sm tracking-wider'>
                                     <ArrowDown className="mr-2 h-4 w-4" />
                                     {downloadingOrders ? 'Downloading...' : 'Download Orders'}
                                 </Button>
@@ -1182,7 +1182,7 @@ return (
                                         />
                                     </div>
                                     <Button
-                                        className="w-full mt-1"
+                                        className="w-full mt-1 font-mono uppercase text-sm tracking-wide"
                                         onClick={downloadOrdersNow}
                                         disabled={!downloadFromDate || !downloadToDate}
                                     >
