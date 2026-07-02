@@ -1759,11 +1759,12 @@ return (
                         <Label htmlFor="qty" className="text-left mt-4">Requested <span className={`font-bold ${selectedRes?.stockType == 'prm' ? 'text-violet-600' : 'text-blue-600'} uppercase`}>{selectedRes?.stockType}</span> Quantity</Label>
                         {(() => {
                             const isStdType   = selectedRes?.stockType === 'std';
-                            const availableStd = 
-                            selectedRes?.status == 'Approved' ? Number(selectedRes?.requestedQty + selectedReviewDesign?.std || 0) :
-                            selectedRes?.status == 'Submitted' ? (selectedReviewDesign?.std >= selectedRes?.requestedQty) ? Number(selectedRes?.requestedQty) : selectedReviewDesign?.std : 0;
+                            const availableStd = Number(selectedReviewDesign?.std || 0) - Number(selectedRes?.approvedQty || 0);
+                            // selectedRes?.status == 'Approved' ? Number(selectedRes?.requestedQty + selectedReviewDesign?.std || 0) :
+                            // selectedRes?.status == 'Submitted' ? (selectedReviewDesign?.std >= selectedRes?.requestedQty) ? Number(selectedRes?.requestedQty) : selectedReviewDesign?.std : 0;
                             const maxQty      = isStdType ? availableStd : undefined;
 
+                            
 
                             if (isStdType) {
                                 if (selectedRes.status == 'Submitted' && availableStd === 0) {
@@ -1802,7 +1803,10 @@ return (
                                             //         return;
                                             //     }
                                             // }
-                                            // setApprovalQty(String(newVal));
+                                            setApprovalQty(String(newVal));
+                                            console.log(newVal);
+                                            console.log(availableStd);
+                            console.log(selectedRes?.requestedQty);
 
                                             if (isStdType) {
                                                 if (selectedRes.status == 'Submitted' && availableStd === 0) {
@@ -1812,8 +1816,8 @@ return (
                                                     // do nothing
                                                     // setApprovalQty(approvalQty);
                                                 }
-                                                else if(selectedRes.status == 'Submitted' && availableStd > 0 && Number(newVal) > availableStd) {
-                                                    setApprovalQty(String(availableStd));
+                                                else if(selectedRes.status == 'Submitted' && availableStd > 0 && Number(newVal) >= availableStd) {
+                                                    setApprovalQty(Number(newVal));
                                                 }
                                                 else if((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd > 0 && Number(newVal) <= availableStd) {
                                                     // do nothing
