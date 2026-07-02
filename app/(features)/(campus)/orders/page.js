@@ -287,6 +287,17 @@ export default function Orders() {
         return () => controller.abort()
     }, [isActionDialogOpen, showDesignOrderHistory, selectedReviewDesign?.design, selectedRes?.id])
 
+    // Clamp approvalQty to availableStd whenever the dialog opens or fresh stock arrives
+    useEffect(() => {
+        if (!selectedRes || selectedRes.stockType !== 'std' || selectedRes.status !== 'Submitted') return;
+        const availableStd = Number(selectedReviewDesign?.std || 0) - Number(selectedRes?.approvedQty || 0);
+        if (availableStd <= 0) {
+            setApprovalQty('0');
+        } else {
+            setApprovalQty(prev => String(Math.min(Number(prev), availableStd)));
+        }
+    }, [selectedRes?.id, selectedRes?.status, selectedReviewDesign?.std, selectedRes?.approvedQty])
+
     useEffect(() => {
         if (activeOrdersTab !== 'Orders') return;
         const sentinel = ordersEndRef.current;
@@ -1760,32 +1771,7 @@ return (
                         {(() => {
                             const isStdType   = selectedRes?.stockType === 'std';
                             const availableStd = Number(selectedReviewDesign?.std || 0) - Number(selectedRes?.approvedQty || 0);
-                            // selectedRes?.status == 'Approved' ? Number(selectedRes?.requestedQty + selectedReviewDesign?.std || 0) :
-                            // selectedRes?.status == 'Submitted' ? (selectedReviewDesign?.std >= selectedRes?.requestedQty) ? Number(selectedRes?.requestedQty) : selectedReviewDesign?.std : 0;
                             const maxQty      = isStdType ? availableStd : undefined;
-
-                            
-
-                            if (isStdType) {
-                                if (selectedRes.status == 'Submitted' && availableStd === 0) {
-                                    setApprovalQty(0);
-                                }
-                                else if ((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd === 0) {
-                                    // do nothing
-                                    // setApprovalQty(approvalQty);
-                                }
-                                else if(selectedRes.status == 'Submitted' && availableStd > 0 && Number(approvalQty) > availableStd) {
-                                    setApprovalQty(String(availableStd));
-                                }
-                                else if((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd > 0) {
-                                    // do nothing
-                                }
-                                //  else if (newVal > availableStd) {
-                                //     setApprovalQty(String(availableStd));
-                                // }
-                            }
-                            
-                            
                             return (
                                 <>
                                     <Input
@@ -1795,43 +1781,15 @@ return (
                                         max={maxQty}
                                         onChange={(e) => {
                                             const newVal = Number(e.target.value) >= 0 ? Number(e.target.value) : 0;
-                                            // if (isStdType) {
-                                            //     if (availableStd === 0) {
-                                            //         if (newVal > Number(approvalQty)) return;
-                                            //     } else if (newVal > availableStd) {
-                                            //         setApprovalQty(String(availableStd));
-                                            //         return;
-                                            //     }
-                                            // }
-                                            setApprovalQty(String(newVal));
-                                            console.log(newVal);
-                                            console.log(availableStd);
-                            console.log(selectedRes?.requestedQty);
-
                                             if (isStdType) {
-                                                if (selectedRes.status == 'Submitted' && availableStd === 0) {
-                                                    setApprovalQty(0);
-                                                }
-                                                else if ((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd === 0) {
-                                                    // do nothing
-                                                    // setApprovalQty(approvalQty);
-                                                }
-                                                else if(selectedRes.status == 'Submitted' && availableStd > 0 && Number(newVal) >= availableStd) {
-                                                    setApprovalQty(Number(newVal));
-                                                }
-                                                else if((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd > 0 && Number(newVal) <= availableStd) {
-                                                    // do nothing
+                                                if (availableStd <= 0 && selectedRes.status === 'Submitted') {
+                                                    setApprovalQty('0');
+                                                } else if (newVal > availableStd) {
+                                                    setApprovalQty(String(availableStd));
+                                                } else {
                                                     setApprovalQty(String(newVal));
                                                 }
-                                                else if((selectedRes.status == 'Approved' || selectedRes.status == 'Rejected') && availableStd > 0 && Number(newVal) > availableStd) {
-                                                    // do nothing
-                                                    setApprovalQty(String(availableStd));
-                                                }
-                                                //  else if (newVal > availableStd) {
-                                                //     setApprovalQty(String(availableStd));
-                                                // }
-                                            }
-                                            else {
+                                            } else {
                                                 setApprovalQty(String(newVal));
                                             }
                                         }}

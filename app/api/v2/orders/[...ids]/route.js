@@ -1317,7 +1317,7 @@ export async function POST(request, {params}) {
 
                         await connection.execute(
                             `INSERT INTO orders (userId, dealerId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, serialId, cartId) VALUES (?, ?, ?, ?, "Submitted", 0, ?, ?, NULL, NULL, ?, ?)`,
-                            [userId, dealerId, design, quantity, stockType, createdOn, serialId, nextCartId]
+                            [userId, dealerId, design, quantity, stockType, createdOn, serialId, cartId || nextCartId]
                         );
                         insertedCount++;
                     }
