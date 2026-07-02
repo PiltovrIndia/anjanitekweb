@@ -950,29 +950,33 @@ export async function GET(request,{params}) {
                 }
 
                 // based on the role, manage the join condition to filter orders by userId or dealerId
-                var joinCond = '';
+                var joinCond = '', nameCond = '';
                 if(role == 'dealer' || role == 'Dealer'){
+                    nameCond += ` u_dealer.name as orderedBy, u.name as dealer, `
                     joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
                     
                     statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
                 }
                 else if(role == 'globaladmin' || role == 'GlobalAdmin'){
+                    nameCond += ` u_dealer.name as orderedBy, u.name as dealer, `
                     joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
                 }
                 else {
-                    joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
-                    joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
+                    nameCond += ` u.name as orderedBy, u_dealer.name as dealer, `
+                    joinCond += ` LEFT JOIN user u ON o.userId = u.id `
+                    joinCond += ` LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id `
                     statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) `
 
                     // get the relatedTo of the userId and split it into an array and then add it to the where condition to filter the orders by userId or relatedTo
+                    // this is to make sure, if anyone in the hirerchy above has placed order for their dealers.
                     const [userRows] = await pool.query('SELECT relatedTo FROM user WHERE id = ?', [userId]);
                     if(userRows.length > 0){
                         const relatedTo = userRows[0].relatedTo;
                         if(relatedTo){
                             const relatedToArray = relatedTo.split(',');
-                            if(relatedToArray.length > 0){
+                            if(relatedToArray.length > 0 && relatedToArray[0] != '-'){
                                 var relatedToCond = '';
                                 for (let index = 0; index < relatedToArray.length; index++) {
                                     const element = relatedToArray[index];
@@ -984,6 +988,9 @@ export async function GET(request,{params}) {
                                     }
                                 }
                                 statusCond += ` OR (`+relatedToCond+` OR u.id LIKE "%`+userId+`%") AND `
+                            }
+                            else {
+                                statusCond += ` AND `
                             }
                         }
                     }
@@ -1007,7 +1014,7 @@ export async function GET(request,{params}) {
                                 o.createdOn,
                                 o.approvedOn,
                                 o.modifiedOn,
-                                p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u_dealer.name as orderedBy, u.name as dealer, u.mobile, u.mapTo,
+                                p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, ${nameCond} u.mobile, u.mapTo,
 
                                 CASE
                                     WHEN o.productionQty > 0 THEN (
@@ -1040,6 +1047,8 @@ export async function GET(request,{params}) {
                             ORDER BY o.`+sortBy+` DESC, o.cartId DESC, o.serialId ASC 
                             LIMIT 20 OFFSET `+offset+`
                             `;
+                            // console.log(query);
+                            
 
                             const [rows] = await pool.query(query, [`%${userId}%`, `%${userId}%`]);
 
