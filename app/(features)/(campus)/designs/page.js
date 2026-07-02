@@ -635,35 +635,55 @@ export default function Products() {
         }
     }
 
-    async function uploadStockDetails(items1){
-        
+    async function uploadStockDetails(items1) {
         setUploadProgress(true);
-        console.log("Started");
-        
-        try {    
-            const result  = await updateUploadStockData(process.env.NEXT_PUBLIC_API_PASS, items1, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id)
-            const queryResult = await result.json() // get data
-            console.log(queryResult);
-            
-            // check for the status
-            if(queryResult.status == 200){
-                setUploadProgress(false);
-                const summary = queryResult.data || [];
-                const succeeded = summary.filter(r => r.success).length;
-                const failed = summary.filter(r => !r.success).length;
-                const msg = failed > 0
-                    ? `Updated ${succeeded} of ${summary.length} designs (${failed} not found). Refresh to view.`
-                    : "Stock uploaded successfully. Refresh to view updated data.";
-                toast({description: msg});
-            }
-            else {
-                setUploadProgress(false);
-                toast({description: queryResult.message || "Upload failed. Please try again!"});
+
+        const batchSize = 50;
+        const batches = [];
+        for (let i = 0; i < items1.length; i += batchSize) {
+            batches.push(items1.slice(i, i + batchSize));
+        }
+
+        const userId = JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id;
+        let totalSucceeded = 0;
+        let totalFailed = 0;
+        const totalRows = items1.length;
+        let hasError = false;
+        let errorMsg = '';
+
+        for (let b = 0; b < batches.length; b++) {
+            try {
+                const result = await updateUploadStockData(
+                    process.env.NEXT_PUBLIC_API_PASS,
+                    batches[b],
+                    userId
+                );
+                const queryResult = await result.json();
+                if (queryResult.status === 200) {
+                    const summary = queryResult.data || [];
+                    totalSucceeded += summary.filter(r => r.success).length;
+                    totalFailed += summary.filter(r => !r.success).length;
+                } else {
+                    hasError = true;
+                    errorMsg = queryResult.message || 'Upload failed. Please try again!';
+                    break;
+                }
+            } catch (e) {
+                hasError = true;
+                errorMsg = 'Network error. Please try again.';
+                break;
             }
         }
-        catch (e){
-            console.log(e);
-            toast({description: "Issue loading. Please refresh or try again later!"});
+
+        setUploadProgress(false);
+
+        if (hasError) {
+            toast({ description: errorMsg });
+        } else {
+            const msg = totalFailed > 0
+                ? `Updated ${totalSucceeded} of ${totalRows} designs (${totalFailed} not found). Refresh to view.`
+                : 'Stock uploaded successfully. Refresh to view updated data.';
+            toast({ description: msg });
         }
     }
 

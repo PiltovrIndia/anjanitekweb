@@ -952,14 +952,18 @@ export async function GET(request,{params}) {
                 // based on the role, manage the join condition to filter orders by userId or dealerId
                 var joinCond = '';
                 if(role == 'dealer' || role == 'Dealer'){
-                    joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
-                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
+                    joinCond += ` LEFT JOIN user u ON o.userId = u.id `
+                    joinCond += ` LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id `
+                    
+                    // statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
                 }
                 else if(role == 'globaladmin' || role == 'GlobalAdmin'){
-                    joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
+                    joinCond += ` LEFT JOIN user u ON o.userId = u.id `
+                    joinCond += ` LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id `
                 }
                 else {
                     joinCond += ` LEFT JOIN user u ON o.userId = u.id `
+                    joinCond += ` LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id `
                     statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) `
 
                     // get the relatedTo of the userId and split it into an array and then add it to the where condition to filter the orders by userId or relatedTo
@@ -1029,7 +1033,7 @@ export async function GET(request,{params}) {
                             LEFT JOIN products1 p ON o.design = p.design 
                             
                             ${joinCond}
-                            LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id 
+                            
                             WHERE 
                             ${statusCond}
                                 o.isDeleted = 0
