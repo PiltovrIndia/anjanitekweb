@@ -952,10 +952,156 @@ export async function GET(request,{params}) {
                 // based on the role, manage the join condition to filter orders by userId or dealerId
                 var joinCond = '';
                 if(role == 'dealer' || role == 'Dealer'){
+                    joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
+                    joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
+                    
+                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
+                }
+                else if(role == 'globaladmin' || role == 'GlobalAdmin'){
+                    joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
+                    joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
+                }
+                else {
+                    joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
+                    joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
+                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) `
+
+                    // get the relatedTo of the userId and split it into an array and then add it to the where condition to filter the orders by userId or relatedTo
+                    const [userRows] = await pool.query('SELECT relatedTo FROM user WHERE id = ?', [userId]);
+                    if(userRows.length > 0){
+                        const relatedTo = userRows[0].relatedTo;
+                        if(relatedTo){
+                            const relatedToArray = relatedTo.split(',');
+                            if(relatedToArray.length > 0){
+                                var relatedToCond = '';
+                                for (let index = 0; index < relatedToArray.length; index++) {
+                                    const element = relatedToArray[index];
+                                    if(index == 0){
+                                        relatedToCond += ` u.id LIKE "%`+element+`%" `
+                                    }
+                                    else {
+                                        relatedToCond += ` OR u.id LIKE "%`+element+`%" `
+                                    }
+                                }
+                                statusCond += ` OR (`+relatedToCond+` OR u.id LIKE "%`+userId+`%") AND `
+                            }
+                        }
+                    }
+                }
+
+                try {
+                    var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+userId+'%" OR u.id LIKE "%'+userId+'%") AND r.isDeleted = 0';
+                    const query = `
+                            SELECT
+                                o.id,
+                                o.userId,
+                                o.dealerId,
+                                o.cartId,
+                                o.serialId,
+                                o.design,
+                                o.requestedQty,
+                                o.approvedQty,
+                                o.productionQty,
+                                o.stockType,
+                                o.status,
+                                o.createdOn,
+                                o.approvedOn,
+                                o.modifiedOn,
+                                p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u_dealer.name as orderedBy, u.name as dealer, u.mobile, u.mapTo,
+
+                                CASE
+                                    WHEN o.productionQty > 0 THEN (
+                                    SELECT COUNT(*) + 1
+                                    FROM orders x
+                                    WHERE x.design = o.design
+                                        AND x.stockType = o.stockType
+                                        AND x.productionQty > 0
+                                        AND x.isDeleted = 0
+                                        AND x.status NOT IN ('Cancelled', 'Rejected')
+                                        AND (
+                                        COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
+                                            OR (
+                                            COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
+                                            AND x.id < o.id
+                                            )
+                                        )
+                                    )
+                                    ELSE NULL
+                                END AS waitlistPosition
+
+                            FROM orders o
+                            LEFT JOIN products1 p ON o.design = p.design 
+                            
+                            ${joinCond}
+                            
+                            WHERE 
+                            ${statusCond}
+                                o.isDeleted = 0
+                            ORDER BY o.`+sortBy+` DESC, o.cartId DESC, o.serialId ASC 
+                            LIMIT 20 OFFSET `+offset+`
+                            `;
+
+                            const [rows] = await pool.query(query, [`%${userId}%`, `%${userId}%`]);
+
+                            const groupedOrders = groupOrdersByCart(rows);
+
+                            // return Response.json({
+                            //     status: 200, 
+                            // success: true,
+                            // message: "Orders fetched successfully",
+                            // totalOrders: groupedOrders.length,
+                            // data: groupedOrders,
+                            // });
+
+                           
+
+                            // if status is provided then filter by status as well
+                            // if(params.ids[2] != 'All'){
+
+                            //     query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") ORDER BY r.'+params.ids[6]+' DESC LIMIT 20 OFFSET '+params.ids[3];
+                            //     queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%")';
+                            // }
+                        // }
+                    // }
+
+                    
+                    // const [rows, fields] = await connection.execute(query);
+                    const [countRows, countFields] = await connection.execute(queryCount);
+                    connection.release();
+
+                    if(rows.length > 0){
+                        return Response.json({status: 200, totalOrders: groupedOrders.length, data: groupedOrders, count: countRows[0].count, message:'Updated!'}, {status: 200})
+                    }
+                    else {
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                
+                } catch (error) { // error updating
+                    return Response.json({status: 404, message:'No Order found!'+error}, {status: 200})
+                }
+            }
+            // get listing for mobile by userId for dealer
+            // /U0.1/$selectedStatus/$offset/$role/$id/$sortBy - lets follow this for admins and dealers
+            // /U0/$id/$sortBy - currently used for dealers 2-id = 5, 3-soryBy = 6
+            else if(params.ids[1] == '0U0'){
+                const status = params.ids[2];      // All / Submitted / Approved / etc.
+                const offset = params.ids[3];        // GlobalAdmin
+                const role = params.ids[4];        // GlobalAdmin
+                const userId = params.ids[5];      // Test002
+                const sortBy = params.ids[6] || "createdOn";
+
+                var statusCond = '';
+                if(status != 'All'){
+                    statusCond = ` AND o.status = '`+status+`' `
+                }
+
+                // based on the role, manage the join condition to filter orders by userId or dealerId
+                var joinCond = '';
+                if(role == 'dealer' || role == 'Dealer'){
                     joinCond += ` LEFT JOIN user u ON o.userId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id `
                     
-                    // statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
+                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
                 }
                 else if(role == 'globaladmin' || role == 'GlobalAdmin'){
                     joinCond += ` LEFT JOIN user u ON o.userId = u.id `
@@ -1040,6 +1186,7 @@ export async function GET(request,{params}) {
                             ORDER BY o.`+sortBy+` DESC, o.cartId DESC, o.serialId ASC 
                             LIMIT 20 OFFSET `+offset+`
                             `;
+console.log(query);
 
                             const [rows] = await pool.query(query, [`%${userId}%`, `%${userId}%`]);
 
@@ -1320,7 +1467,7 @@ export async function POST(request, {params}) {
                         const { cartId, serialId, dealerId, design, quantity, stockType, isProduction } = item;
 
                         await connection.execute(
-                            `INSERT INTO orders1 (userId, dealerId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, serialId, cartId) VALUES (?, ?, ?, ?, "Submitted", 0, ?, ?, NULL, NULL, ?, ?)`,
+                            `INSERT INTO orders (userId, dealerId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, serialId, cartId) VALUES (?, ?, ?, ?, "Submitted", 0, ?, ?, NULL, NULL, ?, ?)`,
                             [userId, dealerId, design, quantity, stockType, createdOn, serialId, cartId || nextCartId]
                         );
                         insertedCount++;
