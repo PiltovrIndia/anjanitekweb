@@ -86,7 +86,7 @@ export async function GET(request,{params}) {
                 try {
                     var str = '';
                     if(params.ids[2].length > 0){
-                        str = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' OR ');
+                        str = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');
                     }
                     else {
                         str = 'FIND_IN_SET("39", tags)';
