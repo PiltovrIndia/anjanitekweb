@@ -149,7 +149,7 @@ export async function GET(request,{params}) {
                     // console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
 
                     // add 'appVersion' with value 5 into the rows[0]
-                    rows[0].appVersion = '5';
+                    rows[0].appVersion = '8';
                     
                     // return the user data
                     // if user is a dealer, get dealer details
