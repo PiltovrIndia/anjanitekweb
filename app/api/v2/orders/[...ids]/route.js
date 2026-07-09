@@ -182,7 +182,7 @@ export async function GET(request,{params}) {
                             END AS waitlistPosition
 
                     FROM orders o
-                    LEFT JOIN products1 p 
+                    LEFT JOIN products p 
                         ON o.design = p.design
                     LEFT JOIN user u 
                         ON o.userId = u.id
@@ -313,7 +313,7 @@ export async function GET(request,{params}) {
 
                     FROM orders o
 
-                    LEFT JOIN products1 p
+                    LEFT JOIN products p
                         ON o.design = p.design
 
                     LEFT JOIN user u
@@ -346,7 +346,7 @@ export async function GET(request,{params}) {
                     FROM (
                         SELECT o.design
                         FROM orders o
-                        LEFT JOIN products1 p
+                        LEFT JOIN products p
                         ON o.design = p.design
                         LEFT JOIN user u ON o.userId = u.id
                         ${whereSql}
@@ -500,7 +500,7 @@ export async function GET(request,{params}) {
 
                     FROM orders r
 
-                    LEFT JOIN products1 p
+                    LEFT JOIN products p
                         ON r.design = p.design
 
                     LEFT JOIN user u
@@ -561,6 +561,13 @@ export async function GET(request,{params}) {
                 var toBeApprovedQty = params.ids[3];
                 var adminId = params.ids[4];
                 var actionDate = params.ids[5];
+
+                // optional admin-chosen batch allocation order (?batchSeq=id1,id2,...)
+                var batchSequence = [];
+                try {
+                    const batchSeqParam = new URL(request.url).searchParams.get('batchSeq');
+                    if (batchSeqParam) batchSequence = batchSeqParam.split(',').map((s) => s.trim()).filter(Boolean);
+                } catch (e) {}
                 
                 if (!orderId) {
                     return Response.json({
@@ -578,9 +585,9 @@ export async function GET(request,{params}) {
 
                     // 3. Combined Query: Fetch both order and product in a single DB round-trip using FOR UPDATE
                     const [[order], [product]] = await Promise.all([
-                    connection.query(`SELECT id, status, stockType, requestedQty, approvedQty, productionQty, design, modifiedOn, waitlistSequence FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]).then(([rows]) => rows),
+                    connection.query(`SELECT id, status, stockType, requestedQty, approvedQty, productionQty, design, dealerId, modifiedOn, waitlistSequence FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]).then(([rows]) => rows),
                     
-                    connection.query(`SELECT productId, design, prm, std FROM products1 WHERE design = (SELECT design FROM orders WHERE id = ? AND isDeleted = 0) FOR UPDATE`, [orderId]).then(([rows]) => rows)]);
+                    connection.query(`SELECT productId, design, prm, std FROM products WHERE design = (SELECT design FROM orders WHERE id = ? AND isDeleted = 0) FOR UPDATE`, [orderId]).then(([rows]) => rows)]);
 
                     // 4. Validate Order existence and state
                     if (!order) {
@@ -604,7 +611,80 @@ export async function GET(request,{params}) {
                     return Response.json({ status: 404, success: false, message: "Product not found" });
                     }
 
-                    if (order.status === "Approved") {
+                    if (order.status === "Approved" && order.stockType === 'prm') {
+
+                        const oldRequestedQty = Number(order.requestedQty || 0);
+                        const newRequestedQty = Number(toBeApprovedQty || 0);
+                        const oldApprovedQty = Number(order.approvedQty || 0);
+
+                        // return the previous allocation to the batches it came from (via the ledger)
+                        const releaseResult = await releasePrmToBatches(connection, {
+                            orderId,
+                            design: order.design,
+                            qty: oldApprovedQty,
+                            adminId,
+                        });
+
+                        // batches are the source of truth for prm availability
+                        const batches = await lockPrmBatches(connection, order.design);
+                        const availableStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
+
+                        const newApprovedQty = Math.min(newRequestedQty, availableStock);
+                        const newProductionQty = Math.max(0, newRequestedQty - newApprovedQty);
+
+                        // compare the new requestedQty to oldRequestedQty, if decrease and productionQty > 0, then avoid modifiedOn update.
+                        const shouldUpdateModifiedOn = newRequestedQty >= oldRequestedQty || newProductionQty === 0;
+                        await connection.query(`UPDATE orders SET requestedQty = ?, approvedQty = ?, productionQty = ?, modifiedOn = ? WHERE id = ?`, [newRequestedQty, newApprovedQty, newProductionQty, shouldUpdateModifiedOn ? actionDate : order.modifiedOn, orderId]);
+
+                        const batchAllocations = drainPrmBatches(batches, newApprovedQty, batchSequence);
+                        await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'ManualAdjustment', adminId });
+
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId);
+
+                        await persistPrmBatchDrain(connection, batches, adminId);
+                        await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
+
+                        await connection.commit();
+
+                        // send notification
+                        const [nrows1] = await pool.query(`SELECT id, name, relatedTo FROM user where mapTo ='${order.dealerId}'`);
+
+                        var gcmIds = [];
+                        // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
+                        if(nrows1.length > 0){
+                            for (let index = 0; index < nrows1.length; index++) {
+                                const element = nrows1[index];
+                                gcmIds.push(element.id);
+                                if(element.relatedTo){
+                                    const relatedIds = element.relatedTo.split(',');
+                                    for (let index = 0; index < relatedIds.length; index++) {
+                                        const relatedId = relatedIds[index];
+                                        gcmIds.push(relatedId);
+                                    }
+                                }
+                            }
+                        }
+
+                        // send the notification
+                        gcmIds.length > 0 ? await send_notification(`Order is Approved for ${nrows1[0].name}`, gcmIds, 'Multiple') : null;
+
+                        return Response.json({
+                            status: 200,
+                            success: true,
+                            message: "Order item updated successfully",
+                            data: {
+                                orderId, design: order.design, stockType: order.stockType,
+                                newRequestedQty, newApprovedQty, newProductionQty,
+                                previousStock: availableStock,
+                                batchAllocations: batchAllocations.map((e) => ({ batch: e.batchId, qty: e.qty })),
+                                releasedToBatches: releaseResult,
+                                waitlistAllocations: allocations,
+                                totalAllocatedQty,
+                                stockAfterAllocation,
+                            },
+                        });
+                    }
+                    else if (order.status === "Approved") {
 
                         const oldRequestedQty = Number(order.requestedQty || 0); // requestedQty – old requestedQty = 30
                         const newRequestedQty = Number(toBeApprovedQty || 0); // toBeApprovedQty – new requestedQty = 28
@@ -625,7 +705,7 @@ export async function GET(request,{params}) {
 
                         const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, order.design, order.stockType, newAvailableStock);
 
-                        await connection.query(`UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
+                        await connection.query(`UPDATE products SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
 
                         await connection.commit();
 
@@ -668,6 +748,44 @@ export async function GET(request,{params}) {
                             },
                         });
                     }
+                    else if (order.stockType === 'prm') {
+                        // batches are the source of truth for prm availability
+                        const batches = await lockPrmBatches(connection, order.design);
+                        const availableStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
+                        const requestedQty = Number(order.requestedQty || 0);
+
+                        const approvedQty = Math.min(Number(toBeApprovedQty), availableStock);
+                        const productionQty = Math.max(0, Number(toBeApprovedQty) - approvedQty);
+
+                        await connection.query(`UPDATE orders SET approvedQty = ?, productionQty = ?, status = 'Approved', approvedOn = ?, modifiedOn = ? WHERE id = ?`,
+                            [approvedQty, productionQty, actionDate, actionDate, orderId]
+                        );
+
+                        const batchAllocations = drainPrmBatches(batches, approvedQty, batchSequence);
+                        await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'InitialApproval', adminId });
+
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId);
+
+                        await persistPrmBatchDrain(connection, batches, adminId);
+                        await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
+
+                        await connection.commit();
+
+                        return Response.json({
+                            status: 200,
+                            success: true,
+                            message: "Order item approved successfully",
+                            data: {
+                                orderId, design: order.design, stockType: order.stockType,
+                                requestedQty, approvedQty, productionQty,
+                                previousStock: availableStock, remainingStock: stockAfterAllocation,
+                                batchAllocations: batchAllocations.map((e) => ({ batch: e.batchId, qty: e.qty })),
+                                waitlistAllocations: allocations,
+                                totalAllocatedQty,
+                                stockAfterAllocation,
+                            },
+                        });
+                    }
                     else {
                         // 6. Memory Math Calculations
                         const stockColumn = getStockColumn(order.stockType);
@@ -685,7 +803,7 @@ export async function GET(request,{params}) {
 
                         const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, order.design, order.stockType, remainingStock);
 
-                        await connection.query(`UPDATE products1 SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]
+                        await connection.query(`UPDATE products SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]
                         );
 
                         await connection.commit();
@@ -721,22 +839,27 @@ export async function GET(request,{params}) {
             }
             // Reject by admin
             else if (params.ids[1] === "U0.3") {
-                try {
-                    var orderId = params.ids[2];
-                    var actionDate = params.ids[5];
+                var orderId = params.ids[2];
+                var adminId = params.ids[4];
+                var actionDate = params.ids[5];
 
-                    if (!orderId) {
-                    return Response.json({
-                        status: 400,
-                        success: false,
-                        message: "orderId is required",
-                    });
-                    }
+                if (!orderId) {
+                return Response.json({
+                    status: 400,
+                    success: false,
+                    message: "orderId is required",
+                });
+                }
+
+                const rejectConnection = await pool.getConnection();
+                try {
+                    await rejectConnection.beginTransaction();
 
                     // if existing status is Approved or Cancelled or Rejected, then update modifiedOn column else update approvedOn column
-                    const [existingOrder] = await pool.query(`SELECT * FROM orders WHERE id = ? AND isDeleted = 0`, [orderId]);
+                    const [existingRows] = await rejectConnection.query(`SELECT * FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]);
 
-                    if (existingOrder.length === 0) {
+                    if (existingRows.length === 0) {
+                    await rejectConnection.rollback();
                     return Response.json({
                         status: 404,
                         success: false,
@@ -744,42 +867,42 @@ export async function GET(request,{params}) {
                     });
                     }
 
-                    const currentStatus = existingOrder[0].status;
+                    const existingOrder = existingRows[0];
+                    const currentStatus = existingOrder.status;
+                    let waitlistAllocations = [];
 
-                    var [result] = [];
                     if (["Approved"].includes(currentStatus)) {
-                    
-                        [result] = await pool.query(`UPDATE orders SET status = 'Rejected', productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
 
-                        console.log(existingOrder[0]);
-                        console.log(existingOrder[0].approvedQty);
-                        console.log(currentStatus);
-                        
-                        
+                        await rejectConnection.query(`UPDATE orders SET status = 'Rejected', productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
 
-                        // if approvedQty > 0, then add that qty back to stock
-                        if (existingOrder[0].approvedQty > 0 && currentStatus === "Approved") {
-                            const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, existingOrder[0].design, existingOrder[0].stockType, existingOrder[0].approvedQty);
-
-                            const stockColumn = getStockColumn(existingOrder[0].stockType);
-                            await pool.query(`UPDATE products1 SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [existingOrder[0].approvedQty, existingOrder[0].design]);
+                        // if approvedQty > 0, return that stock and hand it to the waitlist
+                        const releasedQty = Number(existingOrder.approvedQty || 0);
+                        if (releasedQty > 0) {
+                            if (existingOrder.stockType === 'prm') {
+                                // return the reserved qty to the batches it came from, then re-allocate
+                                await releasePrmToBatches(rejectConnection, { orderId, design: existingOrder.design, qty: releasedQty, adminId });
+                                const batches = await lockPrmBatches(rejectConnection, existingOrder.design);
+                                const result = await allocatePrmWaitlistFromBatches(rejectConnection, existingOrder.design, batches, adminId);
+                                await persistPrmBatchDrain(rejectConnection, batches, adminId);
+                                await rejectConnection.query(`UPDATE products SET prm = ? WHERE design = ?`, [result.remainingStock, existingOrder.design]);
+                                waitlistAllocations = result.allocations;
+                            }
+                            else {
+                                const result = await allocateStockToWaitlist(rejectConnection, existingOrder.design, existingOrder.stockType, releasedQty);
+                                const stockColumn = getStockColumn(existingOrder.stockType);
+                                await rejectConnection.query(`UPDATE products SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [result.remainingStock, existingOrder.design]);
+                                waitlistAllocations = result.allocations;
+                            }
                         }
                     }
                     else {
-                        [result] = await pool.query(`UPDATE orders SET status = 'Rejected', productionQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
+                        await rejectConnection.query(`UPDATE orders SET status = 'Rejected', productionQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
                     }
 
-                    if (result.affectedRows === 0) {
-                        return Response.json({
-                            status: 409,
-                            success: false,
-                            message: "Order item could not be rejected or is already processed",
-                        });
-                    }
+                    await rejectConnection.commit();
 
                     // send notification
-                        const [nrows1] = await connection.execute(`SELECT u.id, u.name, u.relatedTo FROM user u JOIN orders o ON u.id = o.dealerId WHERE o.id ='${order.id}'`);
-                        connection.release();
+                        const [nrows1] = await pool.query(`SELECT id, name, relatedTo FROM user where mapTo ='${existingOrder.dealerId}'`);
 
                         var gcmIds = [];
                         // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
@@ -796,7 +919,7 @@ export async function GET(request,{params}) {
                                 }
                             }
                         }
-                        
+
                         // send the notification
                         gcmIds.length > 0 ? await send_notification(`Order is Rejected for ${nrows1[0].name}`, gcmIds, 'Multiple') : null;
 
@@ -804,35 +927,49 @@ export async function GET(request,{params}) {
                         status: 200,
                         success: true,
                         message: "Order item rejected successfully",
-                        data: { orderId },
+                        data: {
+                            orderId,
+                            design: existingOrder.design,
+                            approvedQty: Number(existingOrder.approvedQty || 0),
+                            productionQty: 0,
+                            waitlistAllocations,
+                        },
                     });
                 } catch (error) {
+                    await rejectConnection.rollback();
                     return Response.json({
                         status: 500,
                         success: false,
                         message: "Failed to reject order item"+error.message,
                         error: error.message,
                     });
+                } finally {
+                    rejectConnection.release();
                 }
             }
             // Mark as Out of Stock by Admin
             else if (params.ids[1] === "U0.31") {
-                try {
-                    var orderId = params.ids[2];
-                    var actionDate = params.ids[5];
+                var orderId = params.ids[2];
+                var adminId = params.ids[4];
+                var actionDate = params.ids[5];
 
-                    if (!orderId) {
-                    return Response.json({
-                        status: 400,
-                        success: false,
-                        message: "orderId is required",
-                    });
-                    }
+                if (!orderId) {
+                return Response.json({
+                    status: 400,
+                    success: false,
+                    message: "orderId is required",
+                });
+                }
+
+                const oosConnection = await pool.getConnection();
+                try {
+                    await oosConnection.beginTransaction();
 
                     // if existing status is Approved or Cancelled or Rejected, then update modifiedOn column else update approvedOn column
-                    const [existingOrder] = await pool.query(`SELECT * FROM orders WHERE id = ? AND isDeleted = 0`, [orderId]);
+                    const [existingRows] = await oosConnection.query(`SELECT * FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]);
 
-                    if (existingOrder.length === 0) {
+                    if (existingRows.length === 0) {
+                    await oosConnection.rollback();
                     return Response.json({
                         status: 404,
                         success: false,
@@ -840,47 +977,62 @@ export async function GET(request,{params}) {
                     });
                     }
 
-                    const currentStatus = existingOrder[0].status;
+                    const existingOrder = existingRows[0];
+                    const currentStatus = existingOrder.status;
+                    let waitlistAllocations = [];
 
-                    var [result] = [];
                     if (["Approved"].includes(currentStatus)) {
-                    
-                        [result] = await pool.query(`UPDATE orders SET status = 'OutOfStock', approvedQty = 0, productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
-                        
 
-                        // if approvedQty > 0, then add that qty back to stock
-                        if (existingOrder[0].approvedQty > 0 && currentStatus === "Approved") {
-                            const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, existingOrder[0].design, existingOrder[0].stockType, existingOrder[0].approvedQty);
+                        await oosConnection.query(`UPDATE orders SET status = 'OutOfStock', approvedQty = 0, productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
 
-                            const stockColumn = getStockColumn(existingOrder[0].stockType);
-                            await pool.query(`UPDATE products1 SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [existingOrder[0].approvedQty, existingOrder[0].design]);
+                        // if approvedQty > 0, return that stock and hand it to the waitlist
+                        const releasedQty = Number(existingOrder.approvedQty || 0);
+                        if (releasedQty > 0) {
+                            if (existingOrder.stockType === 'prm') {
+                                // return the reserved qty to the batches it came from, then re-allocate
+                                await releasePrmToBatches(oosConnection, { orderId, design: existingOrder.design, qty: releasedQty, adminId });
+                                const batches = await lockPrmBatches(oosConnection, existingOrder.design);
+                                const result = await allocatePrmWaitlistFromBatches(oosConnection, existingOrder.design, batches, adminId);
+                                await persistPrmBatchDrain(oosConnection, batches, adminId);
+                                await oosConnection.query(`UPDATE products SET prm = ? WHERE design = ?`, [result.remainingStock, existingOrder.design]);
+                                waitlistAllocations = result.allocations;
+                            }
+                            else {
+                                const result = await allocateStockToWaitlist(oosConnection, existingOrder.design, existingOrder.stockType, releasedQty);
+                                const stockColumn = getStockColumn(existingOrder.stockType);
+                                await oosConnection.query(`UPDATE products SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [result.remainingStock, existingOrder.design]);
+                                waitlistAllocations = result.allocations;
+                            }
                         }
                     }
                     else {
-                        [result] = await pool.query(`UPDATE orders SET status = 'OutOfStock', productionQty = 0, approvedQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
+                        await oosConnection.query(`UPDATE orders SET status = 'OutOfStock', productionQty = 0, approvedQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
                     }
 
-                    if (result.affectedRows === 0) {
-                        return Response.json({
-                            status: 409,
-                            success: false,
-                            message: "Order item could not be made Out of Stock",
-                        });
-                    }
+                    await oosConnection.commit();
 
                     return Response.json({
                         status: 200,
                         success: true,
                         message: "Order item is Out of Stock",
-                        data: { orderId },
+                        data: {
+                            orderId,
+                            design: existingOrder.design,
+                            approvedQty: 0,
+                            productionQty: 0,
+                            waitlistAllocations,
+                        },
                     });
                 } catch (error) {
+                    await oosConnection.rollback();
                     return Response.json({
                         status: 500,
                         success: false,
                         message: "Failed to mark order item"+error.message,
                         error: error.message,
                     });
+                } finally {
+                    oosConnection.release();
                 }
             }
             // soft delete
@@ -932,6 +1084,118 @@ export async function GET(request,{params}) {
                     message: "Failed to delete order item",
                     error: error.message,
                     });
+                }
+            }
+            // Mark all order items of a cart as Sale Order
+            // /U0.5/$cartId/$adminId/$actionDate
+            else if (params.ids[1] === "U0.5") {
+                var cartId = decodeURIComponent(params.ids[2] || '');
+                var adminId = params.ids[3];
+                var actionDate = params.ids[4];
+
+                if (!cartId) {
+                return Response.json({
+                    status: 400,
+                    success: false,
+                    message: "cartId is required",
+                });
+                }
+
+                const saleOrderConnection = await pool.getConnection();
+                try {
+                    await saleOrderConnection.beginTransaction();
+
+                    const [items] = await saleOrderConnection.query(
+                        `SELECT id, dealerId, status, productionQty FROM orders WHERE cartId = ? AND isDeleted = 0 FOR UPDATE`,
+                        [cartId]
+                    );
+
+                    if (items.length === 0) {
+                        await saleOrderConnection.rollback();
+                        return Response.json({
+                            status: 404,
+                            success: false,
+                            message: "No order items found for this cart",
+                        });
+                    }
+
+                    // a cart qualifies only when at least one item is Approved
+                    // and no item is still awaiting review (Submitted)
+                    if (!items.some((item) => item.status === 'Approved')) {
+                        await saleOrderConnection.rollback();
+                        return Response.json({
+                            status: 409,
+                            success: false,
+                            message: "Cart has no approved items to mark as Sale Order",
+                        });
+                    }
+
+                    if (items.some((item) => item.status === 'Submitted')) {
+                        await saleOrderConnection.rollback();
+                        return Response.json({
+                            status: 409,
+                            success: false,
+                            message: "Cart still has pending items awaiting review",
+                        });
+                    }
+
+                    // flip every live item to SaleOrder and clear pending production;
+                    // Cancelled/Rejected items keep their status but any leftover
+                    // productionQty is still cleared
+                    const [result] = await saleOrderConnection.query(
+                        `UPDATE orders SET status = 'SaleOrder', productionQty = 0, modifiedOn = ? WHERE cartId = ? AND isDeleted = 0 AND status NOT IN ('Cancelled', 'Rejected')`,
+                        [actionDate, cartId]
+                    );
+
+                    await saleOrderConnection.query(
+                        `UPDATE orders SET productionQty = 0, modifiedOn = ? WHERE cartId = ? AND isDeleted = 0 AND productionQty > 0`,
+                        [actionDate, cartId]
+                    );
+
+                    await saleOrderConnection.commit();
+
+                    // send notification
+                    const [nrows1] = await pool.query(`SELECT id, name, relatedTo FROM user where mapTo ='${items[0].dealerId}'`);
+
+                    var gcmIds = [];
+                    // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
+                    if(nrows1.length > 0){
+                        for (let index = 0; index < nrows1.length; index++) {
+                            const element = nrows1[index];
+                            gcmIds.push(element.id);
+                            if(element.relatedTo){
+                                const relatedIds = element.relatedTo.split(',');
+                                for (let index = 0; index < relatedIds.length; index++) {
+                                    const relatedId = relatedIds[index];
+                                    gcmIds.push(relatedId);
+                                }
+                            }
+                        }
+                    }
+
+                    // send the notification
+                    gcmIds.length > 0 ? await send_notification(`Order is marked as Sale Order for ${nrows1[0].name}`, gcmIds, 'Multiple') : null;
+
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        message: "Cart marked as Sale Order",
+                        data: {
+                            cartId,
+                            totalItems: items.length,
+                            updatedItems: result.affectedRows,
+                        },
+                    });
+                } catch (error) {
+                    await saleOrderConnection.rollback();
+                    return Response.json({
+                        status: 500,
+                        success: false,
+                        message: "Failed to mark cart as Sale Order "+error.message,
+                        error: error.message,
+                    });
+                } finally {
+                    saleOrderConnection.release();
                 }
             }
             // get listing for mobile by userId for dealer
@@ -997,7 +1261,7 @@ export async function GET(request,{params}) {
                 }
 
                 try {
-                    var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+userId+'%" OR u.id LIKE "%'+userId+'%") AND r.isDeleted = 0';
+                    var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+userId+'%" OR u.id LIKE "%'+userId+'%") AND r.isDeleted = 0';
                     const query = `
                             SELECT
                                 o.id,
@@ -1037,7 +1301,7 @@ export async function GET(request,{params}) {
                                 END AS waitlistPosition
 
                             FROM orders o
-                            LEFT JOIN products1 p ON o.design = p.design 
+                            LEFT JOIN products p ON o.design = p.design 
                             
                             ${joinCond}
                             
@@ -1067,8 +1331,8 @@ export async function GET(request,{params}) {
                             // if status is provided then filter by status as well
                             // if(params.ids[2] != 'All'){
 
-                            //     query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") ORDER BY r.'+params.ids[6]+' DESC LIMIT 20 OFFSET '+params.ids[3];
-                            //     queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%")';
+                            //     query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") ORDER BY r.'+params.ids[6]+' DESC LIMIT 20 OFFSET '+params.ids[3];
+                            //     queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%")';
                             // }
                         // }
                     // }
@@ -1145,7 +1409,7 @@ export async function GET(request,{params}) {
                 }
 
                 try {
-                    var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+userId+'%" OR u.id LIKE "%'+userId+'%") AND r.isDeleted = 0';
+                    var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+userId+'%" OR u.id LIKE "%'+userId+'%") AND r.isDeleted = 0';
                     const query = `
                             SELECT
                                 o.id,
@@ -1185,7 +1449,7 @@ export async function GET(request,{params}) {
                                 END AS waitlistPosition
 
                             FROM orders o
-                            LEFT JOIN products1 p ON o.design = p.design 
+                            LEFT JOIN products p ON o.design = p.design 
                             
                             ${joinCond}
                             
@@ -1214,8 +1478,8 @@ console.log(query);
                             // if status is provided then filter by status as well
                             // if(params.ids[2] != 'All'){
 
-                            //     query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") ORDER BY r.'+params.ids[6]+' DESC LIMIT 20 OFFSET '+params.ids[3];
-                            //     queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%")';
+                            //     query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%") ORDER BY r.'+params.ids[6]+' DESC LIMIT 20 OFFSET '+params.ids[3];
+                            //     queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.isDeleted = 0 AND r.status="'+params.ids[2]+'" AND (u.relatedTo LIKE "%'+params.ids[5]+'%" OR u.id LIKE "%'+params.ids[5]+'%")';
                             // }
                         // }
                     // }
@@ -1239,8 +1503,8 @@ console.log(query);
             // get the list of orders by userId
             else if(params.ids[1] == 'U1'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType from orders r LEFT JOIN products1 p ON r.design = p.design WHERE r.isDeleted = 0 AND (r.userId LIKE "%'+params.ids[2]+'%" OR r.dealerId LIKE "%'+params.ids[2]+'%") ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
-                    const [countRows, countFields] = await connection.execute('SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design WHERE r.isDeleted = 0 AND (r.userId LIKE "%'+params.ids[2]+'%" OR r.dealerId LIKE "%'+params.ids[2]+'%")');
+                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType from orders r LEFT JOIN products p ON r.design = p.design WHERE r.isDeleted = 0 AND (r.userId LIKE "%'+params.ids[2]+'%" OR r.dealerId LIKE "%'+params.ids[2]+'%") ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
+                    const [countRows, countFields] = await connection.execute('SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design WHERE r.isDeleted = 0 AND (r.userId LIKE "%'+params.ids[2]+'%" OR r.dealerId LIKE "%'+params.ids[2]+'%")');
                     connection.release();
 
                     if(rows.length > 0)
@@ -1255,8 +1519,8 @@ console.log(query);
             // get the list of orders by dealer name
             else if(params.ids[1] == 'U1.1'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN dealer d ON r.dealerId=d.dealerId WHERE d.accountName LIKE "%'+params.ids[2]+'%" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
-                    const [countRows, countFields] = await connection.execute('SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN dealer d ON r.dealerId=d.dealerId WHERE d.accountName LIKE "%'+params.ids[2]+'%"');
+                    const [rows, fields] = await connection.execute('SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN dealer d ON r.dealerId=d.dealerId WHERE d.accountName LIKE "%'+params.ids[2]+'%" ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3]);
+                    const [countRows, countFields] = await connection.execute('SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN dealer d ON r.dealerId=d.dealerId WHERE d.accountName LIKE "%'+params.ids[2]+'%"');
                     connection.release();
 
                     if(rows.length > 0)
@@ -1315,7 +1579,7 @@ console.log(query);
 
                     FROM orders r
 
-                    LEFT JOIN products1 p
+                    LEFT JOIN products p
                         ON r.design = p.design
 
                     WHERE r.design LIKE ?
@@ -1368,14 +1632,54 @@ console.log(query);
 
                         // if params.ids[4] value is 'All', then lets have a where condition which we can add in the query to get all the orders irrespective of the production status. If params.ids[4] value is not 'All', then we will filter the orders based on the production status as well.
                         if(params.ids[4] == 'All'){
-                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) ORDER BY r.createdOn DESC';
-                            queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?))';
+                            query = `SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, 
+                                        CASE
+                                        WHEN r.productionQty > 0 THEN (
+                                            SELECT COUNT(*) + 1
+                                            FROM orders x
+                                            WHERE x.design = r.design
+                                            AND x.stockType = r.stockType
+                                            AND x.productionQty > 0
+                                            AND x.isDeleted = 0
+                                            AND x.status NOT IN ('Cancelled', 'Rejected')
+                                            AND (
+                                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                                    OR (
+                                                    COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                                    AND x.id < r.id
+                                                    )
+                                            )
+                                        )
+                                        ELSE NULL
+                                        END AS waitlistSequence,
+                                        u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) ORDER BY r.createdOn DESC`;
+                            queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?))';
                         }
                         else {
 
                             // lets update the query to add user table as well to get user details based on the createdOn and modifiedOn fields using the provided date range in params.ids[3]
-                            query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'" ORDER BY r.createdOn DESC';
-                            queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'"';
+                            query = `SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, 
+                                        CASE
+                                        WHEN r.productionQty > 0 THEN (
+                                            SELECT COUNT(*) + 1
+                                            FROM orders x
+                                            WHERE x.design = r.design
+                                            AND x.stockType = r.stockType
+                                            AND x.productionQty > 0
+                                            AND x.isDeleted = 0
+                                            AND x.status NOT IN ('Cancelled', 'Rejected')
+                                            AND (
+                                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                                    OR (
+                                                    COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                                    AND x.id < r.id
+                                                    )
+                                            )
+                                        )
+                                        ELSE NULL
+                                        END AS waitlistSequence,
+                                        u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'" ORDER BY r.createdOn DESC`;
+                            queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.isProduction="'+params.ids[4]+'"';
                         }
 
                         // if status is provided then filter by status as well
@@ -1383,17 +1687,57 @@ console.log(query);
 
                             // expiryDate field is used to store the modified timestamp for the order. So we can filter the orders modified after a particular timestamp using this field.
                             // if(params.ids[2] == 'Modified'){
-                            //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
+                            //     query = 'SELECT r.*, p.*, u.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE r.expiryDate > r.createdOn ORDER BY r.createdOn DESC LIMIT 20 OFFSET '+params.ids[3];
                             // }
                             // else
 
                                 if(params.ids[4] == 'All'){
-                                    query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" ORDER BY r.createdOn DESC';
-                                    queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'"';
+                                    query = `SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, 
+                                            CASE
+                                                WHEN r.productionQty > 0 THEN (
+                                                    SELECT COUNT(*) + 1
+                                                    FROM orders x
+                                                    WHERE x.design = r.design
+                                                    AND x.stockType = r.stockType
+                                                    AND x.productionQty > 0
+                                                    AND x.isDeleted = 0
+                                                    AND x.status NOT IN ('Cancelled', 'Rejected')
+                                                    AND (
+                                                        COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                                            OR (
+                                                            COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                                            AND x.id < r.id
+                                                            )
+                                                    )
+                                                )
+                                                ELSE NULL
+                                                END AS waitlistSequence,
+                                                u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status='${params.ids[2]}' ORDER BY r.createdOn DESC`;
+                                    queryCount = `SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status='${params.ids[2]}'`;
                                 }
                                 else {
-                                    query = 'SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" AND r.isProduction="'+params.ids[4]+'" ORDER BY r.createdOn DESC';
-                                    queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products1 p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status="'+params.ids[2]+'" AND r.isProduction="'+params.ids[4]+'"';
+                                    query = `SELECT r.*, p.name, p.productId, p.description, p.size, p.tags, p.media, p.prm, p.std, p.isActive, p.designType, 
+                                    CASE
+                                        WHEN r.productionQty > 0 THEN (
+                                            SELECT COUNT(*) + 1
+                                            FROM orders x
+                                            WHERE x.design = r.design
+                                            AND x.stockType = r.stockType
+                                            AND x.productionQty > 0
+                                            AND x.isDeleted = 0
+                                            AND x.status NOT IN ('Cancelled', 'Rejected')
+                                            AND (
+                                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                                    OR (
+                                                    COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                                    AND x.id < r.id
+                                                    )
+                                            )
+                                        )
+                                        ELSE NULL
+                                        END AS waitlistSequence,
+                                        u.name as orderedBy, u_dealer.name as dealer, u.mobile, u.mapTo from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id LEFT JOIN user u_dealer ON r.dealerId=u_dealer.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status='${params.ids[2]}' AND r.isProduction='${params.ids[4]}' ORDER BY r.createdOn DESC`;
+                                    queryCount = `SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?)) AND r.status='${params.ids[2]}' AND r.isProduction='${params.ids[4]}'`;
                                 }
                         }
 
@@ -1476,7 +1820,7 @@ export async function POST(request, {params}) {
                         const { cartId, serialId, dealerId, design, quantity, stockType, isProduction } = item;
 
                         await connection.execute(
-                            `INSERT INTO orders (userId, dealerId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, serialId, cartId) VALUES (?, ?, ?, ?, "Submitted", 0, ?, ?, NULL, NULL, ?, ?)`,
+                            `INSERT INTO orders1 (userId, dealerId, design, requestedQty, status, approvedQty, stockType, createdOn, approvedOn, modifiedOn, serialId, cartId) VALUES (?, ?, ?, ?, "Submitted", 0, ?, ?, NULL, NULL, ?, ?)`,
                             [userId, dealerId, design, quantity, stockType, createdOn, serialId, cartId || nextCartId]
                         );
                         insertedCount++;
@@ -1767,6 +2111,10 @@ function getAdminBasketStatus(order) {
     return "No Items";
   }
 
+  if(order.status === "SaleOrder"){
+    return "Sale Order";
+  }
+
   if (rejectedItems === totalDesigns) {
     return "Rejected";
   }
@@ -1779,7 +2127,7 @@ function getAdminBasketStatus(order) {
     return "Action Required";
   }
 
-  if (totalRequestedQty > 0 && totalApprovedQty === totalRequestedQty && totalProductionQty === 0) {
+  if (totalRequestedQty > 0 && totalApprovedQty <= totalRequestedQty && totalProductionQty === 0) {
     return "Fully Approved";
   }
 
@@ -1878,6 +2226,242 @@ async function allocateStockToWaitlist(connection, design, stockType, remainingS
     return { allocations, totalAllocatedQty, remainingStock };
 }
 
+// ---------------------------------------------------------------------------
+// PRM batch helpers — product_stock_batches is the source of truth for prm
+// stock; every order-batch movement is recorded in order_batch_allocations.
+// ---------------------------------------------------------------------------
+
+/**
+ * Lock this design's active prm batch rows in allocation order (oldest first).
+ * Returns an in-memory model that drainPrmBatches/persistPrmBatchDrain operate on.
+ */
+async function lockPrmBatches(connection, design) {
+    const [rows] = await connection.query(
+        `
+        SELECT id, batchId, availableQty
+        FROM product_stock_batches
+        WHERE design = ?
+        AND stockType = 'prm'
+        AND status = 'Active'
+        AND availableQty > 0
+        ORDER BY receivedOn ASC, id ASC
+        FOR UPDATE
+        `,
+        [design]
+    );
+
+    return rows.map((b) => ({
+        id: b.id,
+        batchId: b.batchId,
+        availableQty: Number(b.availableQty || 0),
+        consumedQty: 0,
+    }));
+}
+
+// drain qty from the locked batches (in memory); returns the per-batch
+// breakdown of what was taken.
+//
+// Selection order:
+// 1. batches in sequenceIds (admin-chosen order), if provided
+// 2. best fit for the remainder: the smallest batch that can cover the
+//    remaining qty on its own; when none can, drain the smallest available
+//    batch and repeat (ties go to the oldest batch)
+function drainPrmBatches(batches, qty, sequenceIds) {
+    let remaining = Number(qty || 0);
+    const entries = [];
+
+    const takeFrom = (batch, wanted) => {
+        const takeQty = Math.min(batch.availableQty, wanted);
+        batch.availableQty -= takeQty;
+        batch.consumedQty += takeQty;
+        remaining -= takeQty;
+        entries.push({ stockBatchId: batch.id, batchId: batch.batchId, qty: takeQty });
+    };
+
+    if (Array.isArray(sequenceIds)) {
+        for (const id of sequenceIds) {
+            if (remaining <= 0) break;
+            const batch = batches.find((b) => String(b.id) === String(id));
+            if (batch && batch.availableQty > 0) takeFrom(batch, remaining);
+        }
+    }
+
+    while (remaining > 0) {
+        const candidates = batches.filter((b) => b.availableQty > 0);
+        if (candidates.length === 0) break;
+
+        const fitting = candidates
+            .filter((b) => b.availableQty >= remaining)
+            .sort((a, b) => a.availableQty - b.availableQty);
+        const pick = fitting[0] || candidates.sort((a, b) => a.availableQty - b.availableQty)[0];
+
+        takeFrom(pick, remaining);
+    }
+
+    return entries;
+}
+
+// write drained quantities back; fully consumed batches are marked Empty
+async function persistPrmBatchDrain(connection, batches, adminId) {
+    for (const batch of batches) {
+        if (batch.consumedQty > 0) {
+            await connection.query(
+                `UPDATE product_stock_batches SET availableQty = ?, status = ?, modifiedOn = NOW(), modifiedBy = ? WHERE id = ?`,
+                [batch.availableQty, batch.availableQty > 0 ? 'Active' : 'Empty', adminId, batch.id]
+            );
+        }
+    }
+}
+
+async function recordBatchLedger(connection, { orderId, design, entries, allocationType, adminId }) {
+    for (const entry of entries) {
+        await connection.query(
+            `
+            INSERT INTO order_batch_allocations
+                (orderId, stockBatchId, design, stockType, allocatedQty, allocationType, createdBy)
+            VALUES (?, ?, ?, 'prm', ?, ?, ?)
+            `,
+            [orderId, entry.stockBatchId, design, entry.qty, allocationType, adminId]
+        );
+    }
+}
+
+/**
+ * Return released prm stock to the batches it was originally allocated from,
+ * using the order_batch_allocations ledger (newest batches refunded first).
+ * Stock reserved before the batch system has no ledger rows and cannot be
+ * attributed to a batch — it is reported back as unattributedQty.
+ */
+async function releasePrmToBatches(connection, { orderId, design, qty, adminId }) {
+    let remaining = Number(qty || 0);
+    const released = [];
+
+    if (remaining <= 0) {
+        return { releasedQty: 0, unattributedQty: 0, released };
+    }
+
+    const [holdings] = await connection.query(
+        `
+        SELECT stockBatchId, SUM(allocatedQty) AS netQty
+        FROM order_batch_allocations
+        WHERE orderId = ? AND stockType = 'prm'
+        GROUP BY stockBatchId
+        HAVING netQty > 0
+        ORDER BY stockBatchId DESC
+        `,
+        [orderId]
+    );
+
+    for (const holding of holdings) {
+        if (remaining <= 0) break;
+
+        const giveBackQty = Math.min(Number(holding.netQty || 0), remaining);
+        if (giveBackQty <= 0) continue;
+
+        await connection.query(
+            `UPDATE product_stock_batches SET availableQty = availableQty + ?, status = 'Active', modifiedOn = NOW(), modifiedBy = ? WHERE id = ?`,
+            [giveBackQty, adminId, holding.stockBatchId]
+        );
+
+        await connection.query(
+            `
+            INSERT INTO order_batch_allocations
+                (orderId, stockBatchId, design, stockType, allocatedQty, allocationType, createdBy)
+            VALUES (?, ?, ?, 'prm', ?, 'ManualAdjustment', ?)
+            `,
+            [orderId, holding.stockBatchId, design, -giveBackQty, adminId]
+        );
+
+        remaining -= giveBackQty;
+        released.push({ stockBatchId: holding.stockBatchId, qty: giveBackQty });
+    }
+
+    return { releasedQty: Number(qty || 0) - remaining, unattributedQty: remaining, released };
+}
+
+/**
+ * Allocate remaining prm batch stock to the waitlist. Mirrors
+ * allocateStockToWaitlist, but drains the locked batches oldest-first and
+ * records every order-batch pair in the ledger.
+ */
+async function allocatePrmWaitlistFromBatches(connection, design, batches, adminId) {
+    let remainingStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
+
+    const [pendingRows] = await connection.query(
+        `
+        SELECT
+        id,
+        cartId,
+        dealerId,
+        design,
+        stockType,
+        requestedQty,
+        approvedQty,
+        productionQty,
+        createdOn
+        FROM orders
+        WHERE design = ?
+        AND stockType = 'prm'
+        AND productionQty > 0
+        AND isDeleted = 0
+        AND status NOT IN ('Cancelled', 'Rejected')
+        ORDER BY
+        COALESCE(modifiedOn, approvedOn, createdOn) ASC,
+        id ASC
+        FOR UPDATE
+        `,
+        [design]
+    );
+
+    const allocations = [];
+    let totalAllocatedQty = 0;
+
+    for (const order of pendingRows) {
+        if (remainingStock <= 0) break;
+
+        const pendingQty = Number(order.productionQty || 0);
+
+        if (pendingQty <= 0) continue;
+
+        const allocateQty = Math.min(remainingStock, pendingQty);
+        const entries = drainPrmBatches(batches, allocateQty);
+
+        const newApprovedQty = Number(order.approvedQty || 0) + allocateQty;
+        const newProductionQty = pendingQty - allocateQty;
+
+        await connection.query(
+            `
+            UPDATE orders
+            SET
+                approvedQty = ?,
+                productionQty = ?,
+                modifiedOn = NOW()
+            WHERE id = ?
+            `,
+            [newApprovedQty, newProductionQty, order.id]
+        );
+
+        await recordBatchLedger(connection, { orderId: order.id, design, entries, allocationType: 'AutoStockAllocation', adminId });
+
+        remainingStock -= allocateQty;
+        totalAllocatedQty += allocateQty;
+
+        allocations.push({
+            orderId: order.id,
+            cartId: order.cartId,
+            dealerId: order.dealerId,
+            design: order.design,
+            stockType: order.stockType,
+            allocatedQty: allocateQty,
+            approvedQty: newApprovedQty,
+            productionQty: newProductionQty,
+            batches: entries.map((e) => ({ batch: e.batchId, qty: e.qty })),
+        });
+    }
+
+    return { allocations, totalAllocatedQty, remainingStock };
+}
+
 function getDesignOrderStatus({
   totalRequestedQty,
   totalApprovedQty,
@@ -1898,7 +2482,7 @@ function getDesignOrderStatus({
     return "Action Required";
   }
 
-  if (totalRequestedQty > 0 && totalApprovedQty === totalRequestedQty && totalProductionQty === 0) {
+  if (totalRequestedQty > 0 && totalApprovedQty <= totalRequestedQty && totalProductionQty === 0) {
     return "Fully Approved";
   }
 
