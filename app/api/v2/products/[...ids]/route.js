@@ -32,12 +32,12 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
-            // get the list of products1
+            // get the list of products
             if(params.ids[1] == 'U1'){
                 try {
                     
-                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite FROM products1 p LEFT JOIN products_selected s ON p.design=s.design LIMIT 20 OFFSET '+params.ids[3]);
-                    // const [rows, fields] = await connection.execute('SELECT * from products1 LIMIT 20 OFFSET '+params.ids[3]);
+                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite FROM products p LEFT JOIN products_selected s ON p.design=s.design LIMIT 20 OFFSET '+params.ids[3]);
+                    // const [rows, fields] = await connection.execute('SELECT * from products LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
 
                     if(rows.length > 0)
@@ -49,11 +49,11 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
-            // get all products1
+            // get all products
             if(params.ids[1] == 'U1.1'){
                 try {
                     
-                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite FROM products1 p LEFT JOIN products_selected s ON p.design=s.design');
+                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite FROM products p LEFT JOIN products_selected s ON p.design=s.design');
                     connection.release();
 
                     if(rows.length > 0)
@@ -65,10 +65,10 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
-            // get products1 by size
+            // get products by size
             else if(params.ids[1] == 'U2'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT * from products1 WHERE size="'+params.ids[2]+'" LIMIT 20 OFFSET '+params.ids[3]);
+                    const [rows, fields] = await connection.execute('SELECT * from products WHERE size="'+params.ids[2]+'" LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
 
                     if(rows.length > 0){
@@ -81,7 +81,7 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
-            // get products1 by tags
+            // get products by tags
             else if(params.ids[1] == 'U3'){
                 try {
                     var str = '';
@@ -93,8 +93,8 @@ export async function GET(request,{params}) {
                     }
                     
                         // const conditions = params.ids[2].split(',').map(tag => `FIND_IN_SET(`+tag+`, tags)`).join(' AND ');                    
-                        const [rows, fields] = await connection.execute(`SELECT * from products1 WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
-                        const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products1 WHERE ${str}`);
+                        const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
+                        const [countRows, countFields] = await connection.execute(`SELECT COUNT(*) as count from products WHERE ${str}`);
                         const totalCount = countRows[0].count;
                         connection.release();
 
@@ -109,12 +109,12 @@ export async function GET(request,{params}) {
                         return Response.json({status: 404, message:'No product found!'}, {status: 200})
                 }
             }
-            // get products1 by search
+            // get products by search
             else if(params.ids[1] == 'U4'){
                 try {
                     var str = `(design LIKE '%${params.ids[2]}%' OR name LIKE '%${params.ids[2]}%')`;
                     
-                    const [rows, fields] = await connection.execute(`SELECT * from products1 WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
+                    const [rows, fields] = await connection.execute(`SELECT * from products WHERE ${str} LIMIT 20 OFFSET ${params.ids[3]}`);
                     connection.release();
 
                         // check if user is found
@@ -131,7 +131,7 @@ export async function GET(request,{params}) {
             // update a product
             else if(params.ids[1] == 'U5'){
                 try {
-                    const [rows, fields] = await connection.execute('UPDATE products1 SET tags="'+params.ids[3]+'", size="'+params.ids[4]+'" WHERE productId="'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('UPDATE products SET tags="'+params.ids[3]+'", size="'+params.ids[4]+'" WHERE productId="'+params.ids[2]+'"');
                     connection.release();
 
                     if(rows.affectedRows > 0){
@@ -148,7 +148,7 @@ export async function GET(request,{params}) {
             // update the images for a product
             else if(params.ids[1] == 'U6'){
                 try {
-                    const [rows, fields] = await connection.execute('UPDATE products1 SET imageUrls="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('UPDATE products SET imageUrls="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
                     connection.release();
 
                     if(rows.affectedRows > 0){
@@ -195,10 +195,10 @@ export async function GET(request,{params}) {
                     // console.log(`INSERT INTO user (${productKeys}) VALUES (${productValues})`);
                     // console.log(`INSERT INTO dealer (${userDetailKeys}) VALUES (${userDetailValues})`);
 
-                    let p = `INSERT INTO products1 (${productKeys}) VALUES (${productValues})`;
+                    let p = `INSERT INTO products (${productKeys}) VALUES (${productValues})`;
                     const [rows, fields] = await connection.execute(p);
 
-                    // const [rows, fields] = await connection.execute('INSERT into products1 (design, name, description, size, tags, imageUrls, createdOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "'+params.ids[5]+'", "'+params.ids[6]+'", "'+params.ids[7]+'", "'+params.ids[8]+'")');
+                    // const [rows, fields] = await connection.execute('INSERT into products (design, name, description, size, tags, imageUrls, createdOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "'+params.ids[5]+'", "'+params.ids[6]+'", "'+params.ids[7]+'", "'+params.ids[8]+'")');
                     connection.release();
                     
 
@@ -249,7 +249,7 @@ export async function GET(request,{params}) {
                     let p = `INSERT INTO products_selected (${productKeys}) VALUES (${productValues})`;
                     const [rows, fields] = await connection.execute(p);
 
-                    // const [rows, fields] = await connection.execute('INSERT into products1 (design, name, description, size, tags, imageUrls, createdOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "'+params.ids[5]+'", "'+params.ids[6]+'", "'+params.ids[7]+'", "'+params.ids[8]+'")');
+                    // const [rows, fields] = await connection.execute('INSERT into products (design, name, description, size, tags, imageUrls, createdOn) VALUES ("'+params.ids[2]+'", "'+params.ids[3]+'", "'+params.ids[4]+'", "'+params.ids[5]+'", "'+params.ids[6]+'", "'+params.ids[7]+'", "'+params.ids[8]+'")');
                     connection.release();
                     
 
@@ -267,7 +267,7 @@ export async function GET(request,{params}) {
             // fetch the latest entry from products_selected
             else if(params.ids[1] == 'U9'){
                 try {
-                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite FROM products1 p RIGHT JOIN products_selected s ON p.design=s.design ORDER BY s.createdOn DESC LIMIT 1');
+                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite FROM products p RIGHT JOIN products_selected s ON p.design=s.design ORDER BY s.createdOn DESC LIMIT 1');
                     const [rowsTags, fieldsTags] = await connection.execute('SELECT * from product_tags');
                     connection.release();
 
@@ -285,9 +285,9 @@ export async function GET(request,{params}) {
             // update product name
             else if(params.ids[1] == 'U10'){
                 try {
-                    console.log('UPDATE products1 SET name="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
+                    console.log('UPDATE products SET name="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
                     
-                    const [rows, fields] = await connection.execute('UPDATE products1 SET name="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
+                    const [rows, fields] = await connection.execute('UPDATE products SET name="'+params.ids[3]+'" WHERE productId="'+params.ids[2]+'"');
                     connection.release();
 
                     if(rows.affectedRows > 0){
@@ -352,7 +352,7 @@ export async function GET(request,{params}) {
 
 //                             // WHERE clause to limit affected rows to the chunk keys
 //                             const wherePlaceholders = chunk.map(() => '?').join(', ');
-//                             const sql = `UPDATE products1 SET ${setClause} WHERE ${keyCol} IN (${wherePlaceholders});`;
+//                             const sql = `UPDATE products SET ${setClause} WHERE ${keyCol} IN (${wherePlaceholders});`;
 
 //                             // build values in the exact order the SQL expects:
 //                             // for each update column -> for each row push (keyValue, columnValue)
@@ -432,7 +432,7 @@ export async function GET(request,{params}) {
                         const [productRows] = await connection.query(
                         `
                         SELECT productId, design, prm, std
-                        FROM products1
+                        FROM products
                         WHERE design IN (${placeholders})
                         FOR UPDATE
                         `,
@@ -513,7 +513,7 @@ export async function GET(request,{params}) {
                          */
                         await connection.query(
                             `
-                            UPDATE products1
+                            UPDATE products
                             SET
                             prm = CASE WHEN ? IS NULL THEN prm ELSE ? END,
                             std = CASE WHEN ? IS NULL THEN std ELSE ? END,
