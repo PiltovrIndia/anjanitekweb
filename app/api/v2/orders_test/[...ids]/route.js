@@ -552,6 +552,296 @@ export async function GET(request,{params}) {
                     connection.release();
                 }
                 }
+            // status-wise order counts for a single design (design orders sheet tabs)
+            else if (params.ids[1] == "U00.3") {
+                try {
+                    const design = params.ids[2];
+
+                    const [rows] = await connection.execute(
+                        `
+                        SELECT status, COUNT(*) AS count
+                        FROM orders
+                        WHERE design = ? AND isDeleted = 0
+                        GROUP BY status
+                        `,
+                        [design]
+                    );
+
+                    return Response.json(
+                        {
+                            status: 200,
+                            success: true,
+                            message: "Design order counts fetched successfully",
+                            data: rows,
+                        },
+                        { status: 200 }
+                    );
+                } catch (error) {
+                    return Response.json(
+                        {
+                            status: 404,
+                            success: false,
+                            message: "No Order found! " + error.message,
+                        },
+                        { status: 200 }
+                    );
+                } finally {
+                    connection.release();
+                }
+            }
+            // paged order listing of a single design filtered by status (design orders sheet)
+            // /U00.4/$design/$status/$page — fixed 50 items per page
+            else if (params.ids[1] == "U00.4") {
+                try {
+                    const design = params.ids[2];
+                    const status = params.ids[3];
+                    const pageNo = Math.max(parseInt(params.ids[4]) || 1, 1);
+                    const pageLimit = 50;
+                    const offset = (pageNo - 1) * pageLimit;
+
+                    const where = ["r.design = ?", "r.isDeleted = 0"];
+                    const values = [design];
+
+                    if (status && status !== "All") {
+                        where.push("r.status = ?");
+                        values.push(status);
+                    }
+
+                    const whereSql = `WHERE ${where.join(" AND ")}`;
+
+                    const [countRows] = await connection.execute(
+                        `SELECT COUNT(*) AS total FROM orders r ${whereSql}`,
+                        values
+                    );
+                    const total = Number(countRows[0]?.total || 0);
+
+                    const [rows] = await connection.execute(
+                    `
+                    SELECT
+                        r.*,
+
+                        p.name,
+                        p.productId,
+                        p.description,
+                        p.size,
+                        p.tags,
+                        p.media,
+                        p.prm,
+                        p.std,
+                        p.isActive,
+                        p.designType,
+
+                        u.name AS orderedBy,
+                        u.mobile,
+                        u.mapTo,
+
+                        u_dealer.name AS dealer,
+
+                        CASE
+                        WHEN r.productionQty > 0 THEN (
+                            SELECT COUNT(*) + 1
+                            FROM orders x
+                            WHERE x.design = r.design
+                            AND x.stockType = r.stockType
+                            AND x.productionQty > 0
+                            AND x.isDeleted = 0
+                            AND x.status NOT IN ('Cancelled', 'Rejected')
+                            AND (
+
+                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                OR (
+                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                AND x.id < r.id
+                                )
+                            )
+                        )
+                        ELSE NULL
+                        END AS waitlistSequence,
+
+                        CASE
+                        WHEN r.requestedQty > 0 THEN ROUND((r.approvedQty / r.requestedQty) * 100)
+                        ELSE 0
+                        END AS availabilityPercent
+
+                    FROM orders r
+
+                    LEFT JOIN products p
+                        ON r.design = p.design
+
+                    LEFT JOIN user u
+                        ON r.userId = u.id
+
+                    LEFT JOIN user u_dealer
+                        ON r.dealerId = u_dealer.id
+
+                    ${whereSql}
+
+                    ORDER BY
+                        r.createdOn DESC,
+                        r.id DESC
+                    LIMIT ${pageLimit} OFFSET ${offset}
+                    `,
+                    values
+                    );
+
+                    return Response.json(
+                        {
+                            status: 200,
+                            success: true,
+                            message: "Design orders fetched successfully",
+                            data: rows,
+                            total,
+                            page: pageNo,
+                            pageSize: pageLimit,
+                        },
+                        { status: 200 }
+                    );
+                } catch (error) {
+                    return Response.json(
+                        {
+                            status: 404,
+                            success: false,
+                            message: "No Order found! " + error.message,
+                        },
+                        { status: 200 }
+                    );
+                } finally {
+                    connection.release();
+                }
+            }
+            // all orders of a single design in a date range, with prm batch
+            // allocations attached — feeds the design orders dialog download
+            // /U00.5/$design/$fromDate,$toDate
+            else if (params.ids[1] == "U00.5") {
+                try {
+                    const design = params.ids[2];
+                    const fromDate = params.ids[3].split(',')[0];
+                    const toDate = params.ids[3].split(',')[1];
+
+                    const [rows] = await connection.execute(
+                    `
+                    SELECT
+                        r.*,
+
+                        p.name,
+                        p.productId,
+                        p.size,
+
+                        u.name AS orderedBy,
+                        u.mobile,
+                        u.mapTo,
+
+                        u_dealer.name AS dealer,
+
+                        CASE
+                        WHEN r.productionQty > 0 THEN (
+                            SELECT COUNT(*) + 1
+                            FROM orders x
+                            WHERE x.design = r.design
+                            AND x.stockType = r.stockType
+                            AND x.productionQty > 0
+                            AND x.isDeleted = 0
+                            AND x.status NOT IN ('Cancelled', 'Rejected')
+                            AND (
+
+                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                OR (
+                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
+                                AND x.id < r.id
+                                )
+                            )
+                        )
+                        ELSE NULL
+                        END AS waitlistSequence
+
+                    FROM orders r
+
+                    LEFT JOIN products p
+                        ON r.design = p.design
+
+                    LEFT JOIN user u
+                        ON r.userId = u.id
+
+                    LEFT JOIN user u_dealer
+                        ON r.dealerId = u_dealer.id
+
+                    WHERE r.design = ?
+                    AND r.isDeleted = 0
+                    AND ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?))
+
+                    ORDER BY
+                        r.createdOn DESC,
+                        r.id DESC
+                    `,
+                    [design, fromDate, toDate, fromDate, toDate]
+                    );
+
+                    // attach the prm batch allocations for every order:
+                    // net quantity currently held per (order, batch) from the ledger
+                    if (rows.length > 0) {
+                        const orderIds = rows.map((r) => r.id);
+                        const placeholders = orderIds.map(() => '?').join(',');
+
+                        const [allocRows] = await connection.query(
+                            `
+                            SELECT oba.orderId, psb.batchId, SUM(oba.allocatedQty) AS allocatedQty
+                            FROM order_batch_allocations oba
+                            JOIN product_stock_batches psb ON psb.id = oba.stockBatchId
+                            WHERE oba.orderId IN (${placeholders})
+                            AND oba.stockType = 'prm'
+                            GROUP BY oba.orderId, psb.batchId
+                            HAVING allocatedQty > 0
+                            ORDER BY oba.orderId ASC, MIN(oba.id) ASC
+                            `,
+                            orderIds
+                        );
+
+                        const allocMap = new Map();
+                        for (const alloc of allocRows) {
+                            const key = String(alloc.orderId);
+                            if (!allocMap.has(key)) allocMap.set(key, []);
+                            allocMap.get(key).push({ batchId: alloc.batchId, qty: Number(alloc.allocatedQty || 0) });
+                        }
+
+                        rows.forEach((r) => {
+                            r.batchAllocations = allocMap.get(String(r.id)) || [];
+                        });
+                    }
+
+                    if (rows.length > 0) {
+                        return Response.json(
+                            {
+                                status: 200,
+                                success: true,
+                                message: "Design orders fetched successfully",
+                                data: rows,
+                            },
+                            { status: 200 }
+                        );
+                    }
+
+                    return Response.json(
+                        {
+                            status: 201,
+                            success: true,
+                            message: "No data found!",
+                            data: [],
+                        },
+                        { status: 200 }
+                    );
+                } catch (error) {
+                    return Response.json(
+                        {
+                            status: 404,
+                            success: false,
+                            message: "No Order found! " + error.message,
+                        },
+                        { status: 200 }
+                    );
+                } finally {
+                    connection.release();
+                }
+            }
             // Approve by admin for an order item
             else if(params.ids[1] == 'U0.2'){
                 // 1. Fail fast: Parse body and validate orderId before hitting the database

@@ -36,7 +36,7 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 'U1'){
                 try {
                     
-                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite, COALESCE(b.activeBatches, 0) as activeBatches FROM products p LEFT JOIN products_selected s ON p.design=s.design LEFT JOIN (SELECT design, COUNT(*) as activeBatches FROM product_stock_batches WHERE stockType="prm" AND status="Active" AND availableQty > 0 GROUP BY design) b ON p.design=b.design COLLATE utf8mb4_general_ci LIMIT 20 OFFSET '+params.ids[3]);
+                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite, COALESCE(b.activeBatches, 0) as activeBatches, COALESCE(o.orderCount, 0) as orderCount FROM products p LEFT JOIN products_selected s ON p.design=s.design LEFT JOIN (SELECT design, COUNT(*) as activeBatches FROM product_stock_batches WHERE stockType="prm" AND status="Active" AND availableQty > 0 GROUP BY design) b ON p.design=b.design COLLATE utf8mb4_general_ci LEFT JOIN (SELECT design, COUNT(*) as orderCount FROM orders WHERE isDeleted=0 GROUP BY design) o ON p.design=o.design WHERE p.isActive=1 LIMIT 20 OFFSET '+params.ids[3]);
                     // const [rows, fields] = await connection.execute('SELECT * from products LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
 
@@ -53,7 +53,7 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 'U1.1'){
                 try {
                     
-                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite, COALESCE(b.activeBatches, 0) as activeBatches FROM products p LEFT JOIN products_selected s ON p.design=s.design LEFT JOIN (SELECT design, COUNT(*) as activeBatches FROM product_stock_batches WHERE stockType="prm" AND status="Active" AND availableQty > 0 GROUP BY design) b ON p.design=b.design COLLATE utf8mb4_general_ci');
+                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite, COALESCE(b.activeBatches, 0) as activeBatches, COALESCE(o.orderCount, 0) as orderCount FROM products p LEFT JOIN products_selected s ON p.design=s.design LEFT JOIN (SELECT design, COUNT(*) as activeBatches FROM product_stock_batches WHERE stockType="prm" AND status="Active" AND availableQty > 0 GROUP BY design) b ON p.design=b.design COLLATE utf8mb4_general_ci LEFT JOIN (SELECT design, COUNT(*) as orderCount FROM orders WHERE isDeleted=0 GROUP BY design) o ON p.design=o.design WHERE p.isActive=1');
                     connection.release();
 
                     if(rows.length > 0)
@@ -318,6 +318,26 @@ export async function GET(request,{params}) {
                     }
                 } catch (error) {
                     return Response.json({status: 404, message:'No batches found!'+error}, {status: 200})
+                }
+            }
+
+            // soft-delete a product: hide it from listings, keep the row for order history
+            else if(params.ids[1] == 'U12'){
+                try {
+                    const [rows, fields] = await connection.execute(
+                        'UPDATE products SET isActive = 0 WHERE productId = ?',
+                        [params.ids[2]]
+                    );
+                    connection.release();
+
+                    if(rows.affectedRows > 0){
+                        return Response.json({status: 200, message:'Design deleted!'}, {status: 200})
+                    }
+                    else {
+                        return Response.json({status: 201, message:'No data found!'}, {status: 200})
+                    }
+                } catch (error) {
+                    return Response.json({status: 404, message:'No product found!'+error}, {status: 200})
                 }
             }
 

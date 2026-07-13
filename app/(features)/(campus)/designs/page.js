@@ -15,7 +15,7 @@ import { Button } from '@/app/components/ui/button'
 import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
-import { ArrowDown, ArrowUp, ArrowUpDown, CheckIcon, HeartIcon, Pencil, Search, Trash } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, CheckIcon, HeartIcon, Pencil, ScrollText, Search, Trash } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
@@ -27,6 +27,7 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHe
 import { Label } from '@/app/components/ui/label'
 import * as XLSX from 'xlsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs'
+import DesignOrdersDialog from './design_orders_sheet'
 
 const xlsx = require('xlsx');
 // Child references can also take paths delimited by '/'
@@ -72,8 +73,18 @@ fetch("/api/v2/designs/"+pass+"/U10/"+productId+"/"+encodeURIComponent(name), {
     },
 });
 
+// soft-delete a product
+const deleteProductAPI = async (pass, productId) =>
+fetch("/api/v2/designs/"+pass+"/U12/"+productId, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
 // design of the day
-const designOfTheDay = async (pass, productData) => 
+const designOfTheDay = async (pass, productData) =>
 fetch("/api/v2/designs/"+pass+"/U8/"+productData, {
     method: "GET",
     headers: {
@@ -165,6 +176,8 @@ export default function Products() {
     const [file, setFile] = useState(null); 
         
     const [selectedProduct, setSelectedProduct] = useState(null);
+    const [ordersSheetProduct, setOrdersSheetProduct] = useState(null); // design whose orders sheet is open
+    const [deletingDesign, setDeletingDesign] = useState(false);
     const [newProductOn, setNewProductOn] = useState(false);
     const [creatingProduct, setCreatingProduct] = useState(false);
     const [offerCreationLoading, setOfferCreationLoading] = useState(false);
@@ -786,7 +799,7 @@ export default function Products() {
             : { key, direction: 'asc' });
     }
 
-    const numericSortKeys = ['prm', 'std', 'activeBatches'];
+    const numericSortKeys = ['prm', 'std', 'activeBatches', 'orderCount'];
     const sortedProducts = sortConfig.key
         ? [...filteredProducts].sort((a, b) => {
             let cmp;
@@ -989,9 +1002,10 @@ return (
                         <TableHead className='cursor-pointer select-none' onClick={() => handleSort('name')}>Design{sortIcon('name')}</TableHead>
                         <TableHead className='cursor-pointer select-none' onClick={() => handleSort('design')}>Design Number{sortIcon('design')}</TableHead>
                         <TableHead className='cursor-pointer select-none' onClick={() => handleSort('size')}>Size{sortIcon('size')}</TableHead>
+                        <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('std')}>Standard stock{sortIcon('std')}</TableHead>
                         <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('prm')}>Premium stock{sortIcon('prm')}</TableHead>
                         <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('activeBatches')}>Active Batches{sortIcon('activeBatches')}</TableHead>
-                        <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('std')}>Standard stock{sortIcon('std')}</TableHead>
+                        <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('orderCount')}>Orders{sortIcon('orderCount')}</TableHead>
                         <TableHead></TableHead>
                     </TableRow>
                 </TableHeader>
@@ -1103,6 +1117,34 @@ return (
                                                                 }
                                                             }
                                                             
+                                                            // soft-delete the design and drop it from the listing
+                                                            async function onDeleteDesign(){
+                                                                if (!window.confirm(`Delete design ${product.design} (${product.name})? It will be removed from the listing.`)) return;
+
+                                                                setDeletingDesign(true);
+                                                                try {
+                                                                    const result = await deleteProductAPI(process.env.NEXT_PUBLIC_API_PASS, product.productId);
+                                                                    const queryResult = await result.json();
+
+                                                                    if(queryResult.status == 200){
+                                                                        toast({ description: "Design deleted!" });
+                                                                        const drop = (list) => list.filter(p => p.productId !== product.productId);
+                                                                        setAllProducts(prev => drop(prev));
+                                                                        setSearchedProducts(prev => drop(prev));
+                                                                        setFilteredProducts(prev => drop(prev));
+                                                                    }
+                                                                    else {
+                                                                        toast({ description: queryResult.message || "Could not delete, try again later!" });
+                                                                    }
+                                                                }
+                                                                catch (e){
+                                                                    toast({ description: "Issue deleting, try again later!" });
+                                                                }
+                                                                finally {
+                                                                    setDeletingDesign(false);
+                                                                }
+                                                            }
+
                                                             // a function to send an API to make the product as design of the day
                                                             async function addToDesignOfTheDay(product){
                                                                 
@@ -1372,7 +1414,11 @@ return (
                                                                                 </div>
                                                                         
                                                                                 <div className="sticky bottom-0 bg-white pt-4 pb-2 mt-4 flex flex-row gap-2 justify-end border-t">
-                                                                                  
+
+                                                                                  <Button variant='outline' className="mr-auto text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700" onClick={onDeleteDesign} disabled={deletingDesign}>
+                                                                                      <Trash size={16} className="mr-2"/> {deletingDesign ? 'Deleting...' : 'Delete Design'}
+                                                                                  </Button>
+
                                                                                   <Sheet>
                                                                                     <SheetTrigger asChild>
                                                                                         <Button variant='secondary'><HeartIcon className='w-4 font-bold text-lg' /> &nbsp;Add to Design of the day</Button>
@@ -1508,25 +1554,27 @@ return (
                                 </div>
                             </TableCell>
                             <TableCell className='font-mono'>{product.size}</TableCell>
-                            <TableCell className='font-mono text-right'>{product.prm}</TableCell>
+                            <TableCell className='font-mono text-right'>
+                                <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">{Number(product.std || 0)}
+                                </span>
+                            </TableCell>
+                            <TableCell className='font-mono text-right'>
+                                <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">{Number(product.prm || 0)}
+                                </span>
+                            </TableCell>
                             <TableCell className='font-mono text-right'>{Number(product.activeBatches) > 0 ? product.activeBatches : '-'}</TableCell>
-                            <TableCell className='font-mono text-right'>{product.std}</TableCell>
+                            
+                            <TableCell className='font-mono text-right'>
+                                {Number(product.orderCount) > 0 ? (
+                                    <span>{product.orderCount}</span>
+                                ) : '-'}
+                            </TableCell>
                             {/* <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY hh:mm A")}</TableCell> */}
                             
                                 <TableCell>
-                                    {searching ?
-                                    <div className="flex flex-row m-12">    
-                                        <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-                                        <p className={`${inter.className} ${styles.text3}`}>Deleting...</p> 
-                                    </div>
-                                    :
                                     <div className="flex flex-row items-center gap-2">
-                                        <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{handleDeleteClick(row)}}><Trash size={16} className="text-red-600"/></Button>            
-                                        {/* <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{setSelectedInvoice(row),setIsDialogOpen(true)}}><Trash size={24} className="text-red-600"/> &nbsp;Delete</Button>             */}
-                                        {/* Dialog Component */}
-                                        
+                                        <Button variant='link' size="sm" onClick={()=>setOrdersSheetProduct(product)} className="text-green-600 hover:text-green-800">Orders</Button>
                                     </div>
-                                    }
                                 </TableCell>
                             
                         </TableRow>
@@ -1591,7 +1639,14 @@ return (
                 </div>
             </DialogContent>
           </Dialog>
-          
+
+          {/* Orders per design — same list and actions as the orders page designs tab */}
+          <DesignOrdersDialog
+            product={ordersSheetProduct}
+            open={!!ordersSheetProduct}
+            onClose={() => setOrdersSheetProduct(null)}
+          />
+
     </div>
 );
 }
