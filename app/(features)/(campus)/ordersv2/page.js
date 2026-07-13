@@ -26,6 +26,7 @@ import { Checkbox } from '@/app/components/ui/checkbox'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/app/components/ui/sheet'
 import { Label } from '@/app/components/ui/label'
 import * as XLSX from 'xlsx';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs'
 import StockOrderDialog from '../products/stock_order_dialog'
 
 const xlsx = require('xlsx');
@@ -36,6 +37,26 @@ const ORDER_PAGE_SIZE = 0;
 // get orders
 const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction) => 
 fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// get design grouped orders
+const getDesignOrdersAPI = async (pass, type, page, role, userId, sortBy) =>
+fetch("/api/v2/orders_test/"+pass+"/U00.1/"+type+"/"+page+"/"+role+"/"+userId+"/"+sortBy, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// get design group specific order items
+const getDesignOrderItemsAPI = async (pass, design, stockType = 'All') =>
+fetch("/api/v2/orders_test/"+pass+"/U00.2/"+encodeURIComponent(design)+"/"+stockType, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -95,7 +116,7 @@ fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId, {
 });
 
 // pass state variable and the method to update state variable
-export default function OrdersV2() {
+export default function Orders() {
     
     const { toast } = useToast();
     const router = useRouter();
@@ -121,6 +142,7 @@ export default function OrdersV2() {
     const [orders, setOrders] = useState([]);
     const [resLoading, setResLoading] = useState(false);
     const [isProduction, setisProduction] = useState('All');
+    const [activeOrdersTab, setActiveOrdersTab] = useState('Orders');
     const [downloadingOrders, setDownloadingOrders] = useState(false);
     const [resOffset, setResOffset] = useState(0);
     const [resStatus, setResStatus] = useState('All');
@@ -130,10 +152,19 @@ export default function OrdersV2() {
     const [showDownloadPopover, setShowDownloadPopover] = useState(false);
     const [stockOrderOpen, setStockOrderOpen] = useState(false);
     const [expandedCartGroups, setExpandedCartGroups] = useState({});
+    const [designOrders, setDesignOrders] = useState([]);
+    const [totalDesignOrders, setTotalDesignOrders] = useState(0);
+    const [designOrdersPage, setDesignOrdersPage] = useState(1);
+    const [designOrdersLoading, setDesignOrdersLoading] = useState(false);
+    const [expandedDesignRows, setExpandedDesignRows] = useState({});
+    const [designOrderItems, setDesignOrderItems] = useState({});
+    const [loadingDesignOrderItems, setLoadingDesignOrderItems] = useState({});
 
     // Sort state
     const [ordersSortKey, setOrdersSortKey] = useState(null);
     const [ordersSortDir, setOrdersSortDir] = useState(null);
+    const [designsSortKey, setDesignsSortKey] = useState(null);
+    const [designsSortDir, setDesignsSortDir] = useState(null);
 
     // Approval Dialog State
     const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
@@ -158,7 +189,9 @@ export default function OrdersV2() {
     const reviewDesignTimer = useRef(null)
     const reviewDesignRef = useRef(null)
     const ordersEndRef = useRef(null)
+    const designsEndRef = useRef(null)
     const loadMoreOrdersRef = useRef(null)
+    const loadMoreDesignsRef = useRef(null)
 
     // var groupedTags = [];
     const [imgSrc, setImgSrc] = useState(``);
@@ -351,6 +384,7 @@ export default function OrdersV2() {
     }, [isActionDialogOpen, selectedRes?.stockType, selectedRes?.status, selectedRes?.id])
 
     useEffect(() => {
+        if (activeOrdersTab !== 'Orders') return;
         const sentinel = ordersEndRef.current;
         if (!sentinel) return;
         const observer = new IntersectionObserver((entries) => {
@@ -358,7 +392,18 @@ export default function OrdersV2() {
         }, { threshold: 0 });
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, []);
+    }, [activeOrdersTab]);
+
+    useEffect(() => {
+        if (activeOrdersTab !== 'Designs') return;
+        const sentinel = designsEndRef.current;
+        if (!sentinel) return;
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) loadMoreDesignsRef.current?.();
+        }, { threshold: 0 });
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [activeOrdersTab]);
 
     // useEffect(() => {
     //         if (user && user.id) {
@@ -526,6 +571,78 @@ export default function OrdersV2() {
                 description: "Issue loading, try again later!",
               })
             setResLoading(false);
+        }
+    }
+
+    async function getDesignOrders(val, page = 1, userObj = user, append = false) {
+        setDesignOrdersLoading(true);
+
+        if (!userObj?.role || !userObj?.id) {
+            setDesignOrdersLoading(false);
+            return;
+        }
+
+        try {
+            
+            const result = await getDesignOrdersAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                val,
+                page,
+                userObj.role,
+                userObj.id,
+                'createdOn'
+            );
+            const queryResult = await result.json();
+
+            if (queryResult.status === 200 && Array.isArray(queryResult.data)) {
+                append ? setDesignOrders(prev => [...prev, ...queryResult.data]) : setDesignOrders(queryResult.data);
+                setTotalDesignOrders(queryResult.totalDesigns ?? queryResult.data.length);
+                setDesignOrdersPage(queryResult.page ?? page);
+            } else {
+                if (!append) { setDesignOrders([]); setTotalDesignOrders(0); }
+            }
+        } catch (e) {
+            toast({ description: "Issue loading designs, try again later!" });
+        } finally {
+            setDesignOrdersLoading(false);
+        }
+    }
+
+    async function getDesignOrderItems(design, stockType = 'All') {
+        if (!design || designOrderItems[design]) {
+            return;
+        }
+
+        setLoadingDesignOrderItems((prev) => ({
+            ...prev,
+            [design]: true,
+        }));
+
+        try {
+            const result = await getDesignOrderItemsAPI(process.env.NEXT_PUBLIC_API_PASS, design, stockType);
+            const queryResult = await result.json();
+
+            setDesignOrderItems((prev) => ({
+                ...prev,
+                [design]: queryResult.status === 200 && Array.isArray(queryResult.data)
+                    ? queryResult.data.map((item) => ({
+                        ...item,
+                        waitlistPosition: item.waitlistPosition ?? item.waitlistSequence,
+                        isProduction: Number(item.productionQty || 0) > 0 ? 1 : 0,
+                    }))
+                    : [],
+            }));
+        } catch (e) {
+            toast({ description: "Issue loading design orders, try again later!" });
+            setDesignOrderItems((prev) => ({
+                ...prev,
+                [design]: [],
+            }));
+        } finally {
+            setLoadingDesignOrderItems((prev) => ({
+                ...prev,
+                [design]: false,
+            }));
         }
     }
 
@@ -752,6 +869,17 @@ export default function OrdersV2() {
                     statuses: getStatusCounts(updatedRows),
                 };
             }));
+
+            // and in the designs tab item panel if it is open
+            if (res.design) {
+                setDesignOrderItems(prev => {
+                    if (!prev[res.design]) return prev;
+                    return {
+                        ...prev,
+                        [res.design]: prev[res.design].map(item => String(item.id) === String(res.id) ? { ...item, status: 'InReview' } : item),
+                    };
+                });
+            }
         }
 
         setSelectedRes(reviewRes);
@@ -1010,6 +1138,20 @@ export default function OrdersV2() {
                             waitlistItems,
                         };
                     }));
+
+                    // Patch designOrderItems if the panel for this design is open
+                    if (data.design) {
+                        setDesignOrderItems(prev => {
+                            if (!prev[data.design]) return prev;
+                            return {
+                                ...prev,
+                                [data.design]: prev[data.design].map(item => {
+                                    const patch = updates.get(String(item.id));
+                                    return patch ? { ...item, ...patch } : item;
+                                }),
+                            };
+                        });
+                    }
                 } else {
                     getOrders(resStatus, resOffset, user);
                 }
@@ -1028,6 +1170,19 @@ export default function OrdersV2() {
             ...prev,
             [cartId]: !prev[cartId],
         }))
+    }
+
+    function toggleDesignRow(design) {
+        const nextExpanded = !expandedDesignRows[design];
+
+        setExpandedDesignRows((prev) => ({
+            ...prev,
+            [design]: nextExpanded,
+        }));
+
+        if (nextExpanded) {
+            getDesignOrderItems(design);
+        }
     }
 
     const filteredOrders = useMemo(() => {
@@ -1081,12 +1236,75 @@ export default function OrdersV2() {
         });
     }, [filteredOrders, ordersSortKey, ordersSortDir])
 
+    const filteredDesignOrders = useMemo(() => {
+        let result = designOrders;
+        if (resSearch.trim()) {
+            const q = resSearch.trim().toLowerCase();
+            result = result.filter((designOrder) => (
+                (designOrder.design || '').toLowerCase().includes(q) ||
+                (designOrder.name || '').toLowerCase().includes(q) ||
+                String(designOrder.productId || '').toLowerCase().includes(q) ||
+                (designOrder.designOrderStatus || '').toLowerCase().includes(q)
+            ));
+        }
+        if (designsSortKey && designsSortDir) {
+            result = [...result].sort((a, b) => {
+                let aVal, bVal;
+                if (designsSortKey === 'designs') {
+                    aVal = (a.design || '').toLowerCase();
+                    bVal = (b.design || '').toLowerCase();
+                    if (aVal < bVal) return designsSortDir === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return designsSortDir === 'asc' ? 1 : -1;
+                    return 0;
+                } else if (designsSortKey === 'requested') {
+                    aVal = Number(a.totalRequestedQty || 0);
+                    bVal = Number(b.totalRequestedQty || 0);
+                } else if (designsSortKey === 'approved') {
+                    aVal = Number(a.totalApprovedQty || 0);
+                    bVal = Number(b.totalApprovedQty || 0);
+                } else if (designsSortKey === 'production') {
+                    aVal = Number(a.totalProductionQty || 0);
+                    bVal = Number(b.totalProductionQty || 0);
+                } else if (designsSortKey === 'percent') {
+                    aVal = Number(a.totalApprovedQty || 0) === 0 ? 0 : Number(a.totalApprovedQty) / Number(a.totalRequestedQty);
+                    bVal = Number(b.totalApprovedQty || 0) === 0 ? 0 : Number(b.totalApprovedQty) / Number(b.totalRequestedQty);
+                } else if (designsSortKey === 'latestOrder') {
+                    aVal = new Date(a.latestCreatedOn || 0).getTime();
+                    bVal = new Date(b.latestCreatedOn || 0).getTime();
+                } else {
+                    return 0;
+                }
+                if (aVal < bVal) return designsSortDir === 'asc' ? -1 : 1;
+                if (aVal > bVal) return designsSortDir === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return result;
+    }, [designOrders, resSearch, designsSortKey, designsSortDir])
+
     function handleStatusChange(val) {
         setResStatus(val);
         setResOffset(0);
+        setDesignOrdersPage(1);
         setExpandedCartGroups({});
+        setExpandedDesignRows({});
+        setDesignOrderItems({});
+        setLoadingDesignOrderItems({});
 
-        getOrders(val, 0, user);
+        if (activeOrdersTab === 'Designs') {
+            getDesignOrders(val, 1, user);
+        } else {
+            getOrders(val, 0, user);
+        }
+    }
+
+    function handleOrdersTabChange(val) {
+        setActiveOrdersTab(val);
+        setResSearch('');
+
+        if (val === 'Designs' && designOrders.length === 0) {
+            getDesignOrders(resStatus, designOrdersPage, user);
+        }
     }
 
     function handleOrdersSort(key) {
@@ -1098,6 +1316,18 @@ export default function OrdersV2() {
         } else {
             setOrdersSortKey(null);
             setOrdersSortDir(null);
+        }
+    }
+
+    function handleDesignsSort(key) {
+        if (designsSortKey !== key) {
+            setDesignsSortKey(key);
+            setDesignsSortDir('asc');
+        } else if (designsSortDir === 'asc') {
+            setDesignsSortDir('desc');
+        } else {
+            setDesignsSortKey(null);
+            setDesignsSortDir(null);
         }
     }
 
@@ -1115,6 +1345,11 @@ export default function OrdersV2() {
         getOrders(resStatus, next, user, isProduction, true);
     };
 
+    loadMoreDesignsRef.current = () => {
+        if (designOrdersLoading || designOrders.length >= totalDesignOrders) return;
+        getDesignOrders(resStatus, designOrdersPage + 1, user, true);
+    };
+
 return (
 
     // <div className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px', overflow:'scroll'}}>
@@ -1128,12 +1363,12 @@ return (
               <h2 className="text-xl font-semibold mr-4">Orders</h2>
               <div className="flex flex-row gap-2 justify-between items-center">
                     
-                    <span className='text-sm text-slate-500'>{totalOrders} Orders listed</span>
+                    <span className='text-sm text-slate-500'>{activeOrdersTab === 'Designs' ? totalDesignOrders : totalOrders} {activeOrdersTab === 'Designs' ? 'Designs' : 'Orders'} listed</span>
                     <div className="flex flex-row items-center gap-3">
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder='Search cart, dealer, or design'
+                                placeholder={activeOrdersTab === 'Designs' ? 'Search design or product' : 'Search cart, dealer, or design'}
                                 value={resSearch}
                                 onChange={e => setResSearch(e.target.value)}
                                 className="pl-8 w-56"
@@ -1204,7 +1439,29 @@ return (
           
           
             <div className="w-full">
+                
+                <Tabs
+                    value={activeOrdersTab}
+                    onValueChange={handleOrdersTabChange}
+                    className="mb-4"
+                >
+                    <TabsList className="grid w-full max-w-[260px] grid-cols-2 rounded-2xl bg-slate-100 p-1 shadow-sm">
+                        <TabsTrigger
+                            value="Orders"
+                            className="rounded-xl text-sm font-semibold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+                        >
+                            Orders
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="Designs"
+                            className="rounded-xl text-sm font-semibold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+                        >
+                            Designs
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
 
+                {activeOrdersTab === 'Orders' ? (<>
                 <Card>
                     <Table>
                         <TableHeader>
@@ -1229,7 +1486,7 @@ return (
                                 <TableHead className="text-right">Waitlist</TableHead>
                                 <TableHead>Stock</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Order Type</TableHead>
+                                <TableHead>Request Type</TableHead>
                                 <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('submittedOn')}>
                                     <span className="flex items-center">Submitted On{sortIcon('submittedOn', ordersSortKey, ordersSortDir)}</span>
                                 </TableHead>
@@ -1472,6 +1729,183 @@ return (
                     {resLoading && orders.length > 0 && <><SpinnerGap className="animate-spin inline-block mr-2 h-4 w-4" />Loading more orders...</>}
                     {!resLoading && orders.length > 0 && orders.length >= totalOrders && <span>All {totalOrders} orders loaded</span>}
                 </div>
+                </>) : (<>
+                <Card>
+                    <Table>
+                        <TableHeader>
+                            <TableRow className="bg-slate-100 text-slate-600 text-sm font-semibold">
+                                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('designs')}>
+                                    <span className="flex items-center">Design Id{sortIcon('designs', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
+                                <TableHead>Design</TableHead>
+                                <TableHead className="text-right">Orders</TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('requested')}>
+                                    <span className="flex items-center justify-end">Requested{sortIcon('requested', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('approved')}>
+                                    <span className="flex items-center justify-end">Approved{sortIcon('approved', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('production')}>
+                                    <span className="flex items-center justify-end">Production{sortIcon('production', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('percent')}>
+                                    <span className="flex items-center justify-end">%{sortIcon('percent', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
+                                <TableHead className="text-right">Waitlist</TableHead>
+                                <TableHead>Stock</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('latestOrder')}>
+                                    <span className="flex items-center">Latest Order{sortIcon('latestOrder', designsSortKey, designsSortDir)}</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {designOrdersLoading ? (
+                                <TableRow><TableCell colSpan={10} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
+                            ) : filteredDesignOrders.length === 0 ? (
+                                <TableRow><TableCell colSpan={10} className="text-center py-10">No designs listed</TableCell></TableRow>
+                            ) : filteredDesignOrders.map((designOrder) => {
+                                const isExpanded = Boolean(expandedDesignRows[designOrder.design])
+                                const childRows = designOrderItems[designOrder.design] || []
+                                const isLoadingItems = Boolean(loadingDesignOrderItems[designOrder.design])
+
+                                const percentage1 = ((designOrder.totalApprovedQty === 0 ? 0 : designOrder.totalApprovedQty / designOrder.totalRequestedQty) * 100)
+                                const percentage = percentage1 > 0 ? percentage1.toFixed(1) : 0
+                                const textColor = percentage < 50 ? 'text-red-500' : 'text-green-600'; // Red if < 50%, Green otherwise
+
+
+                                return (
+                                    <React.Fragment key={designOrder.design}>
+                                        <TableRow
+                                            className="cursor-pointer bg-white text-sm transition-colors hover:bg-slate-100/80"
+                                            onClick={() => toggleDesignRow(designOrder.design)}
+                                        >
+                                            <TableCell className="py-4">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="mt-0.5 rounded-md border border-slate-200 bg-white p-1 text-slate-500">
+                                                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-medium text-slate-900">{designOrder.design}</span><br/>
+                                                        <span className="text-xs text-slate-500">{designOrder.size || '-'}</span>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="py-4">
+                                                <span className="font-medium">{designOrder.name || '-'}</span><br/>
+                                                <span className="text-xs text-slate-500">{designOrder.productId || '-'}</span>
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono">{designOrder.totalOrders}</TableCell>
+                                            <TableCell className="text-right font-mono">{designOrder.totalRequestedQty}</TableCell>
+                                            <TableCell className="text-right font-mono">{designOrder.totalApprovedQty}</TableCell>
+                                            <TableCell className="text-right font-mono">{designOrder.totalProductionQty}</TableCell>
+                                            <TableCell className="text-right font-mono"><span className={textColor}>{percentage}%</span></TableCell>
+                                            <TableCell className="text-right">
+                                                {Number(designOrder.waitlistItems || 0) > 0 ? (
+                                                    <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
+                                                        {designOrder.waitlistItems}
+                                                    </span>
+                                                ) : (
+                                                    <span className="font-mono text-slate-400">0</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-wrap gap-1">
+                                                    <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">PRM {Number(designOrder.prm || 0)}</span>
+                                                    <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">STD {Number(designOrder.std || 0)}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={`uppercase font-medium rounded-full px-2 py-1 text-xs ${designOrder.designOrderStatus === 'Fully Approved' ? 'bg-green-100 text-green-700' : designOrder.designOrderStatus === 'Rejected' ? 'bg-red-100 text-red-700' : designOrder.designOrderStatus === 'Action Required' || designOrder.designOrderStatus === 'Partially Approved' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                    {getOrderStatusLabel(designOrder.designOrderStatus)}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="font-mono text-xs text-slate-500">
+                                                {designOrder.latestCreatedOn ? dayjs(designOrder.latestCreatedOn).format('DD/MM/YYYY hh:mm A') : '-'}
+                                            </TableCell>
+                                        </TableRow>
+
+                                        {isExpanded && (
+                                            isLoadingItems ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={10} className="bg-white py-6 text-center text-sm text-slate-500">
+                                                        <SpinnerGap className="mr-2 inline-block h-4 w-4 animate-spin" />
+                                                        Loading order items...
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : childRows.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={10} className="bg-white py-6 text-center text-sm text-slate-500">
+                                                        No order items listed
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : childRows.map((res) => (
+                                                <TableRow key={`${designOrder.design}-${res.id}`} className="bg-white text-sm hover:bg-slate-50/80">
+                                                    <TableCell className="py-4 pl-16">
+                                                        <span className="font-medium">{res.orderedBy || '-'}</span><br/>
+                                                        <span className="text-xs text-slate-500">{res.userId || '-'}</span>
+                                                    </TableCell>
+                                                    <TableCell className="py-4">
+                                                        <span className="font-medium">{res.dealer || '-'}</span><br/>
+                                                        <span className="text-xs text-slate-500">{res.dealerId || '-'}</span>
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-mono"> </TableCell>
+                                                    <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
+                                                    <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
+                                                    <TableCell className="text-right font-mono">{res.productionQty}</TableCell>
+                                                    <TableCell className="text-right font-mono">
+                                                        {res.status === 'Rejected' ? (
+                                                            <span className="text-red-500">-</span>
+                                                        ) : (
+                                                            <span className={((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1) > 50 ? 'text-green-600' : 'text-red-500'}>{((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1)}%</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        {hasWaitlistPosition(res.waitlistPosition) ? (
+                                                            <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
+                                                                #{res.waitlistPosition}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="font-mono text-slate-400">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={`rounded-full px-2 py-1 text-xs font-medium ${res.stockType === 'prm' ? 'bg-purple-100 text-purple-700' : res.stockType === 'std' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                            {res.stockType || '-'}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={`rounded-full px-2 py-1 text-xs ${getOrderStatusClass(res.status)}`}>
+                                                            {getOrderStatusLabel(res.status)}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-xs text-slate-500">
+                                                        {res.createdOn ? dayjs(res.createdOn).format('DD/MM/YYYY hh:mm A') : '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            {['Submitted', 'InReview'].includes(res.status) && (
+                                                                <Button size="sm" variant="outline" className="bg-blue-600 shadow-md text-white hover:bg-blue-700 hover:text-white" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
+                                                            )}
+                                                            {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected') && (
+                                                                <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(res)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </React.Fragment>
+                                )
+                            })}
+                        </TableBody>
+                    </Table>
+                </Card>
+                <div ref={designsEndRef} className="py-3 text-center text-sm text-slate-400">
+                    {designOrdersLoading && designOrders.length > 0 && <><SpinnerGap className="animate-spin inline-block mr-2 h-4 w-4" />Loading more designs...</>}
+                    {!designOrdersLoading && designOrders.length > 0 && designOrders.length >= totalDesignOrders && <span>All {totalDesignOrders} designs loaded</span>}
+                </div>
+                </>)}
             </div>
           
           <StockOrderDialog

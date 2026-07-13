@@ -295,7 +295,7 @@ export async function GET(request,{params}) {
                         SUM(o.approvedQty) AS totalApprovedQty,
                         SUM(o.productionQty) AS totalProductionQty,
 
-                        SUM(CASE WHEN o.status = 'Submitted' THEN 1 ELSE 0 END) AS submittedItems,
+                        SUM(CASE WHEN o.status IN ('Submitted', 'InReview') THEN 1 ELSE 0 END) AS submittedItems,
                         SUM(CASE WHEN o.status = 'Approved' THEN 1 ELSE 0 END) AS approvedItems,
                         SUM(CASE WHEN o.status = 'Rejected' THEN 1 ELSE 0 END) AS rejectedItems,
                         SUM(CASE WHEN o.productionQty > 0 THEN 1 ELSE 0 END) AS waitlistItems,
@@ -1130,7 +1130,7 @@ export async function GET(request,{params}) {
                         });
                     }
 
-                    if (items.some((item) => item.status === 'Submitted')) {
+                    if (items.some((item) => item.status === 'Submitted' || item.status === 'InReview')) {
                         await saleOrderConnection.rollback();
                         return Response.json({
                             status: 409,
@@ -1196,6 +1196,65 @@ export async function GET(request,{params}) {
                     });
                 } finally {
                     saleOrderConnection.release();
+                }
+            }
+            // get the prm batch allocations currently held by an order
+            // /U0.6/$orderId
+            else if (params.ids[1] === "U0.6") {
+                try {
+                    const [rows] = await connection.query(
+                        `
+                        SELECT psb.batchId, SUM(oba.allocatedQty) AS allocatedQty
+                        FROM order_batch_allocations oba
+                        JOIN product_stock_batches psb ON psb.id = oba.stockBatchId
+                        WHERE oba.orderId = ?
+                        AND oba.stockType = 'prm'
+                        GROUP BY psb.batchId
+                        HAVING allocatedQty > 0
+                        ORDER BY MIN(oba.id) ASC
+                        `,
+                        [params.ids[2]]
+                    );
+                    connection.release();
+
+                    return Response.json({status: 200, data: rows, message:'Data found!'}, {status: 200})
+                } catch (error) {
+                    return Response.json({status: 404, message:'No allocations found!'+error}, {status: 200})
+                }
+            }
+            // mark a Submitted order item as InReview when an admin opens it for review
+            // /U0.7/$orderId
+            else if (params.ids[1] === "U0.7") {
+                try {
+                    var orderId = params.ids[2];
+
+                    if (!orderId) {
+                        return Response.json({
+                            status: 400,
+                            success: false,
+                            message: "orderId is required",
+                        });
+                    }
+
+                    // only a Submitted item moves to InReview; anything else is left untouched
+                    const [result] = await pool.query(
+                        `UPDATE orders SET status = 'InReview' WHERE id = ? AND isDeleted = 0 AND status = 'Submitted'`,
+                        [orderId]
+                    );
+
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        message: result.affectedRows > 0 ? "Order item marked as InReview" : "Order item not in Submitted status",
+                        data: { orderId, updated: result.affectedRows > 0 },
+                    });
+                } catch (error) {
+                    return Response.json({
+                        status: 500,
+                        success: false,
+                        message: "Failed to mark order item as InReview",
+                        error: error.message,
+                    });
                 }
             }
             // get listing for mobile by userId for dealer
@@ -1743,6 +1802,39 @@ console.log(query);
 
                     const [rows, fields] = await connection.execute(query, [params.ids[3].split(',')[0], params.ids[3].split(',')[1], params.ids[3].split(',')[0], params.ids[3].split(',')[1]]);
                     const [countRows, countFields] = await connection.execute(queryCount, [params.ids[3].split(',')[0], params.ids[3].split(',')[1], params.ids[3].split(',')[0], params.ids[3].split(',')[1]]);
+
+                    // attach the prm batch allocations for every order in the report:
+                    // net quantity currently held per (order, batch) from the ledger
+                    if (rows.length > 0) {
+                        const orderIds = rows.map((r) => r.id);
+                        const placeholders = orderIds.map(() => '?').join(',');
+
+                        const [allocRows] = await connection.query(
+                            `
+                            SELECT oba.orderId, psb.batchId, SUM(oba.allocatedQty) AS allocatedQty
+                            FROM order_batch_allocations oba
+                            JOIN product_stock_batches psb ON psb.id = oba.stockBatchId
+                            WHERE oba.orderId IN (${placeholders})
+                            AND oba.stockType = 'prm'
+                            GROUP BY oba.orderId, psb.batchId
+                            HAVING allocatedQty > 0
+                            ORDER BY oba.orderId ASC, MIN(oba.id) ASC
+                            `,
+                            orderIds
+                        );
+
+                        const allocMap = new Map();
+                        for (const alloc of allocRows) {
+                            const key = String(alloc.orderId);
+                            if (!allocMap.has(key)) allocMap.set(key, []);
+                            allocMap.get(key).push({ batchId: alloc.batchId, qty: Number(alloc.allocatedQty || 0) });
+                        }
+
+                        rows.forEach((r) => {
+                            r.batchAllocations = allocMap.get(String(r.id)) || [];
+                        });
+                    }
+
                     connection.release();
 
                     if(rows.length > 0){
@@ -2042,7 +2134,7 @@ function groupAdminOrders(rows) {
     order.totalApprovedQty += approvedQty;
     order.totalProductionQty += productionQty;
 
-    if (row.status === "Submitted") order.submittedItems += 1;
+    if (row.status === "Submitted" || row.status === "InReview") order.submittedItems += 1;
     if (row.status === "Approved") order.approvedItems += 1;
     if (row.status === "Rejected") order.rejectedItems += 1;
     if (productionQty > 0) order.waitlistItems += 1;
@@ -2330,7 +2422,8 @@ async function recordBatchLedger(connection, { orderId, design, entries, allocat
  * Return released prm stock to the batches it was originally allocated from,
  * using the order_batch_allocations ledger (newest batches refunded first).
  * Stock reserved before the batch system has no ledger rows and cannot be
- * attributed to a batch — it is reported back as unattributedQty.
+ * attributed to a batch — it is added back to a per-design 'LEGACY' batch so
+ * it still returns to batch inventory instead of disappearing.
  */
 async function releasePrmToBatches(connection, { orderId, design, qty, adminId }) {
     let remaining = Number(qty || 0);
@@ -2340,27 +2433,61 @@ async function releasePrmToBatches(connection, { orderId, design, qty, adminId }
         return { releasedQty: 0, unattributedQty: 0, released };
     }
 
-    const [holdings] = await connection.query(
+    const [ledgerRows] = await connection.query(
         `
-        SELECT stockBatchId, SUM(allocatedQty) AS netQty
+        SELECT id, stockBatchId, allocatedQty
         FROM order_batch_allocations
         WHERE orderId = ? AND stockType = 'prm'
-        GROUP BY stockBatchId
-        HAVING netQty > 0
-        ORDER BY stockBatchId DESC
+        ORDER BY id ASC
         `,
         [orderId]
     );
 
-    for (const holding of holdings) {
-        if (remaining <= 0) break;
+    /**
+     * Replay the ledger into open allocation lots: a positive row opens a lot
+     * for its batch, a negative row (an earlier refund) consumes the newest
+     * open lots first. What survives is the stock the order currently holds,
+     * batch by batch, in allocation order.
+     */
+    const openLots = [];
+    for (const ledgerRow of ledgerRows) {
+        const rowQty = Number(ledgerRow.allocatedQty || 0);
 
-        const giveBackQty = Math.min(Number(holding.netQty || 0), remaining);
-        if (giveBackQty <= 0) continue;
+        if (rowQty > 0) {
+            openLots.push({ stockBatchId: ledgerRow.stockBatchId, qty: rowQty });
+        }
+        else if (rowQty < 0) {
+            let refund = -rowQty;
+            while (refund > 0 && openLots.length > 0) {
+                const lot = openLots[openLots.length - 1];
+                const take = Math.min(lot.qty, refund);
+                lot.qty -= take;
+                refund -= take;
+                if (lot.qty === 0) openLots.pop();
+            }
+        }
+    }
 
+    /**
+     * Refund the newest open lots first so the release mirrors the batches of
+     * the approval being undone — each batch gets back exactly what the most
+     * recent allocations took from it, even if older ledger history for the
+     * order is inconsistent.
+     */
+    const refundsByBatch = new Map();
+    while (remaining > 0 && openLots.length > 0) {
+        const lot = openLots[openLots.length - 1];
+        const take = Math.min(lot.qty, remaining);
+        lot.qty -= take;
+        remaining -= take;
+        refundsByBatch.set(lot.stockBatchId, (refundsByBatch.get(lot.stockBatchId) || 0) + take);
+        if (lot.qty === 0) openLots.pop();
+    }
+
+    for (const [stockBatchId, giveBackQty] of refundsByBatch) {
         await connection.query(
             `UPDATE product_stock_batches SET availableQty = availableQty + ?, status = 'Active', modifiedOn = NOW(), modifiedBy = ? WHERE id = ?`,
-            [giveBackQty, adminId, holding.stockBatchId]
+            [giveBackQty, adminId, stockBatchId]
         );
 
         await connection.query(
@@ -2369,14 +2496,44 @@ async function releasePrmToBatches(connection, { orderId, design, qty, adminId }
                 (orderId, stockBatchId, design, stockType, allocatedQty, allocationType, createdBy)
             VALUES (?, ?, ?, 'prm', ?, 'ManualAdjustment', ?)
             `,
-            [orderId, holding.stockBatchId, design, -giveBackQty, adminId]
+            [orderId, stockBatchId, design, -giveBackQty, adminId]
         );
 
-        remaining -= giveBackQty;
-        released.push({ stockBatchId: holding.stockBatchId, qty: giveBackQty });
+        released.push({ stockBatchId, qty: giveBackQty });
     }
 
-    return { releasedQty: Number(qty || 0) - remaining, unattributedQty: remaining, released };
+    /**
+     * Stock allocated before the batch ledger existed: park it in the design's
+     * 'LEGACY' batch. No ledger row is written for this refund — the order
+     * never drew this stock from a batch, and a negative entry would corrupt
+     * the order's net holdings for future releases.
+     */
+    if (remaining > 0) {
+        const [productRows] = await connection.query(
+            `SELECT productId FROM products WHERE design = ? LIMIT 1`,
+            [design]
+        );
+
+        await connection.query(
+            `
+            INSERT INTO product_stock_batches
+                (productId, design, batchId, stockType, initialQty, availableQty, status, receivedOn, createdBy)
+            VALUES (?, ?, 'LEGACY', 'prm', ?, ?, 'Active', NOW(), ?)
+            ON DUPLICATE KEY UPDATE
+                initialQty = initialQty + VALUES(initialQty),
+                availableQty = availableQty + VALUES(availableQty),
+                status = 'Active',
+                modifiedOn = NOW(),
+                modifiedBy = VALUES(createdBy)
+            `,
+            [productRows[0]?.productId ?? null, design, remaining, remaining, adminId]
+        );
+
+        released.push({ stockBatchId: null, batchId: 'LEGACY', qty: remaining });
+        remaining = 0;
+    }
+
+    return { releasedQty: Number(qty || 0), unattributedQty: 0, released };
 }
 
 /**

@@ -36,7 +36,7 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 'U1'){
                 try {
                     
-                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite, COALESCE(b.activeBatches, 0) as activeBatches, COALESCE(o.orderCount, 0) as orderCount FROM products p LEFT JOIN products_selected s ON p.design=s.design LEFT JOIN (SELECT design, COUNT(*) as activeBatches FROM product_stock_batches WHERE stockType="prm" AND status="Active" AND availableQty > 0 GROUP BY design) b ON p.design=b.design COLLATE utf8mb4_general_ci LEFT JOIN (SELECT design, COUNT(*) as orderCount FROM orders WHERE isDeleted=0 GROUP BY design) o ON p.design=o.design WHERE p.isActive=1 LIMIT 20 OFFSET '+params.ids[3]);
+                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite, COALESCE(b.activeBatches, 0) as activeBatches, COALESCE(o.orderCount, 0) as orderCount, o.latestOrderOn FROM products p LEFT JOIN products_selected s ON p.design=s.design LEFT JOIN (SELECT design, COUNT(*) as activeBatches FROM product_stock_batches WHERE stockType="prm" AND status="Active" AND availableQty > 0 GROUP BY design) b ON p.design=b.design COLLATE utf8mb4_general_ci LEFT JOIN (SELECT design, COUNT(*) as orderCount, MAX(createdOn) as latestOrderOn FROM orders WHERE isDeleted=0 GROUP BY design) o ON p.design=o.design WHERE p.isActive=1 LIMIT 20 OFFSET '+params.ids[3]);
                     // const [rows, fields] = await connection.execute('SELECT * from products LIMIT 20 OFFSET '+params.ids[3]);
                     connection.release();
 
@@ -53,7 +53,7 @@ export async function GET(request,{params}) {
             if(params.ids[1] == 'U1.1'){
                 try {
                     
-                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite, COALESCE(b.activeBatches, 0) as activeBatches, COALESCE(o.orderCount, 0) as orderCount FROM products p LEFT JOIN products_selected s ON p.design=s.design LEFT JOIN (SELECT design, COUNT(*) as activeBatches FROM product_stock_batches WHERE stockType="prm" AND status="Active" AND availableQty > 0 GROUP BY design) b ON p.design=b.design COLLATE utf8mb4_general_ci LEFT JOIN (SELECT design, COUNT(*) as orderCount FROM orders WHERE isDeleted=0 GROUP BY design) o ON p.design=o.design WHERE p.isActive=1');
+                    const [rows, fields] = await connection.execute('SELECT p.*, s.design as favorite, COALESCE(b.activeBatches, 0) as activeBatches, COALESCE(o.orderCount, 0) as orderCount, o.latestOrderOn FROM products p LEFT JOIN products_selected s ON p.design=s.design LEFT JOIN (SELECT design, COUNT(*) as activeBatches FROM product_stock_batches WHERE stockType="prm" AND status="Active" AND availableQty > 0 GROUP BY design) b ON p.design=b.design COLLATE utf8mb4_general_ci LEFT JOIN (SELECT design, COUNT(*) as orderCount, MAX(createdOn) as latestOrderOn FROM orders WHERE isDeleted=0 GROUP BY design) o ON p.design=o.design WHERE p.isActive=1');
                     connection.release();
 
                     if(rows.length > 0)

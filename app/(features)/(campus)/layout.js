@@ -25,6 +25,7 @@ const PAGE_TITLES = {
   '/manageimages': 'Manage Images',
   '/messages': 'Messages',
   '/offers': 'Offers',
+  '/ordersv2': 'Orders',
   '/productsv2': 'Designs',
   '/registration/form': 'Registration',
   '/sales': 'Sales',

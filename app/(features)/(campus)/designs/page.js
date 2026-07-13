@@ -803,7 +803,16 @@ export default function Products() {
     const sortedProducts = sortConfig.key
         ? [...filteredProducts].sort((a, b) => {
             let cmp;
-            if (numericSortKeys.includes(sortConfig.key)) {
+            if (sortConfig.key === 'latestOrderOn') {
+                // designs without orders always sort last, in both directions
+                const av = a.latestOrderOn ? new Date(a.latestOrderOn).getTime() : null;
+                const bv = b.latestOrderOn ? new Date(b.latestOrderOn).getTime() : null;
+                if (av === null && bv === null) return 0;
+                if (av === null) return 1;
+                if (bv === null) return -1;
+                cmp = av - bv;
+            }
+            else if (numericSortKeys.includes(sortConfig.key)) {
                 cmp = Number(a[sortConfig.key] || 0) - Number(b[sortConfig.key] || 0);
             } else {
                 cmp = String(a[sortConfig.key] || '').localeCompare(String(b[sortConfig.key] || ''), undefined, { numeric: true });
@@ -1006,6 +1015,7 @@ return (
                         <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('prm')}>Premium stock{sortIcon('prm')}</TableHead>
                         <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('activeBatches')}>Active Batches{sortIcon('activeBatches')}</TableHead>
                         <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('orderCount')}>Orders{sortIcon('orderCount')}</TableHead>
+                        <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('latestOrderOn')}>Latest Order{sortIcon('latestOrderOn')}</TableHead>
                         <TableHead></TableHead>
                     </TableRow>
                 </TableHeader>
@@ -1568,6 +1578,9 @@ return (
                                 {Number(product.orderCount) > 0 ? (
                                     <span>{product.orderCount}</span>
                                 ) : '-'}
+                            </TableCell>
+                            <TableCell className='font-mono text-right text-xs text-slate-500'>
+                                {product.latestOrderOn ? dayjs(product.latestOrderOn).format('DD/MM/YYYY') : '-'}
                             </TableCell>
                             {/* <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY hh:mm A")}</TableCell> */}
                             
