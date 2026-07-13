@@ -126,8 +126,13 @@ export async function GET(request, { params }) {
                     monthCondition = '';
                 }
                 else {
+                    // console.log(params.ids[2]);
                     
                     monthCondition = `AND st.monthDate = '${new Date(new Date(params.ids[2]).setMonth(new Date(params.ids[2]).getMonth())).toISOString().slice(0, 7) + '-01'}'`;
+                    // console.log(monthCondition);
+                    // monthCondition = `AND st.monthDate = '${params.ids[2]}'`;
+                    // console.log(monthCondition);
+                    
                 }
                 const userIds = params.ids[3].split(',');
                 
@@ -165,6 +170,7 @@ export async function GET(request, { params }) {
                     FROM targets st
                     JOIN user u ON st.userId = u.id
                     WHERE ${conditionsString1} ${monthCondition}`;
+                // console.log(query);
                 
                     const [targets] = await db.query(query);
 // console.log(targets);
@@ -176,7 +182,8 @@ export async function GET(request, { params }) {
                     
                     // Add 3 entries for all the users with role 'dealer' for the given month with categoryId 1, 2 and 3 with targetAmount and actualAmount as 0, we can identify these entries by checking the monthDate value as 'To be decided'
                     const newMonth = new Date(new Date(params.ids[2]).setMonth(new Date(params.ids[2]).getMonth())).toISOString().slice(0, 7) + '-01';
-                    
+                    // const newMonth = `${params.ids[2]}'`;
+
                     // get all users with role 'dealer'
                     const [dealerRows] = await db.query(`SELECT id FROM user WHERE role='Dealer'`);
                     

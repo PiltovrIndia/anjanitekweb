@@ -15,7 +15,7 @@ import { Button } from '@/app/components/ui/button'
 import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
-import { ArrowDown, CheckIcon, HeartIcon, Pencil, Search, Trash } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, CheckIcon, HeartIcon, Pencil, Search, Trash } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
@@ -34,7 +34,7 @@ const xlsx = require('xlsx');
 
 // get tags for the products
 const getTags = async (pass) => 
-    fetch("/api/v2/products/"+pass+"/U0/", {
+    fetch("/api/v2/designs/"+pass+"/U0/", {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -44,7 +44,7 @@ const getTags = async (pass) =>
 
 // get products
 const getProducts = async (pass, role, offset) => 
-fetch("/api/v2/products/"+pass+"/U1.1/"+role+"/"+offset, {
+fetch("/api/v2/designs/"+pass+"/U1.1/"+role+"/"+offset, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -54,7 +54,7 @@ fetch("/api/v2/products/"+pass+"/U1.1/"+role+"/"+offset, {
 
 // update product
 const upateProduct = async (pass, productId, tags, size) => 
-fetch("/api/v2/products/"+pass+"/U5/"+productId+"/"+tags+"/"+size, {
+fetch("/api/v2/designs/"+pass+"/U5/"+productId+"/"+tags+"/"+size, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -64,7 +64,7 @@ fetch("/api/v2/products/"+pass+"/U5/"+productId+"/"+tags+"/"+size, {
 
 // update product name
 const updateProductName = async (pass, productId, name) => 
-fetch("/api/v2/products/"+pass+"/U10/"+productId+"/"+encodeURIComponent(name), {
+fetch("/api/v2/designs/"+pass+"/U10/"+productId+"/"+encodeURIComponent(name), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -74,7 +74,7 @@ fetch("/api/v2/products/"+pass+"/U10/"+productId+"/"+encodeURIComponent(name), {
 
 // design of the day
 const designOfTheDay = async (pass, productData) => 
-fetch("/api/v2/products/"+pass+"/U8/"+productData, {
+fetch("/api/v2/designs/"+pass+"/U8/"+productData, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -84,7 +84,7 @@ fetch("/api/v2/products/"+pass+"/U8/"+productData, {
 
 // create product
 const createProductAPI = async (pass, productData) => 
-fetch("/api/v2/products/"+pass+"/U7/"+productData, {
+fetch("/api/v2/designs/"+pass+"/U7/"+productData, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -94,9 +94,21 @@ fetch("/api/v2/products/"+pass+"/U7/"+productData, {
 
 
 // upload invoices data
-const updateUploadStockData = async (pass, items1, adminId) => 
-    
-    fetch("/api/v2/products/"+pass+"/U0/"+adminId+"/-", {
+const updateUploadStockData = async (pass, items1, adminId) =>
+
+    fetch("/api/v2/designs/"+pass+"/U0/"+adminId+"/-", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify(items1),
+    });
+
+// remove stock in bulk — same payload shape as the upload, quantities are deducted
+const removeStockDataAPI = async (pass, items1, adminId) =>
+
+    fetch("/api/v2/designs/"+pass+"/U0.1/"+adminId+"/-", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -148,6 +160,7 @@ export default function Products() {
     const [searchedProducts, setSearchedProducts] = useState([]);
     const [filteredProducts, setFilteredProducts] = useState([]);
     const [selectedSize, setSelectedSize] = useState('All');
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
     const [searchQuery, setSearchQuery] = useState(''); // State for search input
     const [file, setFile] = useState(null); 
         
@@ -553,9 +566,14 @@ export default function Products() {
     
     
     // for invocies upload
-    const processStockData = (e) => {
+    const processStockData = () => handleStockFileUpload('add');
+
+    // for stock removal upload — same excel format, quantities are deducted
+    const processStockRemoval = () => handleStockFileUpload('remove');
+
+    const handleStockFileUpload = (mode) => {
         // console.log('Check1');
-        
+
         if (file) {
             const reader = new FileReader();
     
@@ -566,23 +584,25 @@ export default function Products() {
                 // print the length of sheets to console
                 // console.log("Number of sheets:", workbook.SheetNames.length);
 
-                var totalSheetData = [];
-                
+                var totalFlatRows = [];
+
                 for (let index = 0; index < workbook.SheetNames.length; index++) {
                     const element = workbook.SheetNames[index];
-                    
-                
+
+
                     // const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[element];
-                    
+
                     // Specify date format directly in the read operation
                     const data = XLSX.utils.sheet_to_json(worksheet, {
                         dateNF: 'yyyy-mm-dd hh:mm:ss', // Format date columns
                         raw: false, // Do not use raw values (this ensures that dates are processed)
                     });
 
-                    // keep only DESIGN, PRM, STD columns (case-insensitive) and normalize rows
-                    const allowed = ['DESIGN', 'PRM', 'STD'];
+                    // keep only DESIGN, QUANTITY, BATCH columns (case-insensitive) and normalize rows:
+                    // BATCH = 'STD' marks the row's quantity as std stock, any
+                    // other value is the prm batch number for that quantity
+                    const allowed = ['DESIGN', 'QUANTITY', 'BATCH'];
                     const filteredRows = data
                         .map(row => {
                             const out = {};
@@ -592,19 +612,41 @@ export default function Products() {
                             });
                             return {
                                 design: out['DESIGN'] ? String(out['DESIGN']).trim().replace(/-/g, '').replace('ATL', '').trim() : '',
-                                prm: out['PRM'] != null && out['PRM'] !== '' ? (isNaN(Number(out['PRM'])) ? out['PRM'] : Number(out['PRM'])) : null,
-                                std: out['STD'] != null && out['STD'] !== '' ? (isNaN(Number(out['STD'])) ? out['STD'] : Number(out['STD'])) : null,
-                                createdOn: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                                qty: out['QUANTITY'] != null && out['QUANTITY'] !== '' && !isNaN(Number(out['QUANTITY'])) ? Number(out['QUANTITY']) : null,
+                                batch: out['BATCH'] != null && out['BATCH'] !== '' ? String(out['BATCH']).trim() : '',
                             };
                         })
                         .filter(r => r.design && r.design.length);
 
-                    // replace original data array contents with filtered rows so subsequent code uses them
-                    data.length = 0;
-                    filteredRows.forEach(r => data.push(r));
-
-                    totalSheetData = totalSheetData.concat(data);
+                    totalFlatRows = totalFlatRows.concat(filteredRows);
                 }
+
+                // group rows by design: a 'STD' batch value makes the row's
+                // quantity the design's std stock (largest wins if repeated);
+                // every other batch value is a prm batch with its quantity
+                const groupedByDesign = new Map();
+                totalFlatRows.forEach(r => {
+                    if (!groupedByDesign.has(r.design)) {
+                        groupedByDesign.set(r.design, {
+                            design: r.design,
+                            std: null,
+                            batches: [],
+                            createdOn: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                        });
+                    }
+                    const entry = groupedByDesign.get(r.design);
+                    if (r.qty == null) return;
+
+                    if (r.batch.toUpperCase() === 'STD') {
+                        if (entry.std == null || r.qty > entry.std) entry.std = r.qty;
+                    } else {
+                        const existing = entry.batches.find(b => b.batch === r.batch);
+                        if (existing) existing.qty += r.qty;
+                        else entry.batches.push({ batch: r.batch, qty: r.qty });
+                    }
+                });
+
+                const totalSheetData = Array.from(groupedByDesign.values());
                 
                 // Replace '/' with '***' in the invoiceNo field for each item in the data array
                 // const updatedData = data.map(item => {
@@ -623,7 +665,7 @@ export default function Products() {
     
                 // setItems(data);
                 // getInvoiceDataDetails(data);
-                uploadStockDetails(totalSheetData);
+                uploadStockDetails(totalSheetData, mode);
                 // const data = XLSX.utils.sheet_to_json(worksheet);
                 // setItems(data);
                 // getDataDetails(data);
@@ -635,7 +677,7 @@ export default function Products() {
         }
     }
 
-    async function uploadStockDetails(items1) {
+    async function uploadStockDetails(items1, mode = 'add') {
         setUploadProgress(true);
 
         const batchSize = 50;
@@ -653,11 +695,17 @@ export default function Products() {
 
         for (let b = 0; b < batches.length; b++) {
             try {
-                const result = await updateUploadStockData(
-                    process.env.NEXT_PUBLIC_API_PASS,
-                    batches[b],
-                    userId
-                );
+                const result = mode === 'remove'
+                    ? await removeStockDataAPI(
+                        process.env.NEXT_PUBLIC_API_PASS,
+                        batches[b],
+                        userId
+                    )
+                    : await updateUploadStockData(
+                        process.env.NEXT_PUBLIC_API_PASS,
+                        batches[b],
+                        userId
+                    );
                 const queryResult = await result.json();
                 if (queryResult.status === 200) {
                     const summary = queryResult.data || [];
@@ -680,9 +728,10 @@ export default function Products() {
         if (hasError) {
             toast({ description: errorMsg });
         } else {
+            const verb = mode === 'remove' ? 'removed' : 'uploaded';
             const msg = totalFailed > 0
-                ? `Updated ${totalSucceeded} of ${totalRows} designs (${totalFailed} not found). Refresh to view.`
-                : 'Stock uploaded successfully. Refresh to view updated data.';
+                ? `Stock ${verb} for ${totalSucceeded} of ${totalRows} designs (${totalFailed} not found). Refresh to view.`
+                : `Stock ${verb} successfully. Refresh to view updated data.`;
             toast({ description: msg });
         }
     }
@@ -730,8 +779,32 @@ export default function Products() {
             setResLoading(false);
         }
     }
-    
-    
+    // toggle column sort: first click sorts ascending, second flips to descending
+    function handleSort(key) {
+        setSortConfig(prev => prev.key === key
+            ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+            : { key, direction: 'asc' });
+    }
+
+    const numericSortKeys = ['prm', 'std', 'activeBatches'];
+    const sortedProducts = sortConfig.key
+        ? [...filteredProducts].sort((a, b) => {
+            let cmp;
+            if (numericSortKeys.includes(sortConfig.key)) {
+                cmp = Number(a[sortConfig.key] || 0) - Number(b[sortConfig.key] || 0);
+            } else {
+                cmp = String(a[sortConfig.key] || '').localeCompare(String(b[sortConfig.key] || ''), undefined, { numeric: true });
+            }
+            return sortConfig.direction === 'asc' ? cmp : -cmp;
+        })
+        : filteredProducts;
+
+    const sortIcon = (key) => sortConfig.key !== key
+        ? <ArrowUpDown className="inline-block ml-1 h-3 w-3 text-slate-400" />
+        : sortConfig.direction === 'asc'
+            ? <ArrowUp className="inline-block ml-1 h-3 w-3" />
+            : <ArrowDown className="inline-block ml-1 h-3 w-3" />;
+
 return (
 
     // <div className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px', overflow:'scroll'}}>
@@ -740,13 +813,16 @@ return (
     //           <h2 className="text-xl font-semibold mr-4">Designs</h2>
               
              
-    <div className={`${inter.className} flex flex-col min-h-screen w-full overflow-auto`} style={{ gap: '8px' }}>
+    <div className={`${inter.className} flex flex-col flex-1 min-h-0 w-full overflow-y-auto`} style={{ gap: '8px' }}>
         <div className='flex flex-row gap-2 items-center py-4' >
               <h2 className="text-xl font-semibold mr-4">Designs</h2>
               
               <Sheet>
                     <SheetTrigger asChild>
-                        <Button className="text-white bg-green-600"><GridFour className='font-bold text-lg'/>&nbsp; Upload Stock</Button>
+                        <Button size="xs" className="bg-green-600 hover:bg-green-700 text-white font-mono uppercase text-sm tracking-wider px-3 py-2" >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Stock
+                        </Button>
                     </SheetTrigger>
                     <SheetContent>
                         <SheetHeader>
@@ -769,7 +845,36 @@ return (
                         </SheetFooter>
                     </SheetContent>
                 </Sheet>
-                
+              
+              <Sheet>
+                    <SheetTrigger asChild>
+                        <Button size="xs" className="bg-orange-600 hover:bg-orange-700 text-white font-mono uppercase text-sm tracking-wider px-3 py-2" >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Remove Stock
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent>
+                        <SheetHeader>
+                        <SheetTitle>File upload</SheetTitle>
+                        <SheetDescription>
+                            Make sure you use the correct format. Click Upload now when file is selected.
+                        </SheetDescription>
+                        </SheetHeader>
+                        <div className="grid gap-4 py-4">
+                            <br/>
+                            <div className="grid w-full max-w-sm items-center gap-1.5">
+                                <Label htmlFor="picture">Data file</Label>
+                                <Input id="picture" type="file" accept=".xlsx, .xls" onChange={handleFileSelect} />
+                            </div>
+                        </div>
+                        <SheetFooter>
+                        <SheetClose asChild>
+                            <Button type="submit" onClick={processStockRemoval}>Upload now</Button>
+                        </SheetClose>
+                        </SheetFooter>
+                    </SheetContent>
+                </Sheet>
+
 
                 {uploadProgress ? <Card className="w-[350px]">
                     <CardHeader>
@@ -881,18 +986,19 @@ return (
             {/* <Table> */}
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Design</TableHead>
-                        <TableHead>Design Number</TableHead>
-                        <TableHead>Size</TableHead>
-                        <TableHead className='text-right'>Premium stock</TableHead>
-                        <TableHead className='text-right'>Standard stock</TableHead>
+                        <TableHead className='cursor-pointer select-none' onClick={() => handleSort('name')}>Design{sortIcon('name')}</TableHead>
+                        <TableHead className='cursor-pointer select-none' onClick={() => handleSort('design')}>Design Number{sortIcon('design')}</TableHead>
+                        <TableHead className='cursor-pointer select-none' onClick={() => handleSort('size')}>Size{sortIcon('size')}</TableHead>
+                        <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('prm')}>Premium stock{sortIcon('prm')}</TableHead>
+                        <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('activeBatches')}>Active Batches{sortIcon('activeBatches')}</TableHead>
+                        <TableHead className='cursor-pointer select-none text-right' onClick={() => handleSort('std')}>Standard stock{sortIcon('std')}</TableHead>
                         <TableHead></TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     
-                    {(filteredProducts==null) ? '' :
-                    filteredProducts.map((product) => (
+                    {(sortedProducts==null) ? '' :
+                    sortedProducts.map((product) => (
                         <TableRow key={product.id}>
                             <TableCell>
                                 {/* <div className='flex flex-row gap-2 items-center text-blue-600 font-semibold py-4 w-max cursor-pointer' onClick={() => handleRowClick(product)}> {product.name} </div> */}
@@ -1011,7 +1117,7 @@ return (
                                                                 };
                                                                 
                                                                 try {    
-                                                                    console.log("/api/v2/products/"+process.env.NEXT_PUBLIC_API_PASS+"/U8/"+JSON.stringify(productData));
+                                                                    console.log("/api/v2/designs/"+process.env.NEXT_PUBLIC_API_PASS+"/U8/"+JSON.stringify(productData));
                                                                     
                                                                     const result  = await designOfTheDay(process.env.NEXT_PUBLIC_API_PASS, JSON.stringify(productData)) 
                                                                     const queryResult = await result.json() // get data
@@ -1403,6 +1509,7 @@ return (
                             </TableCell>
                             <TableCell className='font-mono'>{product.size}</TableCell>
                             <TableCell className='font-mono text-right'>{product.prm}</TableCell>
+                            <TableCell className='font-mono text-right'>{Number(product.activeBatches) > 0 ? product.activeBatches : '-'}</TableCell>
                             <TableCell className='font-mono text-right'>{product.std}</TableCell>
                             {/* <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY hh:mm A")}</TableCell> */}
                             

@@ -15,7 +15,7 @@ import { Button } from '@/app/components/ui/button'
 import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
-import { ArrowDown, CheckIcon, ChevronDown, ChevronRight, HeartIcon, Pencil, Search, Trash } from 'lucide-react'
+import { ArrowDown, CheckIcon, ChevronDown, ChevronRight, FileCheck, HeartIcon, Pencil, Search, Trash } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
@@ -36,7 +36,7 @@ const ORDER_PAGE_SIZE = 0;
 
 // get orders
 const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction) => 
-fetch("/api/v2/orders/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction, {
+fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -46,7 +46,7 @@ fetch("/api/v2/orders/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+so
 
 // get design grouped orders
 const getDesignOrdersAPI = async (pass, type, page, role, userId, sortBy) =>
-fetch("/api/v2/orders/"+pass+"/U00.1/"+type+"/"+page+"/"+role+"/"+userId+"/"+sortBy, {
+fetch("/api/v2/orders_test/"+pass+"/U00.1/"+type+"/"+page+"/"+role+"/"+userId+"/"+sortBy, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -56,7 +56,7 @@ fetch("/api/v2/orders/"+pass+"/U00.1/"+type+"/"+page+"/"+role+"/"+userId+"/"+sor
 
 // get design group specific order items
 const getDesignOrderItemsAPI = async (pass, design, stockType = 'All') =>
-fetch("/api/v2/orders/"+pass+"/U00.2/"+encodeURIComponent(design)+"/"+stockType, {
+fetch("/api/v2/orders_test/"+pass+"/U00.2/"+encodeURIComponent(design)+"/"+stockType, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -66,7 +66,7 @@ fetch("/api/v2/orders/"+pass+"/U00.2/"+encodeURIComponent(design)+"/"+stockType,
 
 // get report specific listing
 const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction) =>
-fetch("/api/v2/orders/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction, {
+fetch("/api/v2/orders_test/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -76,7 +76,7 @@ fetch("/api/v2/orders/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+",
 
 
 const getOrdersByDesignAPI = async (pass, design, signal) =>
-fetch("/api/v2/orders/"+pass+"/U2/"+encodeURIComponent(design), {
+fetch("/api/v2/orders_test/"+pass+"/U2/"+encodeURIComponent(design), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -86,8 +86,28 @@ fetch("/api/v2/orders/"+pass+"/U2/"+encodeURIComponent(design), {
 });
 
 // update order status
-const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate, design) => 
-fetch("/api/v2/orders/"+pass+"/"+path+"/"+orderId+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design), {
+const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate, design, batchSeq) =>
+fetch("/api/v2/orders_test/"+pass+"/"+path+"/"+orderId+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design)+(Array.isArray(batchSeq) && batchSeq.length > 0 ? "?batchSeq="+batchSeq.join(',') : ""), {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// mark all order items of a cart as sale order
+const markCartAsSaleOrderAPI = async (pass, cartId, adminId, actionDate) =>
+fetch("/api/v2/orders_test/"+pass+"/U0.5/"+encodeURIComponent(cartId)+"/"+adminId+"/"+actionDate, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// mark a submitted order item as in review
+const markOrderInReviewAPI = async (pass, orderId) =>
+fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -160,6 +180,12 @@ export default function Orders() {
     const [designOrderHistoryError, setDesignOrderHistoryError] = useState('')
     const [isEditingOrderItem, setIsEditingOrderItem] = useState(false)
     const [showDesignOrderHistory, setShowDesignOrderHistory] = useState(false)
+    const [designBatches, setDesignBatches] = useState([])
+    const [loadingDesignBatches, setLoadingDesignBatches] = useState(false)
+    const [batchSequence, setBatchSequence] = useState([]) // admin-chosen batch allocation order (stock batch ids)
+    const [orderAllocations, setOrderAllocations] = useState([]) // batches allocated to the approved order under review
+    const [loadingOrderAllocations, setLoadingOrderAllocations] = useState(false)
+    const [saleOrderCartId, setSaleOrderCartId] = useState(null) // cartId currently being marked as Sale Order
     const reviewDesignTimer = useRef(null)
     const reviewDesignRef = useRef(null)
     const ordersEndRef = useRef(null)
@@ -289,7 +315,7 @@ export default function Orders() {
 
     // Clamp approvalQty to availableStd whenever the dialog opens or fresh stock arrives
     useEffect(() => {
-        if (!selectedRes || selectedRes.stockType !== 'std' || selectedRes.status !== 'Submitted') return;
+        if (!selectedRes || selectedRes.stockType !== 'std' || !['Submitted', 'InReview'].includes(selectedRes.status)) return;
         const availableStd = Number(selectedReviewDesign?.std || 0) - Number(selectedRes?.approvedQty || 0);
         if (availableStd <= 0) {
             setApprovalQty('0');
@@ -297,6 +323,65 @@ export default function Orders() {
             setApprovalQty(prev => String(Math.min(Number(prev), availableStd)));
         }
     }, [selectedRes?.id, selectedRes?.status, selectedReviewDesign?.std, selectedRes?.approvedQty])
+
+    // Load the PRM stock batches for the design under review
+    useEffect(() => {
+        const design = selectedReviewDesign?.design || selectedRes?.design;
+        if (!isActionDialogOpen || selectedRes?.stockType !== 'prm' || !design) {
+            setDesignBatches([]);
+            setLoadingDesignBatches(false);
+            setBatchSequence([]);
+            return;
+        }
+
+        let cancelled = false;
+        setLoadingDesignBatches(true);
+        setBatchSequence([]);
+
+        fetch(`/api/v2/designs/${process.env.NEXT_PUBLIC_API_PASS}/U11/${encodeURIComponent(design)}`, {
+            headers: { 'Content-Type': 'application/json' },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!cancelled) setDesignBatches(data.status === 200 && Array.isArray(data.data) ? data.data : []);
+        })
+        .catch(() => {
+            if (!cancelled) setDesignBatches([]);
+        })
+        .finally(() => {
+            if (!cancelled) setLoadingDesignBatches(false);
+        });
+
+        return () => { cancelled = true; };
+    }, [isActionDialogOpen, selectedRes?.stockType, selectedReviewDesign?.design, selectedRes?.design])
+
+    // For an approved PRM order, load the batches its stock is allocated from
+    useEffect(() => {
+        if (!isActionDialogOpen || selectedRes?.stockType !== 'prm' || selectedRes?.status !== 'Approved' || !selectedRes?.id) {
+            setOrderAllocations([]);
+            setLoadingOrderAllocations(false);
+            return;
+        }
+
+        let cancelled = false;
+        setLoadingOrderAllocations(true);
+
+        fetch(`/api/v2/orders_test/${process.env.NEXT_PUBLIC_API_PASS}/U0.6/${selectedRes.id}`, {
+            headers: { 'Content-Type': 'application/json' },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!cancelled) setOrderAllocations(data.status === 200 && Array.isArray(data.data) ? data.data : []);
+        })
+        .catch(() => {
+            if (!cancelled) setOrderAllocations([]);
+        })
+        .finally(() => {
+            if (!cancelled) setLoadingOrderAllocations(false);
+        });
+
+        return () => { cancelled = true; };
+    }, [isActionDialogOpen, selectedRes?.stockType, selectedRes?.status, selectedRes?.id])
 
     useEffect(() => {
         if (activeOrdersTab !== 'Orders') return;
@@ -427,11 +512,16 @@ export default function Orders() {
         if (status === 'Rejected') return 'bg-red-100 text-red-700'
         if (status === 'Modified') return 'bg-yellow-100 text-yellow-700'
         if (status === 'OutOfStock') return 'bg-orange-100 text-orange-700'
+        if (status === 'SaleOrder') return 'bg-emerald-100 text-emerald-700'
+        if (status === 'InReview') return 'bg-sky-100 text-sky-700'
         return 'bg-gray-100 text-gray-700'
     }
 
     function getOrderStatusLabel(status) {
-        return status === 'Submitted' ? 'Pending' : status || '-'
+        if (status === 'Submitted') return 'Pending'
+        if (status === 'SaleOrder') return 'Sale Order'
+        if (status === 'InReview') return 'In Review'
+        return status || '-'
     }
 
     async function getOrders(val, offsetR, userObj = user, productionFilter = isProduction, append = false){
@@ -563,6 +653,8 @@ export default function Orders() {
         setShowDownloadPopover(false);
 
         try {
+            console.log("/api/v2/orders_test/"+process.env.NEXT_PUBLIC_API_PASS+"/report/"+statusToDownload+"/"+encodeURIComponent(downloadFromDate)+","+encodeURIComponent(downloadToDate)+"/"+isProduction);
+            
             const result = await getOrdersByDateAPI(
                 process.env.NEXT_PUBLIC_API_PASS,
                 statusToDownload,
@@ -597,34 +689,46 @@ export default function Orders() {
                 return;
             }
 
-            const orderRows = allOrders.map((res) => ({
-                // orderId: res.id,
-                dealerName: res.dealer || '-',
-                orderedBy: res.orderedBy || '-',
-                userId: res.userId || '-',
-                mobile: res.mobile || '-',
-                // salesPerson: res.mapTo || '-',
-                design: res.design || '-',
-                productName: res.name || '-',
-                // productId: res.productId || '-',
-                requestedQty: Number(res.requestedQty || 0),
-                approvedQty: Number(res.approvedQty || 0),
-                stockType: res.stockType || '-',
-                waitlistPosition: res.waitlistPosition || '-',
-                size: res.size || '-',
-                status: res.status || '-',
-                submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
-                approvedOn: res.approvedOn ? dayjs(res.approvedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
-                modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
-                requestType: res.isProduction == 1 || Number(res.productionQty || 0) > 0 ? 'Production' : 'Current',
-            }));
+            // an order item allocated from multiple batches becomes one row per
+            // batch, carrying the batch number and the qty taken from that batch
+            const orderRows = allOrders.flatMap((res) => {
+                const buildRow = (batchNo, batchQty) => ({
+                    // orderId: res.id,
+                    dealerName: res.dealer || '-',
+                    orderedBy: res.orderedBy || '-',
+                    userId: res.userId || '-',
+                    mobile: res.mobile || '-',
+                    // salesPerson: res.mapTo || '-',
+                    design: res.design || '-',
+                    productName: res.name || '-',
+                    // productId: res.productId || '-',
+                    requestedQty: Number(res.requestedQty || 0),
+                    approvedQty: Number(res.approvedQty || 0),
+                    batchNo,
+                    batchQty,
+                    stockType: res.stockType || '-',
+                    waitlistPosition: res.waitlistSequence || '-',
+                    size: res.size || '-',
+                    status: res.status || '-',
+                    submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                    approvedOn: res.approvedOn ? dayjs(res.approvedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                    modifiedOn: res.modifiedOn ? dayjs(res.modifiedOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                    requestType: res.isProduction == 1 || Number(res.productionQty || 0) > 0 ? 'Production' : 'Current',
+                });
+
+                const allocations = Array.isArray(res.batchAllocations) ? res.batchAllocations : [];
+                if (allocations.length === 0) {
+                    return [buildRow('-', '-')];
+                }
+                return allocations.map((alloc) => buildRow(alloc.batchId || 'UNNAMED', Number(alloc.qty || 0)));
+            });
 
             const worksheet = xlsx.utils.json_to_sheet(orderRows);
             const workbook = xlsx.utils.book_new();
             xlsx.utils.book_append_sheet(workbook, worksheet, 'Orders');
             xlsx.writeFile(workbook, `orders${isProduction != 'All' ? (isProduction == 1 ? '_Production' : '_Current') : ''}_${statusToDownload.toLowerCase()}_${downloadFromDate}_to_${downloadToDate}.xlsx`);
 
-            toast({ description: `Downloaded ${orderRows.length} orders` });
+            toast({ description: `Downloaded ${allOrders.length} orders (${orderRows.length} rows)` });
         } catch (e) {
             toast({ description: e.message || 'Failed to download orders' });
         } finally {
@@ -746,23 +850,55 @@ export default function Orders() {
     
 
     async function handleUpdateStatus(res) {
-        setSelectedRes(res);
+        // opening a Submitted item for review moves it to InReview right away
+        let reviewRes = res;
+        if (res.status === 'Submitted') {
+            reviewRes = { ...res, status: 'InReview' };
 
-        setApprovalQty(res.requestedQty); // Default to requested quantity
-        setSelectedReviewDesign(res)
+            markOrderInReviewAPI(process.env.NEXT_PUBLIC_API_PASS, res.id).catch(() => {});
+
+            // reflect the new status in the orders listing
+            setOrders(prev => prev.map(group => {
+                if (!group.rows?.some(row => String(row.id) === String(res.id))) return group;
+                const updatedRows = group.rows.map(row => String(row.id) === String(res.id) ? { ...row, status: 'InReview' } : row);
+                return {
+                    ...group,
+                    rows: updatedRows,
+                    first: updatedRows[0] || group.first,
+                    status: group.rows.length === 1 ? 'InReview' : group.status,
+                    statuses: getStatusCounts(updatedRows),
+                };
+            }));
+
+            // and in the designs tab item panel if it is open
+            if (res.design) {
+                setDesignOrderItems(prev => {
+                    if (!prev[res.design]) return prev;
+                    return {
+                        ...prev,
+                        [res.design]: prev[res.design].map(item => String(item.id) === String(res.id) ? { ...item, status: 'InReview' } : item),
+                    };
+                });
+            }
+        }
+
+        setSelectedRes(reviewRes);
+
+        setApprovalQty(reviewRes.requestedQty); // Default to requested quantity
+        setSelectedReviewDesign(reviewRes)
         setReviewDesignQuery('')
         setReviewDesignResults([])
         setShowReviewDesignDrop(false)
         setDesignOrderHistory([])
         setDesignOrderHistoryError('')
         setShowDesignOrderHistory(false)
-        setIsEditingOrderItem(res.status === 'Submitted')
+        setIsEditingOrderItem(reviewRes.status === 'InReview')
 
         setIsActionDialogOpen(true);
 
         // Fetch fresh stock for this design in the background
         if (res.design) {
-            fetch(`/api/v2/products/${process.env.NEXT_PUBLIC_API_PASS}/U4/${encodeURIComponent(res.design)}/0`, {
+            fetch(`/api/v2/designs/${process.env.NEXT_PUBLIC_API_PASS}/U4/${encodeURIComponent(res.design)}/0`, {
                 headers: { 'Content-Type': 'application/json' },
             })
             .then(r => r.json())
@@ -788,7 +924,7 @@ export default function Orders() {
         reviewDesignTimer.current = setTimeout(async () => {
             setSearchingReviewDesigns(true)
             try {
-                const res = await fetch(`/api/v2/products/${process.env.NEXT_PUBLIC_API_PASS}/U4/${encodeURIComponent(value)}/0`, {
+                const res = await fetch(`/api/v2/designs/${process.env.NEXT_PUBLIC_API_PASS}/U4/${encodeURIComponent(value)}/0`, {
                     headers: { 'Content-Type': 'application/json' },
                 })
                 const data = await res.json()
@@ -810,6 +946,112 @@ export default function Orders() {
         setShowDesignOrderHistory(false)
         setDesignOrderHistory([])
         setDesignOrderHistoryError('')
+    }
+
+    // mark every order item of a cart as Sale Order (clears pending production)
+    async function handleMarkSaleOrder(group, e) {
+        e?.stopPropagation?.();
+        if (saleOrderCartId) return;
+
+        const confirmed = window.confirm(`Mark all items of cart #${group.first?.cartId || group.cartId} as Sale Order? Pending production quantities will be cleared.`);
+        if (!confirmed) return;
+
+        setSaleOrderCartId(group.cartId);
+        try {
+            const result = await markCartAsSaleOrderAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                group.first?.cartId || group.cartId,
+                user?.id,
+                dayjs().format('YYYY-MM-DD HH:mm:ss')
+            );
+            const queryResult = await result.json();
+
+            if (queryResult.status === 200) {
+                toast({ description: `Cart marked as Sale Order (${queryResult.data?.updatedItems ?? 0} items updated)` });
+
+                // patch the group in place: live items become SaleOrder, all production cleared
+                setOrders(prev => prev.map(g => {
+                    if (String(g.cartId) !== String(group.cartId)) return g;
+
+                    const updatedRows = g.rows.map(row => ['Cancelled', 'Rejected', 'Deleted'].includes(row.status)
+                        ? { ...row, productionQty: 0 }
+                        : { ...row, status: 'SaleOrder', productionQty: 0 });
+
+                    const totalRequestedQty  = updatedRows.reduce((s, r) => s + Number(r.requestedQty  || 0), 0);
+                    const totalApprovedQty   = updatedRows.reduce((s, r) => s + Number(r.approvedQty   || 0), 0);
+
+                    return {
+                        ...g,
+                        rows: updatedRows,
+                        first: updatedRows[0] || g.first,
+                        totalRequestedQty, totalApprovedQty,
+                        totalProductionQty: 0,
+                        requestedQty: totalRequestedQty,
+                        approvedQty: totalApprovedQty,
+                        productionQty: 0,
+                        waitlistItems: 0,
+                        status: updatedRows[0]?.status || g.status,
+                        requestTypes: ['Current'],
+                        statuses: getStatusCounts(updatedRows),
+                    };
+                }));
+            } else {
+                toast({ description: queryResult.message || 'Failed to mark cart as Sale Order' });
+            }
+        } catch (e) {
+            toast({ description: 'Error marking cart as Sale Order' });
+        } finally {
+            setSaleOrderCartId(null);
+        }
+    }
+
+    // panel showing which batches an approved order's stock was allocated from
+    const renderAllocatedBatchesPanel = () => (
+        <div className="rounded-lg border border-slate-200 bg-white">
+            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-900">Allocated batches</span>
+                        <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                            {orderAllocations.length}
+                        </span>
+                    </div>
+                    <div className="text-xs text-slate-500">{selectedRes?.design || '-'}</div>
+                </div>
+                <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">
+                    Allocated {orderAllocations.reduce((sum, alloc) => sum + Number(alloc.allocatedQty || 0), 0)}
+                </span>
+            </div>
+
+            {loadingOrderAllocations ? (
+                <div className="flex items-center justify-center border-t border-slate-100 px-3 py-4 text-sm text-slate-500">
+                    <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />
+                    Loading allocations...
+                </div>
+            ) : orderAllocations.length === 0 ? (
+                <div className="border-t border-slate-100 px-3 py-4 text-center text-sm text-slate-500">
+                    No batch allocations recorded for this order
+                </div>
+            ) : (
+                <div className="max-h-44 divide-y divide-slate-100 overflow-y-auto border-t border-slate-100">
+                    {orderAllocations.map((alloc) => (
+                        <div key={alloc.batchId || 'unnamed'} className="flex items-center justify-between gap-3 px-3 py-2">
+                            <div className="text-sm font-medium text-slate-900">{alloc.batchId || 'Unnamed batch'}</div>
+                            <span className="font-mono font-medium text-slate-900">{Number(alloc.allocatedQty || 0)}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    // tap a batch row to add/remove it from the manual allocation order
+    function toggleBatchInSequence(batch) {
+        if (!isEditingOrderItem) return;
+        if (batch.status !== 'Active' || Number(batch.availableQty || 0) <= 0) return;
+        setBatchSequence(prev => prev.includes(batch.id)
+            ? prev.filter(id => id !== batch.id)
+            : [...prev, batch.id]);
     }
 
     async function submitApproval(status) {
@@ -836,15 +1078,16 @@ export default function Orders() {
             else if(status.toLowerCase() == 'outofstock'){
                 path = 'U0.31';
             }
-            // console.log("/api/v2/orders/"+process.env.NEXT_PUBLIC_API_PASS+"/"+path+"/"+selectedRes.id+"/"+approvalQty+"/"+selectedRes.userId+"/"+dayjs().format('YYYY-MM-DD HH:mm:ss')+"/"+encodeURIComponent(selectedReviewDesign.design));
+            // console.log("/api/v2/orders_test/"+process.env.NEXT_PUBLIC_API_PASS+"/"+path+"/"+selectedRes.id+"/"+approvalQty+"/"+selectedRes.userId+"/"+dayjs().format('YYYY-MM-DD HH:mm:ss')+"/"+encodeURIComponent(selectedReviewDesign.design));
             
             const result = await updateOrderStatusAPI(
                 process.env.NEXT_PUBLIC_API_PASS, path,
-                selectedRes.id, 
+                selectedRes.id,
                 approvalQty,
                 selectedRes.userId,
                 dayjs().format('YYYY-MM-DD HH:mm:ss'),
                 selectedReviewDesign.design,
+                path === 'U0.2' && selectedRes.stockType === 'prm' ? batchSequence : [],
             );
             const queryResult = await result.json();
 
@@ -1116,18 +1359,11 @@ return (
               
              
     <div className={`${inter.className} flex flex-col min-h-screen w-full overflow-auto`} style={{ gap: '8px' }}>
-        <div className='flex flex-row gap-2 items-center py-4' >
+        <div className='flex flex-row gap-2 items-center justify-between' >
               <h2 className="text-xl font-semibold mr-4">Orders</h2>
-              
-              <Toaster />
-          </div>
-
-          
-          
-            <div className="w-full">
-                <div className="flex flex-row justify-between items-center py-4">
+              <div className="flex flex-row gap-2 justify-between items-center">
                     
-                    <span className='text-sm text-slate-500'>{activeOrdersTab === 'Designs' ? totalDesignOrders : totalOrders} {activeOrdersTab === 'Designs' ? 'Designs' : 'Orders'} found</span>
+                    <span className='text-sm text-slate-500'>{activeOrdersTab === 'Designs' ? totalDesignOrders : totalOrders} {activeOrdersTab === 'Designs' ? 'Designs' : 'Orders'} listed</span>
                     <div className="flex flex-row items-center gap-3">
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1145,21 +1381,23 @@ return (
                             <SelectContent>
                                 <SelectItem value="All">All Status</SelectItem>
                                 <SelectItem value="Submitted">Pending</SelectItem>
+                                <SelectItem value="InReview">InReview</SelectItem>
                                 <SelectItem value="Approved">Approved</SelectItem>
                                 <SelectItem value="Rejected">Rejected</SelectItem>
                                 <SelectItem value="Modified">Modified</SelectItem>
                                 <SelectItem value="OutOfStock">OutofStock</SelectItem>
+                                <SelectItem value="SaleOrder">SaleOrder</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Button onClick={() => setStockOrderOpen(true)} className="bg-green-600 hover:bg-green-700 text-white font-mono uppercase text-sm tracking-wider" >
+                        <Button size="xs" onClick={() => setStockOrderOpen(true)} className="bg-green-600 hover:bg-green-700 text-white font-mono uppercase text-sm tracking-wider px-3 py-2" >
                                 <Plus className="mr-2 h-4 w-4" />
-                                Add Stock Order
+                                Add Order
                             </Button>
                         <Popover open={showDownloadPopover} onOpenChange={setShowDownloadPopover}>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" disabled={downloadingOrders} className=' font-mono uppercase text-sm tracking-wider'>
+                                <Button variant="outline" size="xs" disabled={downloadingOrders} className=' font-mono uppercase text-sm tracking-wider px-3 py-2'>
                                     <ArrowDown className="mr-2 h-4 w-4" />
-                                    {downloadingOrders ? 'Downloading...' : 'Download Orders'}
+                                    {downloadingOrders ? 'Downloading...' : 'Download'}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-72 p-4" align="end">
@@ -1194,7 +1432,14 @@ return (
                         </Popover>
                     </div>
                 </div>
+              
+              <Toaster />
+          </div>
 
+          
+          
+            <div className="w-full">
+                
                 <Tabs
                     value={activeOrdersTab}
                     onValueChange={handleOrdersTabChange}
@@ -1220,7 +1465,7 @@ return (
                 <Card>
                     <Table>
                         <TableHeader>
-                            <TableRow>
+                            <TableRow className="bg-slate-100 text-slate-600 text-sm font-semibold">
                                 <TableHead>Ordered by</TableHead>
                                 <TableHead>Dealer</TableHead>
                                 <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('designs')}>
@@ -1252,7 +1497,7 @@ return (
                             {resLoading ? (
                                 <TableRow><TableCell colSpan={12} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
                             ) : groupedOrders.length === 0 ? (
-                                <TableRow><TableCell colSpan={12} className="text-center py-10">No orders found</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={12} className="text-center py-10">No orders listed</TableCell></TableRow>
                             ) : groupedOrders.map((group) => {
                                 const isExpanded = Boolean(expandedCartGroups[group.cartId])
                                 const hasMultipleRows = group.rows.length > 0
@@ -1265,10 +1510,10 @@ return (
                                 return (
                                     <React.Fragment key={group.id}>
                                         <TableRow
-                                            className={`text-sm transition-colors ${hasMultipleRows ? 'cursor-pointer bg-slate-50/80 hover:bg-slate-100/80' : 'bg-slate-50/40 hover:bg-slate-100/60'}`}
+                                            className={`text-sm transition-colors ${hasMultipleRows ? 'cursor-pointer bg-white hover:bg-slate-100/80' : 'bg-white hover:bg-slate-100/60'}`}
                                             onClick={hasMultipleRows ? () => toggleCartGroup(group.cartId) : undefined}
                                         >
-                                            <TableCell className="py-4">
+                                            <TableCell className="py-2">
                                                 <div className="flex items-start gap-3">
                                                     {/* <div className="mt-0.5 rounded-md border border-slate-200 bg-white p-1 text-slate-500">
                                                         {hasMultipleRows ? (
@@ -1286,23 +1531,27 @@ return (
                                                     <div className="mt-0.5 p-3 text-slate-500"></div>}
                                                     <div>
                                                         <span className='font-medium'>{group.first.orderedBy}</span><br/>
-                                                        <span className='text-xs text-slate-500'>{group.first.userId}</span>
-                                                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                                                            <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                                                        <span className="rounded-full bg-white px-2 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
                                                                 #{group.first.cartId || group.cartId}
 
                                                             </span>
-                                                            {/* <span className={textColor}>{percentage}%</span> */}
-                                                            {/* <span className="text-[11px] text-slate-500">
+                                                        {/* <span className='text-xs text-slate-500'>{group.first.userId}</span> */}
+                                                        {/* <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                            <span className="rounded-full bg-white px-2 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                                                                #{group.first.cartId || group.cartId}
+
+                                                            </span>
+                                                            <span className={textColor}>{percentage}%</span>
+                                                            <span className="text-[11px] text-slate-500">
                                                                 {group.rows.length} item{group.rows.length > 1 ? 's' : ''}
-                                                            </span> */}
-                                                        </div>
+                                                            </span>
+                                                        </div> */}
                                                     </div>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 <span className='font-medium'>{group.first.dealer}</span><br/>
-                                                <span className='text-xs text-slate-500'>{group.first.dealerId}</span>
+                                                {/* <span className='text-xs text-slate-500'>{group.first.dealerId}</span> */}
                                             </TableCell>
                                             <TableCell>
                                                 <span className="font-medium text-slate-800">
@@ -1317,7 +1566,13 @@ return (
                                             <TableCell className="text-right font-mono">{group.requestedQty}</TableCell>
                                             <TableCell className="text-right font-mono">{group.approvedQty}</TableCell>
                                             <TableCell className="text-right font-mono">{group.productionQty}</TableCell>
-                                            <TableCell className="text-right font-mono"><span className={textColor}>{percentage}%</span></TableCell>
+                                            <TableCell className="text-right font-mono">
+                                                {group.statuses.every(status => status.label === 'Rejected') ? (
+                                                    <span className={textColor}></span>
+                                                ) : (
+                                                    <span className={textColor}>{percentage}%</span>
+                                                )}
+                                            </TableCell>
                                             <TableCell className="text-right">
                                                 {Number(group.waitlistItems || 0) > 0 ? (
                                                     <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
@@ -1339,8 +1594,8 @@ return (
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
                                                     {group.statuses.map((status) => (
-                                                        <span key={`${group.cartId}-${status.label}`} className={`uppercase font-medium px-2 py-1 rounded-full text-xs ${status.label === 'Approved' || status.label === 'Fully Approved' ? 'bg-green-100 text-green-700' : status.label === 'Rejected' ? 'bg-red-100 text-red-700' : status.label === 'Modified' || status.label === 'Action Required' || status.label === 'Partially Approved' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                            {status.label == 'Submitted' ? 'Pending' : status.label} {status.count > 1 ? `(${status.count})` : ''}
+                                                        <span key={`${group.cartId}-${status.label}`} className={`uppercase font-medium px-2 py-1 rounded-full text-xs ${status.label === 'Approved' || status.label === 'Fully Approved' ? 'bg-green-100 text-green-700' : status.label === 'Rejected' ? 'bg-red-100 text-red-700' : status.label === 'SaleOrder' ? 'bg-emerald-100 text-emerald-700' : status.label === 'InReview' ? 'bg-sky-100 text-sky-700' : status.label === 'Modified' || status.label === 'Action Required' || status.label === 'Partially Approved' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                            {status.label == 'Submitted' ? 'Pending' : status.label == 'SaleOrder' ? 'Sale Order' : status.label == 'InReview' ? 'In Review' : status.label} {status.count > 1 ? `(${status.count})` : ''}
                                                         </span>
                                                     ))}
                                                 </div>
@@ -1348,32 +1603,54 @@ return (
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
                                                     {group.requestTypes.map((requestType) => (
-                                                        <span key={`${group.cartId}-${requestType}`} className={`uppercase font-medium px-2 py-1 rounded-full text-xs font-medium ${requestType === 'Production' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                            {requestType}
+                                                        <span key={`${group.cartId}-${requestType}`} className={`uppercase font-mono px-2 py-1 rounded-full text-xs font-semibold ${requestType === 'Production' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                            {requestType == 'Current' ? 'C' : 'P'}
                                                         </span>
                                                     ))}
                                                 </div>
                                             </TableCell>
                                             <TableCell className='font-mono text-xs text-slate-500'>{dayjs(group.first.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
                                             <TableCell className="text-right">
-                                                {hasMultipleRows ? (
-                                                    <span className="text-xs font-medium text-slate-500">
-                                                        {isExpanded ? 'Hide items' : 'View items'}
-                                                    </span>
-                                                ) : (
-                                                    <div className="flex justify-end gap-2">
-                                                        {group.first.status === 'Submitted' && (
-                                                            <div className='flex flex-row items-center gap-2'>
-                                                                <Button size="sm" variant="secondary" className="bg-blue-600 shadow-md text-white hover:bg-blue-700" onClick={() => handleUpdateStatus(group.first)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
-                                                            </div>
-                                                        )}
-                                                        {(group.first.status === 'Approved' || group.first.status === 'Modified' || group.first.status === 'Rejected') && (
-                                                            <div className='flex flex-row items-center gap-2'>
-                                                                <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(group.first)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                {(() => {
+                                                    const groupRows = group.rows?.length ? group.rows : [group.first];
+                                                    const saleOrderEligible = groupRows.some(r => r?.status === 'Approved') && !groupRows.some(r => ['Submitted', 'InReview'].includes(r?.status));
+                                                    const isMarking = saleOrderCartId === group.cartId;
+                                                    const saleOrderButton = saleOrderEligible ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="text-emerald-700 border-emerald-600 hover:bg-emerald-50 hover:text-emerald-800"
+                                                            disabled={isMarking}
+                                                            onClick={(e) => handleMarkSaleOrder(group, e)}
+                                                        >
+                                                            {isMarking ? <SpinnerGap className="mr-2 h-4 w-4 animate-spin" /> : <FileCheck className="mr-2 h-4 w-4" />}
+                                                            Sale Order
+                                                        </Button>
+                                                    ) : null;
+
+                                                    return hasMultipleRows ? (
+                                                        <div className="flex items-center justify-end gap-3">
+                                                            {saleOrderButton}
+                                                            <span className="text-xs font-medium text-slate-500">
+                                                                {isExpanded ? 'Hide items' : 'View items'}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex justify-end gap-2">
+                                                            {['Submitted', 'InReview'].includes(group.first.status) && (
+                                                                <div className='flex flex-row items-center gap-2'>
+                                                                    <Button size="sm" variant="secondary" className="bg-blue-600 shadow-md text-white hover:bg-blue-700" onClick={() => handleUpdateStatus(group.first)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
+                                                                </div>
+                                                            )}
+                                                            {(group.first.status === 'Approved' || group.first.status === 'Modified' || group.first.status === 'Rejected') && (
+                                                                <div className='flex flex-row items-center gap-2'>
+                                                                    <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(group.first)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
+                                                                </div>
+                                                            )}
+                                                            {saleOrderButton}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </TableCell>
                                         </TableRow>
                                         {hasMultipleRows && isExpanded && group.rows.map((res) => (
@@ -1394,7 +1671,13 @@ return (
                                                 <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
                                                 <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
                                                 <TableCell className="text-right font-mono">{res.productionQty}</TableCell>
-                                                <TableCell className="text-right font-mono"><span className={((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1) > 50 ? 'text-green-600' : 'text-red-500'}>{((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1)}%</span></TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    {res.status === 'Rejected' ? (
+                                                        <span className="text-red-500">-</span>
+                                                    ) : (
+                                                        <span className={((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1) > 50 ? 'text-green-600' : 'text-red-500'}>{((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1)}%</span>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="text-right">
                                                     {hasWaitlistPosition(res.waitlistPosition) ? (
                                                         <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
@@ -1410,19 +1693,19 @@ return (
                                                     </span>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                        {res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
+                                                    <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'SaleOrder' ? 'bg-emerald-100 text-emerald-700' : res.status === 'InReview' ? 'bg-sky-100 text-sky-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        {res.status === 'SaleOrder' ? 'Sale Order' : res.status === 'InReview' ? 'In Review' : res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified' || res.status === 'SaleOrder') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${(res.isProduction == 1) ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                        {(res.isProduction == 1) ? 'Production' : 'Current'}
+                                                    <span className={`px-2 py-1 font-mono uppercase rounded-full text-xs font-bold ${(res.isProduction == 1) ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        {(res.isProduction == 1) ? 'P' : 'C'}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell className='font-mono text-xs text-slate-500'>{dayjs(res.createdOn).format('DD/MM/YYYY hh:mm A')}</TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-2">
-                                                        {res.status === 'Submitted' && (
+                                                        {['Submitted', 'InReview'].includes(res.status) && (
                                                             <div className='flex flex-row items-center gap-2'>
                                                                 <Button size="sm" variant="outline" className="bg-blue-600 shadow-md text-white hover:bg-blue-700 hover:text-white" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
                                                             </div>
@@ -1450,7 +1733,7 @@ return (
                 <Card>
                     <Table>
                         <TableHeader>
-                            <TableRow>
+                            <TableRow className="bg-slate-100 text-slate-600 text-sm font-semibold">
                                 <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleDesignsSort('designs')}>
                                     <span className="flex items-center">Design Id{sortIcon('designs', designsSortKey, designsSortDir)}</span>
                                 </TableHead>
@@ -1480,7 +1763,7 @@ return (
                             {designOrdersLoading ? (
                                 <TableRow><TableCell colSpan={10} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
                             ) : filteredDesignOrders.length === 0 ? (
-                                <TableRow><TableCell colSpan={10} className="text-center py-10">No designs found</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={10} className="text-center py-10">No designs listed</TableCell></TableRow>
                             ) : filteredDesignOrders.map((designOrder) => {
                                 const isExpanded = Boolean(expandedDesignRows[designOrder.design])
                                 const childRows = designOrderItems[designOrder.design] || []
@@ -1494,7 +1777,7 @@ return (
                                 return (
                                     <React.Fragment key={designOrder.design}>
                                         <TableRow
-                                            className="cursor-pointer bg-slate-50/80 text-sm transition-colors hover:bg-slate-100/80"
+                                            className="cursor-pointer bg-white text-sm transition-colors hover:bg-slate-100/80"
                                             onClick={() => toggleDesignRow(designOrder.design)}
                                         >
                                             <TableCell className="py-4">
@@ -1553,7 +1836,7 @@ return (
                                             ) : childRows.length === 0 ? (
                                                 <TableRow>
                                                     <TableCell colSpan={10} className="bg-white py-6 text-center text-sm text-slate-500">
-                                                        No order items found
+                                                        No order items listed
                                                     </TableCell>
                                                 </TableRow>
                                             ) : childRows.map((res) => (
@@ -1570,7 +1853,13 @@ return (
                                                     <TableCell className="text-right font-mono">{res.requestedQty}</TableCell>
                                                     <TableCell className="text-right font-mono">{res.approvedQty}</TableCell>
                                                     <TableCell className="text-right font-mono">{res.productionQty}</TableCell>
-                                                    <TableCell className="text-right font-mono"><span className={((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1) > 50 ? 'text-green-600' : 'text-red-500'}>{((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1)}%</span></TableCell>
+                                                    <TableCell className="text-right font-mono">
+                                                        {res.status === 'Rejected' ? (
+                                                            <span className="text-red-500">-</span>
+                                                        ) : (
+                                                            <span className={((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1) > 50 ? 'text-green-600' : 'text-red-500'}>{((res.approvedQty === 0 ? 0 : res.approvedQty / res.requestedQty) * 100).toFixed(1)}%</span>
+                                                        )}
+                                                    </TableCell>
                                                     <TableCell className="text-right">
                                                         {hasWaitlistPosition(res.waitlistPosition) ? (
                                                             <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
@@ -1595,7 +1884,7 @@ return (
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <div className="flex justify-end gap-2">
-                                                            {res.status === 'Submitted' && (
+                                                            {['Submitted', 'InReview'].includes(res.status) && (
                                                                 <Button size="sm" variant="outline" className="bg-blue-600 shadow-md text-white hover:bg-blue-700 hover:text-white" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
                                                             )}
                                                             {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected') && (
@@ -1685,6 +1974,8 @@ return (
                     </div>
                     ) : null}
 
+                    {!isEditingOrderItem && selectedRes?.stockType === 'prm' && selectedRes?.status === 'Approved' ? renderAllocatedBatchesPanel() : null}
+
                     {isEditingOrderItem ? (
                     <>
                     <div className="space-y-2" ref={reviewDesignRef}>
@@ -1756,7 +2047,7 @@ return (
                             )}
                             {showReviewDesignDrop && !searchingReviewDesigns && reviewDesignResults.length === 0 && reviewDesignQuery.trim() && (
                                 <div className="absolute z-50 mt-1 w-full rounded-md border bg-white p-3 text-sm text-gray-500 shadow">
-                                    No designs found
+                                    No designs listed
                                 </div>
                             )}
                         </div>
@@ -1782,7 +2073,7 @@ return (
                                         onChange={(e) => {
                                             const newVal = Number(e.target.value) >= 0 ? Number(e.target.value) : 0;
                                             if (isStdType) {
-                                                if (availableStd <= 0 && selectedRes.status === 'Submitted') {
+                                                if (availableStd <= 0 && ['Submitted', 'InReview'].includes(selectedRes.status)) {
                                                     setApprovalQty('0');
                                                 } else if (newVal > availableStd) {
                                                     setApprovalQty(String(availableStd));
@@ -1802,14 +2093,113 @@ return (
                                                 : `Max STD available: ${availableStd}`}
                                         </p>
                                     )}
+                                    {!isStdType && (() => {
+                                        const batchAvailable = designBatches.reduce((sum, b) => sum + (b.status === 'Active' ? Number(b.availableQty || 0) : 0), 0);
+                                        const isReApproval = ['Approved', 'Modified'].includes(selectedRes?.status);
+                                        const effectiveAvailable = batchAvailable + (isReApproval ? Number(selectedRes?.approvedQty || 0) : 0);
+                                        return (
+                                            <p className="text-xs -mt-2 text-slate-500">
+                                                {loadingDesignBatches
+                                                    ? 'Checking batch availability...'
+                                                    : <>Available PRM from batches: <span className="font-medium text-violet-600">{effectiveAvailable}</span>{isReApproval ? ' (incl. this order’s reservation)' : ''} • excess moves to production</>}
+                                            </p>
+                                        );
+                                    })()}
                                 </>
                             );
                         })()}
                     </div>
+
+                    {selectedRes?.stockType === 'prm' ? (
+                    selectedRes?.status === 'Approved' ? renderAllocatedBatchesPanel() : (
+                    <div className="rounded-lg border border-slate-200 bg-white">
+                        <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-slate-900">PRM stock batches</span>
+                                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                                        {designBatches.length}
+                                    </span>
+                                </div>
+                                <div className="text-xs text-slate-500">{selectedReviewDesign?.design || selectedRes?.design || '-'}</div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                {batchSequence.length > 0 ? (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 px-2 text-xs text-slate-500 hover:text-slate-800"
+                                        onClick={() => setBatchSequence([])}
+                                    >
+                                        Clear order
+                                    </Button>
+                                ) : null}
+                                <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">
+                                    Available {designBatches.reduce((sum, b) => sum + (b.status === 'Active' ? Number(b.availableQty || 0) : 0), 0)}
+                                </span>
+                            </div>
+                        </div>
+
+                        {loadingDesignBatches ? (
+                            <div className="flex items-center justify-center border-t border-slate-100 px-3 py-4 text-sm text-slate-500">
+                                <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />
+                                Loading batches...
+                            </div>
+                        ) : designBatches.length === 0 ? (
+                            <div className="border-t border-slate-100 px-3 py-4 text-center text-sm text-slate-500">
+                                No batches listed for this design
+                            </div>
+                        ) : (
+                            <>
+                                <div className="max-h-44 divide-y divide-slate-100 overflow-y-auto border-t border-slate-100">
+                                    {designBatches.map((batch) => {
+                                        const seqIndex = batchSequence.indexOf(batch.id);
+                                        const selectable = batch.status === 'Active' && Number(batch.availableQty || 0) > 0;
+                                        return (
+                                        <div
+                                            key={batch.id}
+                                            onClick={() => toggleBatchInSequence(batch)}
+                                            className={`flex items-center justify-between gap-3 px-3 py-2 ${selectable ? 'cursor-pointer hover:bg-slate-50' : 'opacity-60'} ${seqIndex >= 0 ? 'bg-violet-50 hover:bg-violet-50' : ''}`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {seqIndex >= 0 ? (
+                                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">
+                                                        {seqIndex + 1}
+                                                    </span>
+                                                ) : null}
+                                                <div>
+                                                    <div className="text-sm font-medium text-slate-900">{batch.batchId || 'Unnamed batch'}</div>
+                                                    <div className="text-xs text-slate-500">
+                                                        Received {batch.receivedOn ? dayjs(batch.receivedOn).format('DD/MM/YYYY') : '-'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-2 text-xs">
+                                                <span className={`rounded-full px-2 py-1 font-medium ${batch.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                    {batch.status}
+                                                </span>
+                                                <span className="font-mono font-medium text-slate-900">
+                                                    {Number(batch.availableQty || 0)}<span className="text-slate-400"> / {Number(batch.initialQty || 0)}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                    {batchSequence.length > 0
+                                        ? 'Stock will be taken from the numbered batches in order; any remainder is auto-picked by best fit.'
+                                        : 'Tap batches to set the allocation order — otherwise the smallest batch that covers the quantity is used.'}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    )
+                    ) : null}
                     </>
                     ) : null}
 
-                    {(!isEditingOrderItem || selectedRes?.status === 'Submitted') ? (
+                    {(!isEditingOrderItem || ['Submitted', 'InReview'].includes(selectedRes?.status)) ? (
                     <div className="rounded-lg border border-slate-200 bg-white">
                         <div className="flex items-center justify-between gap-3 px-3 py-2.5">
                             <div>
@@ -1828,7 +2218,7 @@ return (
                         {showDesignOrderHistory ? (
                             <>
                                 <div className="flex items-center justify-between border-y border-slate-200 bg-slate-50 px-3 py-2">
-                                    <span className="text-xs font-medium text-slate-600">Orders found</span>
+                                    <span className="text-xs font-medium text-slate-600">Orders listed</span>
                                     <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
                                         {designOrderHistory.length}
                                     </span>
@@ -1845,7 +2235,7 @@ return (
                                         </div>
                                     ) : designOrderHistory.length === 0 ? (
                                         <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                                            No other orders found
+                                            No other orders listed
                                         </div>
                                     ) : (
                                         <div className="divide-y divide-slate-100">
@@ -1901,7 +2291,7 @@ return (
                 <div className="flex justify-end gap-3">
                     {isEditingOrderItem ? (
                         <>
-                            {selectedRes?.status === 'Submitted' ? (
+                            {['Submitted', 'InReview'].includes(selectedRes?.status) ? (
                                 <Button variant="outline" onClick={() => setIsActionDialogOpen(false)} disabled={resLoading}>Close</Button>
                             ) : (
                                 <Button variant="outline" onClick={() => setIsEditingOrderItem(false)} disabled={resLoading}>Cancel Edit</Button>
@@ -1937,7 +2327,7 @@ return (
                         <>
                             <Button variant="outline" onClick={() => setIsActionDialogOpen(false)}>Close</Button>
                             <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => { setShowDesignOrderHistory(false); setIsEditingOrderItem(true); }}>
-                                {selectedRes?.status === 'Submitted' ? 'Review Order' : 'Edit Order'}
+                                {['Submitted', 'InReview'].includes(selectedRes?.status) ? 'Review Order' : 'Edit Order'}
                             </Button>
                         </>
                     )}

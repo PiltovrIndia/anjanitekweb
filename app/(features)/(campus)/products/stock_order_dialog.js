@@ -179,7 +179,7 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
                 createdOn,
             }
 
-            const res = await fetch(`/api/v2/orders/${pass}/U4`, {
+            const res = await fetch(`/api/v2/orders_test/${pass}/U4`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),

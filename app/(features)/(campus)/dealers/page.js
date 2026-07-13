@@ -810,7 +810,7 @@ export default function Outing() {
             else {
                 
                 setBulkUploading(false);
-                toast({description: "Upload success. Refresh to view updated data"});
+                toast({description: "Facing error. Try again later!"});
             }
         }
         catch (e){
