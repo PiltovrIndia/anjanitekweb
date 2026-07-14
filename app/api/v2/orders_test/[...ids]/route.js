@@ -915,11 +915,14 @@ export async function GET(request,{params}) {
                             adminId,
                         });
 
-                        // batches are the source of truth for prm availability
+                        // batches are the source of truth for prm availability;
+                        // a manual batch selection caps the approvable qty to
+                        // those batches — the shortfall moves to production
                         const batches = await lockPrmBatches(connection, order.design);
                         const availableStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
+                        const reachableStock = selectablePrmStock(batches, batchSequence);
 
-                        const newApprovedQty = Math.min(newRequestedQty, availableStock);
+                        const newApprovedQty = Math.min(newRequestedQty, reachableStock);
                         const newProductionQty = Math.max(0, newRequestedQty - newApprovedQty);
 
                         // compare the new requestedQty to oldRequestedQty, if decrease and productionQty > 0, then avoid modifiedOn update.
@@ -929,7 +932,7 @@ export async function GET(request,{params}) {
                         const batchAllocations = drainPrmBatches(batches, newApprovedQty, batchSequence);
                         await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'ManualAdjustment', adminId });
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId);
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId, orderId);
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
@@ -1039,12 +1042,15 @@ export async function GET(request,{params}) {
                         });
                     }
                     else if (order.stockType === 'prm') {
-                        // batches are the source of truth for prm availability
+                        // batches are the source of truth for prm availability;
+                        // a manual batch selection caps the approvable qty to
+                        // those batches — the shortfall moves to production
                         const batches = await lockPrmBatches(connection, order.design);
                         const availableStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
+                        const reachableStock = selectablePrmStock(batches, batchSequence);
                         const requestedQty = Number(order.requestedQty || 0);
 
-                        const approvedQty = Math.min(Number(toBeApprovedQty), availableStock);
+                        const approvedQty = Math.min(Number(toBeApprovedQty), reachableStock);
                         const productionQty = Math.max(0, Number(toBeApprovedQty) - approvedQty);
 
                         await connection.query(`UPDATE orders SET approvedQty = ?, productionQty = ?, status = 'Approved', approvedOn = ?, modifiedOn = ? WHERE id = ?`,
@@ -1054,7 +1060,7 @@ export async function GET(request,{params}) {
                         const batchAllocations = drainPrmBatches(batches, approvedQty, batchSequence);
                         await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'InitialApproval', adminId });
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId);
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId, orderId);
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
@@ -1396,7 +1402,7 @@ export async function GET(request,{params}) {
                     await saleOrderConnection.beginTransaction();
 
                     const [items] = await saleOrderConnection.query(
-                        `SELECT id, dealerId, status, productionQty FROM orders WHERE cartId = ? AND isDeleted = 0 FOR UPDATE`,
+                        `SELECT id, userId, dealerId, design, stockType, requestedQty, approvedQty, productionQty, status, batch, createdOn, approvedOn, modifiedOn, serialId FROM orders WHERE cartId = ? AND isDeleted = 0 FOR UPDATE`,
                         [cartId]
                     );
 
@@ -1442,6 +1448,36 @@ export async function GET(request,{params}) {
                         [actionDate, cartId]
                     );
 
+                    // every live item whose pending production was just cleared gets a
+                    // fresh tracking item in the same cart: the Sale Order covers the
+                    // approvedQty, and the clone carries the productionQty forward as a
+                    // separate Approved item (approvedQty 0, next serialId). Original
+                    // queue timestamps are copied so it keeps its waitlist position.
+                    let nextSerialId = items.reduce((max, item) => Math.max(max, Number(item.serialId || 0)), 0) + 1;
+                    const splitItems = [];
+
+                    for (const item of items) {
+                        if (['Cancelled', 'Rejected'].includes(item.status)) continue;
+
+                        const pendingQty = Number(item.productionQty || 0);
+                        if (pendingQty <= 0) continue;
+
+                        const [insertResult] = await saleOrderConnection.query(
+                            `INSERT INTO orders
+                                (userId, dealerId, design, requestedQty, status, stockType, approvedQty, batch, createdOn, approvedOn, modifiedOn, productionQty, cartId, serialId, isDeleted)
+                             VALUES (?, ?, ?, ?, 'Approved', ?, 0, ?, ?, ?, ?, ?, ?, ?, 0)`,
+                            [item.userId, item.dealerId, item.design, pendingQty, item.stockType, item.batch, item.createdOn, item.approvedOn, item.modifiedOn, pendingQty, cartId, nextSerialId]
+                        );
+
+                        splitItems.push({
+                            sourceOrderId: item.id,
+                            newOrderId: insertResult.insertId,
+                            serialId: nextSerialId,
+                            productionQty: pendingQty,
+                        });
+                        nextSerialId += 1;
+                    }
+
                     await saleOrderConnection.commit();
 
                     // send notification
@@ -1474,6 +1510,7 @@ export async function GET(request,{params}) {
                             cartId,
                             totalItems: items.length,
                             updatedItems: result.affectedRows,
+                            splitItems,
                         },
                     });
                 } catch (error) {
@@ -2644,10 +2681,11 @@ async function lockPrmBatches(connection, design) {
 // breakdown of what was taken.
 //
 // Selection order:
-// 1. batches in sequenceIds (admin-chosen order), if provided
-// 2. best fit for the remainder: the smallest batch that can cover the
-//    remaining qty on its own; when none can, drain the smallest available
-//    batch and repeat (ties go to the oldest batch)
+// 1. batches in sequenceIds (admin-chosen order), if provided — ONLY those
+//    batches are drained; any shortfall stays with the caller and moves to
+//    production
+// 2. no selection: smallest availableQty first (ties go to the oldest batch),
+//    continuing batch by batch until the qty is covered or batches run out
 function drainPrmBatches(batches, qty, sequenceIds) {
     let remaining = Number(qty || 0);
     const entries = [];
@@ -2660,27 +2698,33 @@ function drainPrmBatches(batches, qty, sequenceIds) {
         entries.push({ stockBatchId: batch.id, batchId: batch.batchId, qty: takeQty });
     };
 
-    if (Array.isArray(sequenceIds)) {
+    if (Array.isArray(sequenceIds) && sequenceIds.length > 0) {
         for (const id of sequenceIds) {
             if (remaining <= 0) break;
             const batch = batches.find((b) => String(b.id) === String(id));
             if (batch && batch.availableQty > 0) takeFrom(batch, remaining);
         }
+        return entries;
     }
 
-    while (remaining > 0) {
-        const candidates = batches.filter((b) => b.availableQty > 0);
-        if (candidates.length === 0) break;
-
-        const fitting = candidates
-            .filter((b) => b.availableQty >= remaining)
-            .sort((a, b) => a.availableQty - b.availableQty);
-        const pick = fitting[0] || candidates.sort((a, b) => a.availableQty - b.availableQty)[0];
-
-        takeFrom(pick, remaining);
+    const bySmallest = [...batches].sort((a, b) => a.availableQty - b.availableQty || a.id - b.id);
+    for (const batch of bySmallest) {
+        if (remaining <= 0) break;
+        if (batch.availableQty > 0) takeFrom(batch, remaining);
     }
 
     return entries;
+}
+
+// stock reachable by the drain: capped to the selected batches when a
+// sequence is provided, otherwise everything that is available
+function selectablePrmStock(batches, sequenceIds) {
+    if (Array.isArray(sequenceIds) && sequenceIds.length > 0) {
+        return batches
+            .filter((b) => sequenceIds.some((id) => String(id) === String(b.id)))
+            .reduce((sum, b) => sum + Number(b.availableQty || 0), 0);
+    }
+    return batches.reduce((sum, b) => sum + Number(b.availableQty || 0), 0);
 }
 
 // write drained quantities back; fully consumed batches are marked Empty
@@ -2830,8 +2874,13 @@ async function releasePrmToBatches(connection, { orderId, design, qty, adminId }
  * Allocate remaining prm batch stock to the waitlist. Mirrors
  * allocateStockToWaitlist, but drains the locked batches oldest-first and
  * records every order-batch pair in the ledger.
+ *
+ * excludeOrderId keeps the order that triggered this pass out of it: its
+ * production remainder is an explicit admin decision (e.g. a manual batch
+ * selection that intentionally left qty unapproved) and must not be
+ * auto-filled from the other batches.
  */
-async function allocatePrmWaitlistFromBatches(connection, design, batches, adminId) {
+async function allocatePrmWaitlistFromBatches(connection, design, batches, adminId, excludeOrderId = null) {
     let remainingStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
 
     const [pendingRows] = await connection.query(
@@ -2852,12 +2901,13 @@ async function allocatePrmWaitlistFromBatches(connection, design, batches, admin
         AND productionQty > 0
         AND isDeleted = 0
         AND status NOT IN ('Cancelled', 'Rejected')
+        ${excludeOrderId != null ? 'AND id != ?' : ''}
         ORDER BY
         COALESCE(modifiedOn, approvedOn, createdOn) ASC,
         id ASC
         FOR UPDATE
         `,
-        [design]
+        excludeOrderId != null ? [design, excludeOrderId] : [design]
     );
 
     const allocations = [];

@@ -1048,6 +1048,16 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                                         Clear order
                                     </Button>
                                 ) : null}
+                                {batchSequence.length > 0 ? (() => {
+                                    // running total of what the selected batches can supply vs the qty being approved
+                                    const selectedSum = designBatches.filter((b) => batchSequence.includes(b.id)).reduce((sum, b) => sum + Number(b.availableQty || 0), 0);
+                                    const qty = Number(approvalQty || 0);
+                                    return (
+                                        <span className={`rounded-full px-2 py-1 text-xs font-medium ${selectedSum >= qty ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                            Selected {Math.min(selectedSum, qty)} / {qty}{selectedSum < qty ? ` • ${qty - selectedSum} to production` : ''}
+                                        </span>
+                                    );
+                                })() : null}
                                 <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">
                                     Available {designBatches.reduce((sum, b) => sum + (b.status === 'Active' ? Number(b.availableQty || 0) : 0), 0)}
                                 </span>
@@ -1102,8 +1112,8 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                                 </div>
                                 <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                                     {batchSequence.length > 0
-                                        ? 'Stock will be taken from the numbered batches in order; any remainder is auto-picked by best fit.'
-                                        : 'Tap batches to set the allocation order — otherwise the smallest batch that covers the quantity is used.'}
+                                        ? 'Stock will be taken from the numbered batches in order; any remainder moves to production.'
+                                        : 'Tap batches to set the allocation order — otherwise stock is taken from the smallest batches first, and any excess moves to production.'}
                                 </div>
                             </>
                         )}
@@ -1211,10 +1221,20 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                                 <Button variant="outline" onClick={() => setIsEditingOrderItem(false)} disabled={actionLoading}>Cancel Edit</Button>
                             )}
 
-                            <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={actionLoading}>
-                                {actionLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                                Approve
-                            </Button>
+                            {/* prm: 'Auto Approve' (smallest batches first, leftover to production) when
+                                nothing is selected; 'Approve' (selected batches only, shortfall to
+                                production) once at least one batch is picked */}
+                            {selectedRes?.stockType === 'prm' && batchSequence.length === 0 ? (
+                                <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={actionLoading}>
+                                    {actionLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                    Auto Approve
+                                </Button>
+                            ) : (
+                                <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={actionLoading}>
+                                    {actionLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                    Approve
+                                </Button>
+                            )}
 
                             <Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={actionLoading}>
                                 {actionLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
