@@ -1268,10 +1268,6 @@ export async function GET(request,{params}) {
                 const sortBy = params.ids[6] || "createdOn";
 
                 var statusCond = '';
-                if(status != 'All'){
-                    statusCond = ` AND o.status = '`+status+`' `
-                }
-
                 // based on the role, manage the join condition to filter orders by userId or dealerId
                 var joinCond = '', nameCond = '';
                 if(role == 'dealer' || role == 'Dealer'){
@@ -1279,7 +1275,10 @@ export async function GET(request,{params}) {
                     joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
                     
-                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
+                    if(status != 'All'){
+                        statusCond = ` o.status = '`+status+`' AND `
+                    }
+                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) `
                 }
                 else if(role == 'globaladmin' || role == 'GlobalAdmin'){
                     nameCond += ` u_dealer.name as orderedBy, u.name as dealer, `
@@ -1290,6 +1289,10 @@ export async function GET(request,{params}) {
                     nameCond += ` u.name as orderedBy, u_dealer.name as dealer, `
                     joinCond += ` LEFT JOIN user u ON o.userId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id `
+
+                    if(status != 'All'){
+                        statusCond = ` o.status = '`+status+`' AND `
+                    }
                     statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) `
 
                     // get the relatedTo of the userId and split it into an array and then add it to the where condition to filter the orders by userId or relatedTo
@@ -1318,6 +1321,9 @@ export async function GET(request,{params}) {
                         }
                     }
                 }
+
+                
+                
 
                 try {
                     var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+userId+'%" OR u.id LIKE "%'+userId+'%") AND r.isDeleted = 0';
