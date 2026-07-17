@@ -1278,12 +1278,15 @@ export async function GET(request,{params}) {
                     if(status != 'All'){
                         statusCond = ` o.status = '`+status+`' AND `
                     }
-                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) `
+                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
                 }
                 else if(role == 'globaladmin' || role == 'GlobalAdmin'){
                     nameCond += ` u_dealer.name as orderedBy, u.name as dealer, `
                     joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
+                    if(status != 'All'){
+                        statusCond = ` o.status = '`+status+`' AND `
+                    }
                 }
                 else {
                     nameCond += ` u.name as orderedBy, u_dealer.name as dealer, `
@@ -1293,7 +1296,7 @@ export async function GET(request,{params}) {
                     if(status != 'All'){
                         statusCond = ` o.status = '`+status+`' AND `
                     }
-                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) `
+                    statusCond += ` ((u.relatedTo LIKE ? OR u.id LIKE ?) `
 
                     // get the relatedTo of the userId and split it into an array and then add it to the where condition to filter the orders by userId or relatedTo
                     // this is to make sure, if anyone in the hirerchy above has placed order for their dealers.
@@ -1313,7 +1316,7 @@ export async function GET(request,{params}) {
                                         relatedToCond += ` OR u.id LIKE "%`+element+`%" `
                                     }
                                 }
-                                statusCond += ` OR (`+relatedToCond+` OR u.id LIKE "%`+userId+`%") AND `
+                                statusCond += ` OR (`+relatedToCond+` OR u.id LIKE "%`+userId+`%")) AND `
                             }
                             else {
                                 statusCond += ` AND `
@@ -1321,8 +1324,6 @@ export async function GET(request,{params}) {
                         }
                     }
                 }
-
-                
                 
 
                 try {
@@ -1353,7 +1354,7 @@ export async function GET(request,{params}) {
                                         AND x.stockType = o.stockType
                                         AND x.productionQty > 0
                                         AND x.isDeleted = 0
-                                        AND x.status NOT IN ('Cancelled', 'Rejected')
+                                        AND x.status IN ('${status}')
                                         AND (
                                         COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
                                             OR (
