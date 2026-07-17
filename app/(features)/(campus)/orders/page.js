@@ -1748,7 +1748,7 @@ return (
                         ) : (
                             <>
                                 <div className="max-h-44 divide-y divide-slate-100 overflow-y-auto border-t border-slate-100">
-                                    {designBatches.map((batch) => {
+                                    {designBatches.filter((batch) => Number(batch.availableQty || 0) > 0).map((batch) => {
                                         const seqIndex = batchSequence.indexOf(batch.id);
                                         const selectable = batch.status === 'Active' && Number(batch.availableQty || 0) > 0;
                                         return (
@@ -1900,19 +1900,23 @@ return (
                                 {/* prm: 'Auto Approve' (smallest batches first, leftover to production) when
                                     nothing is selected; 'Approve' (selected batches only, shortfall to
                                     production) once at least one batch is picked */}
-                                {selectedRes?.stockType === 'prm' && batchSequence.length === 0 ? (
-                                    <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
-                                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                                        Auto Approve
-                                    </Button>
-                                ) : (
-                                    <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
-                                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                                        Approve
-                                    </Button>
-                                )}
-                                    {/* )
-                                } */}
+                                
+                                
+                                {
+                                    selectedRes?.stockType === 'prm' && batchSequence.length === 0 ?
+                                    (
+                                        <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
+                                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                                Auto Approve
+                                        </Button>
+                                    ) : (
+                                        <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
+                                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                            Approve
+                                        </Button>
+                                    )
+                                }
+                                   
                            
                             
                             

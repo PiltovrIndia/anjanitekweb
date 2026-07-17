@@ -552,296 +552,6 @@ export async function GET(request,{params}) {
                     connection.release();
                 }
                 }
-            // status-wise order counts for a single design (design orders sheet tabs)
-            else if (params.ids[1] == "U00.3") {
-                try {
-                    const design = params.ids[2];
-
-                    const [rows] = await connection.execute(
-                        `
-                        SELECT status, COUNT(*) AS count
-                        FROM orders
-                        WHERE design = ? AND isDeleted = 0
-                        GROUP BY status
-                        `,
-                        [design]
-                    );
-
-                    return Response.json(
-                        {
-                            status: 200,
-                            success: true,
-                            message: "Design order counts fetched successfully",
-                            data: rows,
-                        },
-                        { status: 200 }
-                    );
-                } catch (error) {
-                    return Response.json(
-                        {
-                            status: 404,
-                            success: false,
-                            message: "No Order found! " + error.message,
-                        },
-                        { status: 200 }
-                    );
-                } finally {
-                    connection.release();
-                }
-            }
-            // paged order listing of a single design filtered by status (design orders sheet)
-            // /U00.4/$design/$status/$page — fixed 50 items per page
-            else if (params.ids[1] == "U00.4") {
-                try {
-                    const design = params.ids[2];
-                    const status = params.ids[3];
-                    const pageNo = Math.max(parseInt(params.ids[4]) || 1, 1);
-                    const pageLimit = 50;
-                    const offset = (pageNo - 1) * pageLimit;
-
-                    const where = ["r.design = ?", "r.isDeleted = 0"];
-                    const values = [design];
-
-                    if (status && status !== "All") {
-                        where.push("r.status = ?");
-                        values.push(status);
-                    }
-
-                    const whereSql = `WHERE ${where.join(" AND ")}`;
-
-                    const [countRows] = await connection.execute(
-                        `SELECT COUNT(*) AS total FROM orders r ${whereSql}`,
-                        values
-                    );
-                    const total = Number(countRows[0]?.total || 0);
-
-                    const [rows] = await connection.execute(
-                    `
-                    SELECT
-                        r.*,
-
-                        p.name,
-                        p.productId,
-                        p.description,
-                        p.size,
-                        p.tags,
-                        p.media,
-                        p.prm,
-                        p.std,
-                        p.isActive,
-                        p.designType,
-
-                        u.name AS orderedBy,
-                        u.mobile,
-                        u.mapTo,
-
-                        u_dealer.name AS dealer,
-
-                        CASE
-                        WHEN r.productionQty > 0 THEN (
-                            SELECT COUNT(*) + 1
-                            FROM orders x
-                            WHERE x.design = r.design
-                            AND x.stockType = r.stockType
-                            AND x.productionQty > 0
-                            AND x.isDeleted = 0
-                            AND x.status NOT IN ('Cancelled', 'Rejected')
-                            AND (
-
-                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
-                                OR (
-                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
-                                AND x.id < r.id
-                                )
-                            )
-                        )
-                        ELSE NULL
-                        END AS waitlistSequence,
-
-                        CASE
-                        WHEN r.requestedQty > 0 THEN ROUND((r.approvedQty / r.requestedQty) * 100)
-                        ELSE 0
-                        END AS availabilityPercent
-
-                    FROM orders r
-
-                    LEFT JOIN products p
-                        ON r.design = p.design
-
-                    LEFT JOIN user u
-                        ON r.userId = u.id
-
-                    LEFT JOIN user u_dealer
-                        ON r.dealerId = u_dealer.id
-
-                    ${whereSql}
-
-                    ORDER BY
-                        r.createdOn DESC,
-                        r.id DESC
-                    LIMIT ${pageLimit} OFFSET ${offset}
-                    `,
-                    values
-                    );
-
-                    return Response.json(
-                        {
-                            status: 200,
-                            success: true,
-                            message: "Design orders fetched successfully",
-                            data: rows,
-                            total,
-                            page: pageNo,
-                            pageSize: pageLimit,
-                        },
-                        { status: 200 }
-                    );
-                } catch (error) {
-                    return Response.json(
-                        {
-                            status: 404,
-                            success: false,
-                            message: "No Order found! " + error.message,
-                        },
-                        { status: 200 }
-                    );
-                } finally {
-                    connection.release();
-                }
-            }
-            // all orders of a single design in a date range, with prm batch
-            // allocations attached — feeds the design orders dialog download
-            // /U00.5/$design/$fromDate,$toDate
-            else if (params.ids[1] == "U00.5") {
-                try {
-                    const design = params.ids[2];
-                    const fromDate = params.ids[3].split(',')[0];
-                    const toDate = params.ids[3].split(',')[1];
-
-                    const [rows] = await connection.execute(
-                    `
-                    SELECT
-                        r.*,
-
-                        p.name,
-                        p.productId,
-                        p.size,
-
-                        u.name AS orderedBy,
-                        u.mobile,
-                        u.mapTo,
-
-                        u_dealer.name AS dealer,
-
-                        CASE
-                        WHEN r.productionQty > 0 THEN (
-                            SELECT COUNT(*) + 1
-                            FROM orders x
-                            WHERE x.design = r.design
-                            AND x.stockType = r.stockType
-                            AND x.productionQty > 0
-                            AND x.isDeleted = 0
-                            AND x.status NOT IN ('Cancelled', 'Rejected')
-                            AND (
-
-                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
-                                OR (
-                                COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) = COALESCE(r.modifiedOn, r.approvedOn, r.createdOn)
-                                AND x.id < r.id
-                                )
-                            )
-                        )
-                        ELSE NULL
-                        END AS waitlistSequence
-
-                    FROM orders r
-
-                    LEFT JOIN products p
-                        ON r.design = p.design
-
-                    LEFT JOIN user u
-                        ON r.userId = u.id
-
-                    LEFT JOIN user u_dealer
-                        ON r.dealerId = u_dealer.id
-
-                    WHERE r.design = ?
-                    AND r.isDeleted = 0
-                    AND ((DATE(r.createdOn) BETWEEN ? AND ?) OR (DATE(r.modifiedOn) BETWEEN ? AND ?))
-
-                    ORDER BY
-                        r.createdOn DESC,
-                        r.id DESC
-                    `,
-                    [design, fromDate, toDate, fromDate, toDate]
-                    );
-
-                    // attach the prm batch allocations for every order:
-                    // net quantity currently held per (order, batch) from the ledger
-                    if (rows.length > 0) {
-                        const orderIds = rows.map((r) => r.id);
-                        const placeholders = orderIds.map(() => '?').join(',');
-
-                        const [allocRows] = await connection.query(
-                            `
-                            SELECT oba.orderId, psb.batchId, SUM(oba.allocatedQty) AS allocatedQty
-                            FROM order_batch_allocations oba
-                            JOIN product_stock_batches psb ON psb.id = oba.stockBatchId
-                            WHERE oba.orderId IN (${placeholders})
-                            AND oba.stockType = 'prm'
-                            GROUP BY oba.orderId, psb.batchId
-                            HAVING allocatedQty > 0
-                            ORDER BY oba.orderId ASC, MIN(oba.id) ASC
-                            `,
-                            orderIds
-                        );
-
-                        const allocMap = new Map();
-                        for (const alloc of allocRows) {
-                            const key = String(alloc.orderId);
-                            if (!allocMap.has(key)) allocMap.set(key, []);
-                            allocMap.get(key).push({ batchId: alloc.batchId, qty: Number(alloc.allocatedQty || 0) });
-                        }
-
-                        rows.forEach((r) => {
-                            r.batchAllocations = allocMap.get(String(r.id)) || [];
-                        });
-                    }
-
-                    if (rows.length > 0) {
-                        return Response.json(
-                            {
-                                status: 200,
-                                success: true,
-                                message: "Design orders fetched successfully",
-                                data: rows,
-                            },
-                            { status: 200 }
-                        );
-                    }
-
-                    return Response.json(
-                        {
-                            status: 201,
-                            success: true,
-                            message: "No data found!",
-                            data: [],
-                        },
-                        { status: 200 }
-                    );
-                } catch (error) {
-                    return Response.json(
-                        {
-                            status: 404,
-                            success: false,
-                            message: "No Order found! " + error.message,
-                        },
-                        { status: 200 }
-                    );
-                } finally {
-                    connection.release();
-                }
-            }
             // Approve by admin for an order item
             else if(params.ids[1] == 'U0.2'){
                 // 1. Fail fast: Parse body and validate orderId before hitting the database
@@ -915,14 +625,11 @@ export async function GET(request,{params}) {
                             adminId,
                         });
 
-                        // batches are the source of truth for prm availability;
-                        // a manual batch selection caps the approvable qty to
-                        // those batches — the shortfall moves to production
+                        // batches are the source of truth for prm availability
                         const batches = await lockPrmBatches(connection, order.design);
                         const availableStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
-                        const reachableStock = selectablePrmStock(batches, batchSequence);
 
-                        const newApprovedQty = Math.min(newRequestedQty, reachableStock);
+                        const newApprovedQty = Math.min(newRequestedQty, availableStock);
                         const newProductionQty = Math.max(0, newRequestedQty - newApprovedQty);
 
                         // compare the new requestedQty to oldRequestedQty, if decrease and productionQty > 0, then avoid modifiedOn update.
@@ -932,7 +639,7 @@ export async function GET(request,{params}) {
                         const batchAllocations = drainPrmBatches(batches, newApprovedQty, batchSequence);
                         await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'ManualAdjustment', adminId });
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId, orderId);
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId);
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
@@ -1042,15 +749,12 @@ export async function GET(request,{params}) {
                         });
                     }
                     else if (order.stockType === 'prm') {
-                        // batches are the source of truth for prm availability;
-                        // a manual batch selection caps the approvable qty to
-                        // those batches — the shortfall moves to production
+                        // batches are the source of truth for prm availability
                         const batches = await lockPrmBatches(connection, order.design);
                         const availableStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
-                        const reachableStock = selectablePrmStock(batches, batchSequence);
                         const requestedQty = Number(order.requestedQty || 0);
 
-                        const approvedQty = Math.min(Number(toBeApprovedQty), reachableStock);
+                        const approvedQty = Math.min(Number(toBeApprovedQty), availableStock);
                         const productionQty = Math.max(0, Number(toBeApprovedQty) - approvedQty);
 
                         await connection.query(`UPDATE orders SET approvedQty = ?, productionQty = ?, status = 'Approved', approvedOn = ?, modifiedOn = ? WHERE id = ?`,
@@ -1060,7 +764,7 @@ export async function GET(request,{params}) {
                         const batchAllocations = drainPrmBatches(batches, approvedQty, batchSequence);
                         await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'InitialApproval', adminId });
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId, orderId);
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId);
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
@@ -1402,7 +1106,7 @@ export async function GET(request,{params}) {
                     await saleOrderConnection.beginTransaction();
 
                     const [items] = await saleOrderConnection.query(
-                        `SELECT id, userId, dealerId, design, stockType, requestedQty, approvedQty, productionQty, status, batch, createdOn, approvedOn, modifiedOn, serialId FROM orders WHERE cartId = ? AND isDeleted = 0 FOR UPDATE`,
+                        `SELECT id, dealerId, status, productionQty FROM orders WHERE cartId = ? AND isDeleted = 0 FOR UPDATE`,
                         [cartId]
                     );
 
@@ -1448,36 +1152,6 @@ export async function GET(request,{params}) {
                         [actionDate, cartId]
                     );
 
-                    // every live item whose pending production was just cleared gets a
-                    // fresh tracking item in the same cart: the Sale Order covers the
-                    // approvedQty, and the clone carries the productionQty forward as a
-                    // separate Approved item (approvedQty 0, next serialId). Original
-                    // queue timestamps are copied so it keeps its waitlist position.
-                    let nextSerialId = items.reduce((max, item) => Math.max(max, Number(item.serialId || 0)), 0) + 1;
-                    const splitItems = [];
-
-                    for (const item of items) {
-                        if (['Cancelled', 'Rejected'].includes(item.status)) continue;
-
-                        const pendingQty = Number(item.productionQty || 0);
-                        if (pendingQty <= 0) continue;
-
-                        const [insertResult] = await saleOrderConnection.query(
-                            `INSERT INTO orders
-                                (userId, dealerId, design, requestedQty, status, stockType, approvedQty, batch, createdOn, approvedOn, modifiedOn, productionQty, cartId, serialId, isDeleted)
-                             VALUES (?, ?, ?, ?, 'Approved', ?, 0, ?, ?, ?, ?, ?, ?, ?, 0)`,
-                            [item.userId, item.dealerId, item.design, pendingQty, item.stockType, item.batch, item.createdOn, item.approvedOn, item.modifiedOn, pendingQty, cartId, nextSerialId]
-                        );
-
-                        splitItems.push({
-                            sourceOrderId: item.id,
-                            newOrderId: insertResult.insertId,
-                            serialId: nextSerialId,
-                            productionQty: pendingQty,
-                        });
-                        nextSerialId += 1;
-                    }
-
                     await saleOrderConnection.commit();
 
                     // send notification
@@ -1510,7 +1184,6 @@ export async function GET(request,{params}) {
                             cartId,
                             totalItems: items.length,
                             updatedItems: result.affectedRows,
-                            splitItems,
                         },
                     });
                 } catch (error) {
@@ -1595,10 +1268,6 @@ export async function GET(request,{params}) {
                 const sortBy = params.ids[6] || "createdOn";
 
                 var statusCond = '';
-                if(status != 'All'){
-                    statusCond = ` AND o.status = '`+status+`' `
-                }
-
                 // based on the role, manage the join condition to filter orders by userId or dealerId
                 var joinCond = '', nameCond = '';
                 if(role == 'dealer' || role == 'Dealer'){
@@ -1606,18 +1275,28 @@ export async function GET(request,{params}) {
                     joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
                     
+                    if(status != 'All'){
+                        statusCond = ` o.status = '`+status+`' AND `
+                    }
                     statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
                 }
                 else if(role == 'globaladmin' || role == 'GlobalAdmin'){
                     nameCond += ` u_dealer.name as orderedBy, u.name as dealer, `
                     joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
+                    if(status != 'All'){
+                        statusCond = ` o.status = '`+status+`' AND `
+                    }
                 }
                 else {
                     nameCond += ` u.name as orderedBy, u_dealer.name as dealer, `
                     joinCond += ` LEFT JOIN user u ON o.userId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.dealerId=u_dealer.id `
-                    statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) `
+
+                    if(status != 'All'){
+                        statusCond = ` o.status = '`+status+`' AND `
+                    }
+                    statusCond += ` ((u.relatedTo LIKE ? OR u.id LIKE ?) `
 
                     // get the relatedTo of the userId and split it into an array and then add it to the where condition to filter the orders by userId or relatedTo
                     // this is to make sure, if anyone in the hirerchy above has placed order for their dealers.
@@ -1637,7 +1316,7 @@ export async function GET(request,{params}) {
                                         relatedToCond += ` OR u.id LIKE "%`+element+`%" `
                                     }
                                 }
-                                statusCond += ` OR (`+relatedToCond+` OR u.id LIKE "%`+userId+`%") AND `
+                                statusCond += ` OR (`+relatedToCond+` OR u.id LIKE "%`+userId+`%")) AND `
                             }
                             else {
                                 statusCond += ` AND `
@@ -1645,6 +1324,7 @@ export async function GET(request,{params}) {
                         }
                     }
                 }
+                
 
                 try {
                     var queryCount = 'SELECT count(*) as count from orders r LEFT JOIN products p ON r.design = p.design LEFT JOIN user u ON r.userId = u.id WHERE (u.relatedTo LIKE "%'+userId+'%" OR u.id LIKE "%'+userId+'%") AND r.isDeleted = 0';
@@ -1674,7 +1354,7 @@ export async function GET(request,{params}) {
                                         AND x.stockType = o.stockType
                                         AND x.productionQty > 0
                                         AND x.isDeleted = 0
-                                        AND x.status NOT IN ('Cancelled', 'Rejected')
+                                        AND x.status IN ('${status}')
                                         AND (
                                         COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
                                             OR (
@@ -2681,11 +2361,10 @@ async function lockPrmBatches(connection, design) {
 // breakdown of what was taken.
 //
 // Selection order:
-// 1. batches in sequenceIds (admin-chosen order), if provided — ONLY those
-//    batches are drained; any shortfall stays with the caller and moves to
-//    production
-// 2. no selection: smallest availableQty first (ties go to the oldest batch),
-//    continuing batch by batch until the qty is covered or batches run out
+// 1. batches in sequenceIds (admin-chosen order), if provided
+// 2. best fit for the remainder: the smallest batch that can cover the
+//    remaining qty on its own; when none can, drain the smallest available
+//    batch and repeat (ties go to the oldest batch)
 function drainPrmBatches(batches, qty, sequenceIds) {
     let remaining = Number(qty || 0);
     const entries = [];
@@ -2698,33 +2377,27 @@ function drainPrmBatches(batches, qty, sequenceIds) {
         entries.push({ stockBatchId: batch.id, batchId: batch.batchId, qty: takeQty });
     };
 
-    if (Array.isArray(sequenceIds) && sequenceIds.length > 0) {
+    if (Array.isArray(sequenceIds)) {
         for (const id of sequenceIds) {
             if (remaining <= 0) break;
             const batch = batches.find((b) => String(b.id) === String(id));
             if (batch && batch.availableQty > 0) takeFrom(batch, remaining);
         }
-        return entries;
     }
 
-    const bySmallest = [...batches].sort((a, b) => a.availableQty - b.availableQty || a.id - b.id);
-    for (const batch of bySmallest) {
-        if (remaining <= 0) break;
-        if (batch.availableQty > 0) takeFrom(batch, remaining);
+    while (remaining > 0) {
+        const candidates = batches.filter((b) => b.availableQty > 0);
+        if (candidates.length === 0) break;
+
+        const fitting = candidates
+            .filter((b) => b.availableQty >= remaining)
+            .sort((a, b) => a.availableQty - b.availableQty);
+        const pick = fitting[0] || candidates.sort((a, b) => a.availableQty - b.availableQty)[0];
+
+        takeFrom(pick, remaining);
     }
 
     return entries;
-}
-
-// stock reachable by the drain: capped to the selected batches when a
-// sequence is provided, otherwise everything that is available
-function selectablePrmStock(batches, sequenceIds) {
-    if (Array.isArray(sequenceIds) && sequenceIds.length > 0) {
-        return batches
-            .filter((b) => sequenceIds.some((id) => String(id) === String(b.id)))
-            .reduce((sum, b) => sum + Number(b.availableQty || 0), 0);
-    }
-    return batches.reduce((sum, b) => sum + Number(b.availableQty || 0), 0);
 }
 
 // write drained quantities back; fully consumed batches are marked Empty
@@ -2874,13 +2547,8 @@ async function releasePrmToBatches(connection, { orderId, design, qty, adminId }
  * Allocate remaining prm batch stock to the waitlist. Mirrors
  * allocateStockToWaitlist, but drains the locked batches oldest-first and
  * records every order-batch pair in the ledger.
- *
- * excludeOrderId keeps the order that triggered this pass out of it: its
- * production remainder is an explicit admin decision (e.g. a manual batch
- * selection that intentionally left qty unapproved) and must not be
- * auto-filled from the other batches.
  */
-async function allocatePrmWaitlistFromBatches(connection, design, batches, adminId, excludeOrderId = null) {
+async function allocatePrmWaitlistFromBatches(connection, design, batches, adminId) {
     let remainingStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
 
     const [pendingRows] = await connection.query(
@@ -2901,13 +2569,12 @@ async function allocatePrmWaitlistFromBatches(connection, design, batches, admin
         AND productionQty > 0
         AND isDeleted = 0
         AND status NOT IN ('Cancelled', 'Rejected')
-        ${excludeOrderId != null ? 'AND id != ?' : ''}
         ORDER BY
         COALESCE(modifiedOn, approvedOn, createdOn) ASC,
         id ASC
         FOR UPDATE
         `,
-        excludeOrderId != null ? [design, excludeOrderId] : [design]
+        [design]
     );
 
     const allocations = [];
