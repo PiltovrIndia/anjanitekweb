@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -90,5 +92,33 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  body,
+  body * {
+    font-family: 'Google Sans Code', monospace !important;
+  }
+}
+
+@layer components {
+  .campus-sidebar-toggle {
+    position: sticky;
+    top: 1rem;
+    z-index: 50;
+    width: fit-content;
+    margin-bottom: -2.5rem;
+  }
+
+  .campus-page-content > * > :first-child {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    min-height: 3rem;
+    width: 100%;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    padding-left: 3rem;
+    background: hsl(var(--background));
+    border-bottom: 1px solid hsl(var(--border));
   }
 }

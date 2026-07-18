@@ -68,33 +68,35 @@ export default function Vertification() {
     const [resultMessage, setResultMessage] = useState('');
 
     useEffect(()=>{
-        // Retrieve the cookie
-        let cookieValue = biscuits.get('sc_user_detail')
-        // let cookieValue = document.cookie.replace(/(?:(?:^|.*;\s*)sc_user_detail\s*\=\s*([^;]*).*$)|^.*$/, "$1");
-        if(cookieValue){
+        const cookieValue = biscuits.get('sc_user_detail')
+
+        if(!cookieValue){
+            setSession(false)
+            return
+        }
+
+        try {
             const obj = JSON.parse(decodeURIComponent(cookieValue))
-            
-            // for now, only admins can login in to this portal
-            if(obj.role == 'GlobalAdmin' || obj.role == 'SuperAdmin' || obj.role == 'Admin' || obj.role == 'OutingAdmin' || obj.role == 'OutingIssuer')
+            const role = obj.role?.toLocaleLowerCase()
+
+            if(['globaladmin', 'superadmin', 'admin', 'outingadmin', 'outingissuer'].includes(role))
             {
                 setSession(true)
-                // router.push('/dashboard')
-                router.push('/dashboard')
+                router.replace('/dashboard')
             }
-            else if(obj.role == 'Student' || obj.role == 'student'){
+            else if(role == 'student'){
                 setSession(true)
-                // router.push('/dashboard')
-                router.push('/profileupdate')
+                router.replace('/profileupdate')
             }
             else {
-
+                biscuits.remove('sc_user_detail', { path: '/' })
+                setSession(false)
             }
-        }
-        else{
+        } catch {
+            biscuits.remove('sc_user_detail', { path: '/' })
             setSession(false)
-            // console.log('Not found')
         }
-    },[session]);
+    },[router]);
  
      // Function to handle the "Enter" key press
      const handleKeyPress = (event) => {
@@ -218,7 +220,7 @@ function clearCookies(){
 
      // clear cookies
     //  document.cookie = "";
-     biscuits.remove('sc_user_detail')
+     biscuits.remove('sc_user_detail', { path: '/' })
 
      // clearing the state variable
      setUsername(''),setPhone(''),setuserFound(false),seterrorMsg(''),setotpSent(false),setverifyOtpMsg(''),setOTP(),setinfoMsg(false),setUser()

@@ -107,7 +107,7 @@ export function AppSidebar({ userData, ...props }) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href={homeHref}>
-                <div className="relative flex size-10 items-center justify-center overflow-hidden rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
+                <div className="relative flex size-10 items-center justify-center overflow-hidden rounded-xl bg-sidebar-primary-foreground text-sidebar-primary-foreground">
                   <Image src="/anjani_logo.webp" alt="Anjani Tek" fill className="object-cover" sizes="40px" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">

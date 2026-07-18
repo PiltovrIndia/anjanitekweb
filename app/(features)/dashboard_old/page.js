@@ -163,7 +163,7 @@ export default function DashboardOld() {
     function clearCookies(){
 
         //  document.cookie = "";
-        biscuits.remove('sc_user_detail')
+        biscuits.remove('sc_user_detail', { path: '/' })
 
         // clearing the state variable
         setUser()

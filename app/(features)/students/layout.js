@@ -31,8 +31,8 @@ const inter = Inter({ subsets: ['latin'] })
     function clearCookies(){
 
       //  document.cookie = "";
-      biscuits.remove('sc_user_detail')
-      router.push('/')
+      biscuits.remove('sc_user_detail', { path: '/' })
+      router.replace('/')
       
   }
     

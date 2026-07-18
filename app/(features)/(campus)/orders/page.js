@@ -350,6 +350,20 @@ export default function OrdersV2() {
         return () => { cancelled = true; };
     }, [isActionDialogOpen, selectedRes?.stockType, selectedRes?.status, selectedRes?.id])
 
+    // Pre-fill the manual allocation order with this order's existing batch
+    // allocations when editing an already-approved prm order, so the admin
+    // edits from what's currently reserved instead of starting blank
+    useEffect(() => {
+        if (!isEditingOrderItem || selectedRes?.stockType !== 'prm' || selectedRes?.status !== 'Approved') return;
+        if (loadingDesignBatches || loadingOrderAllocations) return;
+        if (batchSequence.length > 0 || orderAllocations.length === 0 || designBatches.length === 0) return;
+        const preselected = orderAllocations
+            .map((alloc) => designBatches.find((b) => b.batchId === alloc.batchId)?.id)
+            .filter(Boolean);
+        if (preselected.length > 0) setBatchSequence(preselected);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEditingOrderItem, selectedRes?.stockType, selectedRes?.status, loadingDesignBatches, loadingOrderAllocations, orderAllocations, designBatches])
+
     useEffect(() => {
         const sentinel = ordersEndRef.current;
         if (!sentinel) return;
@@ -897,6 +911,18 @@ export default function OrdersV2() {
         }
     }
 
+    // when editing an already-approved prm order, a batch's true selectable
+    // capacity is its current availableQty plus whatever this order already
+    // has reserved on it — that reservation gets released back to the batch
+    // before the new selection is drained on submit
+    const isEditingApprovedPrm = isEditingOrderItem && selectedRes?.stockType === 'prm' && selectedRes?.status === 'Approved';
+    const reservedQtyByBatch = useMemo(() => {
+        const map = {};
+        orderAllocations.forEach((alloc) => { map[alloc.batchId] = Number(alloc.allocatedQty || 0); });
+        return map;
+    }, [orderAllocations]);
+    const getEffectiveAvailableQty = (batch) => Number(batch.availableQty || 0) + (isEditingApprovedPrm ? Number(reservedQtyByBatch[batch.batchId] || 0) : 0);
+
     // panel showing which batches an approved order's stock was allocated from
     const renderAllocatedBatchesPanel = () => (
         <div className="rounded-lg border border-slate-200 bg-white">
@@ -937,10 +963,13 @@ export default function OrdersV2() {
         </div>
     );
 
-    // tap a batch row to add/remove it from the manual allocation order
+    // tap a batch row to add/remove it from the manual allocation order.
+    // a batch fully reserved by this order shows as 'Empty' (its stock is
+    // drained into the reservation) but is still selectable — its effective
+    // qty already accounts for that reservation
     function toggleBatchInSequence(batch) {
         if (!isEditingOrderItem) return;
-        if (batch.status !== 'Active' || Number(batch.availableQty || 0) <= 0) return;
+        if (getEffectiveAvailableQty(batch) <= 0) return;
         setBatchSequence(prev => prev.includes(batch.id)
             ? prev.filter(id => id !== batch.id)
             : [...prev, batch.id]);
@@ -1697,14 +1726,13 @@ return (
                     </div>
 
                     {selectedRes?.stockType === 'prm' ? (
-                    selectedRes?.status === 'Approved' ? renderAllocatedBatchesPanel() : (
                     <div className="rounded-lg border border-slate-200 bg-white">
                         <div className="flex items-center justify-between gap-3 px-3 py-2.5">
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold text-slate-900">PRM stock batches</span>
+                                    <span className="text-sm font-semibold text-slate-900">PRM batches</span>
                                     <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                                        {designBatches.length}
+                                        {designBatches.filter((batch) => getEffectiveAvailableQty(batch) > 0).length}
                                     </span>
                                 </div>
                                 <div className="text-xs text-slate-500">{selectedReviewDesign?.design || selectedRes?.design || '-'}</div>
@@ -1722,7 +1750,7 @@ return (
                                 ) : null}
                                 {batchSequence.length > 0 ? (() => {
                                     // running total of what the selected batches can supply vs the qty being approved
-                                    const selectedSum = designBatches.filter((b) => batchSequence.includes(b.id)).reduce((sum, b) => sum + Number(b.availableQty || 0), 0);
+                                    const selectedSum = designBatches.filter((b) => batchSequence.includes(b.id)).reduce((sum, b) => sum + getEffectiveAvailableQty(b), 0);
                                     const qty = Number(approvalQty || 0);
                                     return (
                                         <span className={`rounded-full px-2 py-1 text-xs font-medium ${selectedSum >= qty ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -1731,12 +1759,12 @@ return (
                                     );
                                 })() : null}
                                 <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">
-                                    Available {designBatches.reduce((sum, b) => sum + (b.status === 'Active' ? Number(b.availableQty || 0) : 0), 0)}
+                                    Available {designBatches.reduce((sum, b) => sum + getEffectiveAvailableQty(b), 0)}
                                 </span>
                             </div>
                         </div>
 
-                        {loadingDesignBatches ? (
+                        {loadingDesignBatches || (isEditingApprovedPrm && loadingOrderAllocations) ? (
                             <div className="flex items-center justify-center border-t border-slate-100 px-3 py-4 text-sm text-slate-500">
                                 <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />
                                 Loading batches...
@@ -1748,9 +1776,11 @@ return (
                         ) : (
                             <>
                                 <div className="max-h-44 divide-y divide-slate-100 overflow-y-auto border-t border-slate-100">
-                                    {designBatches.filter((batch) => Number(batch.availableQty || 0) > 0).map((batch) => {
+                                    {designBatches.filter((batch) => getEffectiveAvailableQty(batch) > 0).map((batch) => {
                                         const seqIndex = batchSequence.indexOf(batch.id);
-                                        const selectable = batch.status === 'Active' && Number(batch.availableQty || 0) > 0;
+                                        const effectiveQty = getEffectiveAvailableQty(batch);
+                                        const selectable = effectiveQty > 0;
+                                        const reservedQty = Number(reservedQtyByBatch[batch.batchId] || 0);
                                         return (
                                         <div
                                             key={batch.id}
@@ -1771,6 +1801,11 @@ return (
                                                 </div>
                                             </div>
                                             <div className="flex shrink-0 items-center gap-2 text-xs">
+                                                {reservedQty > 0 ? (
+                                                    <span className="rounded-full bg-violet-100 px-2 py-1 font-medium text-violet-700">
+                                                        Reserved {reservedQty}
+                                                    </span>
+                                                ) : null}
                                                 <span className={`rounded-full px-2 py-1 font-medium ${batch.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
                                                     {batch.status}
                                                 </span>
@@ -1790,7 +1825,6 @@ return (
                             </>
                         )}
                     </div>
-                    )
                     ) : null}
                     </>
                     ) : null}

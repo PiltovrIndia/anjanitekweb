@@ -210,7 +210,7 @@ function clearCookies(){
 
      // clear cookies
     //  document.cookie = "";
-     biscuits.remove('sc_user_detail')
+     biscuits.remove('sc_user_detail', { path: '/' })
 
      // clearing the state variable
      setUsername(''),setPhone(''),setuserFound(false),seterrorMsg(''),setotpSent(false),setverifyOtpMsg(''),setOTP(),setinfoMsg(false),setUser()
