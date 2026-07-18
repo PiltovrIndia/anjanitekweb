@@ -627,7 +627,12 @@ export async function GET(request,{params}) {
 
                         // batches are the source of truth for prm availability
                         const batches = await lockPrmBatches(connection, order.design);
-                        const availableStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
+                        // when the admin manually picked batches, only their stock counts toward
+                        // approvedQty — the rest of the design's stock is off-limits and any
+                        // shortfall goes to production instead of being silently backfilled
+                        const availableStock = batchSequence.length > 0
+                            ? batches.filter((b) => batchSequence.map(String).includes(String(b.id))).reduce((sum, b) => sum + b.availableQty, 0)
+                            : batches.reduce((sum, b) => sum + b.availableQty, 0);
 
                         const newApprovedQty = Math.min(newRequestedQty, availableStock);
                         const newProductionQty = Math.max(0, newRequestedQty - newApprovedQty);
@@ -639,7 +644,7 @@ export async function GET(request,{params}) {
                         const batchAllocations = drainPrmBatches(batches, newApprovedQty, batchSequence);
                         await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'ManualAdjustment', adminId });
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId);
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId, orderId);
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
@@ -751,7 +756,12 @@ export async function GET(request,{params}) {
                     else if (order.stockType === 'prm') {
                         // batches are the source of truth for prm availability
                         const batches = await lockPrmBatches(connection, order.design);
-                        const availableStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
+                        // when the admin manually picked batches, only their stock counts toward
+                        // approvedQty — the rest of the design's stock is off-limits and any
+                        // shortfall goes to production instead of being silently backfilled
+                        const availableStock = batchSequence.length > 0
+                            ? batches.filter((b) => batchSequence.map(String).includes(String(b.id))).reduce((sum, b) => sum + b.availableQty, 0)
+                            : batches.reduce((sum, b) => sum + b.availableQty, 0);
                         const requestedQty = Number(order.requestedQty || 0);
 
                         const approvedQty = Math.min(Number(toBeApprovedQty), availableStock);
@@ -764,7 +774,7 @@ export async function GET(request,{params}) {
                         const batchAllocations = drainPrmBatches(batches, approvedQty, batchSequence);
                         await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'InitialApproval', adminId });
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId);
+                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId, orderId);
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
@@ -2361,8 +2371,10 @@ async function lockPrmBatches(connection, design) {
 // breakdown of what was taken.
 //
 // Selection order:
-// 1. batches in sequenceIds (admin-chosen order), if provided
-// 2. best fit for the remainder: the smallest batch that can cover the
+// 1. when sequenceIds is a non-empty array (admin manually picked batches),
+//    drain only those batches, in that order; any qty left over once they're
+//    exhausted is NOT pulled from other batches — it's left as production.
+// 2. otherwise (auto mode), best fit: the smallest batch that can cover the
 //    remaining qty on its own; when none can, drain the smallest available
 //    batch and repeat (ties go to the oldest batch)
 function drainPrmBatches(batches, qty, sequenceIds) {
@@ -2377,12 +2389,13 @@ function drainPrmBatches(batches, qty, sequenceIds) {
         entries.push({ stockBatchId: batch.id, batchId: batch.batchId, qty: takeQty });
     };
 
-    if (Array.isArray(sequenceIds)) {
+    if (Array.isArray(sequenceIds) && sequenceIds.length > 0) {
         for (const id of sequenceIds) {
             if (remaining <= 0) break;
             const batch = batches.find((b) => String(b.id) === String(id));
             if (batch && batch.availableQty > 0) takeFrom(batch, remaining);
         }
+        return entries;
     }
 
     while (remaining > 0) {
@@ -2548,7 +2561,11 @@ async function releasePrmToBatches(connection, { orderId, design, qty, adminId }
  * allocateStockToWaitlist, but drains the locked batches oldest-first and
  * records every order-batch pair in the ledger.
  */
-async function allocatePrmWaitlistFromBatches(connection, design, batches, adminId) {
+// excludeOrderId keeps this from immediately re-absorbing leftover batch stock
+// back into the order that was just approved in the same transaction — its
+// productionQty (e.g. a shortfall left on purpose by a manual batch pick)
+// should only be filled by a later, separate action, not this one.
+async function allocatePrmWaitlistFromBatches(connection, design, batches, adminId, excludeOrderId) {
     let remainingStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
 
     const [pendingRows] = await connection.query(
@@ -2569,12 +2586,13 @@ async function allocatePrmWaitlistFromBatches(connection, design, batches, admin
         AND productionQty > 0
         AND isDeleted = 0
         AND status NOT IN ('Cancelled', 'Rejected')
+        ${excludeOrderId ? 'AND id != ?' : ''}
         ORDER BY
         COALESCE(modifiedOn, approvedOn, createdOn) ASC,
         id ASC
         FOR UPDATE
         `,
-        [design]
+        excludeOrderId ? [design, excludeOrderId] : [design]
     );
 
     const allocations = [];
