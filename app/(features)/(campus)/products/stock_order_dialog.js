@@ -142,18 +142,23 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
     // PRM rule: if qty > available, split into (available, isProduction=false) + (rest, isProduction=true)
     // STD rule: qty <= available, single entry, isProduction=false
     const buildDesignsArray = () => {
+        
+        
         const designs = []
+        const atlCartId = `C${Date.now()}`
+        const vclCartId = `C${Date.now()+1}`
         let serialId = 1
         for (const item of cartItems) {
+            
             const qty = Number(item.quantity)
             const availPrm = Number(item.product.prm) || 0
             if (item.stockType === 'prm' && qty > availPrm) {
                 if (availPrm > 0) {
-                    designs.push({ serialId: serialId++, dealerId: selectedDealer.id, productId: item.product.productId, design: item.product.design, quantity: availPrm, stockType: 'prm', isProduction: false })
+                    designs.push({ cartId: (item.product.designType == 1) ? atlCartId : vclCartId,  serialId: serialId++, dealerId: selectedDealer.id, productId: item.product.productId, design: item.product.design, quantity: availPrm, stockType: 'prm', isProduction: false })
                 }
-                designs.push({ serialId: serialId++, dealerId: selectedDealer.id, productId: item.product.productId, design: item.product.design, quantity: qty - availPrm, stockType: 'prm', isProduction: true })
+                designs.push({ cartId: (item.product.designType == 1) ? atlCartId : vclCartId, serialId: serialId++, dealerId: selectedDealer.id, productId: item.product.productId, design: item.product.design, quantity: qty - availPrm, stockType: 'prm', isProduction: true })
             } else {
-                designs.push({ serialId: serialId++, dealerId: selectedDealer.id, productId: item.product.productId, design: item.product.design, quantity: qty, stockType: item.stockType, isProduction: false })
+                designs.push({ cartId: (item.product.designType == 1) ? atlCartId : vclCartId, serialId: serialId++, dealerId: selectedDealer.id, productId: item.product.productId, design: item.product.design, quantity: qty, stockType: item.stockType, isProduction: false })
             }
         }
         return designs
@@ -174,7 +179,6 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
 
             const body = {
                 userId: id,
-                cartId: `C${Date.now()}`,
                 designs: buildDesignsArray(),
                 createdOn,
             }

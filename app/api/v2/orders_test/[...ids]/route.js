@@ -562,11 +562,11 @@ export async function GET(request,{params}) {
                 var adminId = params.ids[4];
                 var actionDate = params.ids[5];
 
-                // optional admin-chosen batch allocation order (?batchSeq=id1,id2,...)
+                // optional admin-chosen batch allocation order (?batchSeq=id1,id2,... or id1:qty,id2:qty,...)
                 var batchSequence = [];
                 try {
                     const batchSeqParam = new URL(request.url).searchParams.get('batchSeq');
-                    if (batchSeqParam) batchSequence = batchSeqParam.split(',').map((s) => s.trim()).filter(Boolean);
+                    if (batchSeqParam) batchSequence = parseBatchSequenceParam(batchSeqParam);
                 } catch (e) {}
                 
                 if (!orderId) {
@@ -631,7 +631,7 @@ export async function GET(request,{params}) {
                         // approvedQty — the rest of the design's stock is off-limits and any
                         // shortfall goes to production instead of being silently backfilled
                         const availableStock = batchSequence.length > 0
-                            ? batches.filter((b) => batchSequence.map(String).includes(String(b.id))).reduce((sum, b) => sum + b.availableQty, 0)
+                            ? getManualBatchAvailableStock(batches, batchSequence)
                             : batches.reduce((sum, b) => sum + b.availableQty, 0);
 
                         const newApprovedQty = Math.min(newRequestedQty, availableStock);
@@ -760,7 +760,7 @@ export async function GET(request,{params}) {
                         // approvedQty — the rest of the design's stock is off-limits and any
                         // shortfall goes to production instead of being silently backfilled
                         const availableStock = batchSequence.length > 0
-                            ? batches.filter((b) => batchSequence.map(String).includes(String(b.id))).reduce((sum, b) => sum + b.availableQty, 0)
+                            ? getManualBatchAvailableStock(batches, batchSequence)
                             : batches.reduce((sum, b) => sum + b.availableQty, 0);
                         const requestedQty = Number(order.requestedQty || 0);
 
@@ -2367,13 +2367,39 @@ async function lockPrmBatches(connection, design) {
     }));
 }
 
+function parseBatchSequenceParam(batchSeqParam = '') {
+    return batchSeqParam
+        .split(',')
+        .map((rawEntry) => {
+            const [rawId, rawQty] = rawEntry.split(':');
+            const id = rawId?.trim();
+            const qty = Number(rawQty);
+            return {
+                id,
+                qty: Number.isFinite(qty) && qty > 0 ? qty : null,
+            };
+        })
+        .filter((entry) => entry.id);
+}
+
+function getManualBatchAvailableStock(batches, sequenceEntries) {
+    return sequenceEntries.reduce((sum, entry) => {
+        const id = typeof entry === 'object' ? entry.id : entry;
+        const qtyLimit = typeof entry === 'object' ? entry.qty : null;
+        const batch = batches.find((b) => String(b.id) === String(id));
+        if (!batch) return sum;
+        return sum + Math.min(batch.availableQty, qtyLimit || batch.availableQty);
+    }, 0);
+}
+
 // drain qty from the locked batches (in memory); returns the per-batch
 // breakdown of what was taken.
 //
 // Selection order:
 // 1. when sequenceIds is a non-empty array (admin manually picked batches),
-//    drain only those batches, in that order; any qty left over once they're
-//    exhausted is NOT pulled from other batches — it's left as production.
+//    drain only those batches, in that order. A sequence entry can be either
+//    a batch id or { id, qty }; qty caps how much can be taken from that batch.
+//    Any qty left over is NOT pulled from other batches — it's left as production.
 // 2. otherwise (auto mode), best fit: the smallest batch that can cover the
 //    remaining qty on its own; when none can, drain the smallest available
 //    batch and repeat (ties go to the oldest batch)
@@ -2390,10 +2416,12 @@ function drainPrmBatches(batches, qty, sequenceIds) {
     };
 
     if (Array.isArray(sequenceIds) && sequenceIds.length > 0) {
-        for (const id of sequenceIds) {
+        for (const entry of sequenceIds) {
             if (remaining <= 0) break;
+            const id = typeof entry === 'object' ? entry.id : entry;
+            const qtyLimit = typeof entry === 'object' ? entry.qty : null;
             const batch = batches.find((b) => String(b.id) === String(id));
-            if (batch && batch.availableQty > 0) takeFrom(batch, remaining);
+            if (batch && batch.availableQty > 0) takeFrom(batch, Math.min(remaining, qtyLimit || remaining));
         }
         return entries;
     }

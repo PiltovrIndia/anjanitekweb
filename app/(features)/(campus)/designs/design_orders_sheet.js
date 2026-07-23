@@ -137,6 +137,7 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
     const [designBatches, setDesignBatches] = useState([])
     const [loadingDesignBatches, setLoadingDesignBatches] = useState(false)
     const [batchSequence, setBatchSequence] = useState([]) // admin-chosen batch allocation order (stock batch ids)
+    const [batchQtyById, setBatchQtyById] = useState({}) // admin-chosen qty per selected batch id
     const [orderAllocations, setOrderAllocations] = useState([]) // batches allocated to the approved order under review
     const [loadingOrderAllocations, setLoadingOrderAllocations] = useState(false)
     const reviewDesignTimer = useRef(null)
@@ -406,12 +407,14 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
             setDesignBatches([]);
             setLoadingDesignBatches(false);
             setBatchSequence([]);
+            setBatchQtyById({});
             return;
         }
 
         let cancelled = false;
         setLoadingDesignBatches(true);
         setBatchSequence([]);
+        setBatchQtyById({});
 
         fetch(`/api/v2/designs/${process.env.NEXT_PUBLIC_API_PASS}/U11/${encodeURIComponent(reviewDesign)}`, {
             headers: { 'Content-Type': 'application/json' },
@@ -468,7 +471,15 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
         const preselected = orderAllocations
             .map((alloc) => designBatches.find((b) => b.batchId === alloc.batchId)?.id)
             .filter(Boolean);
-        if (preselected.length > 0) setBatchSequence(preselected);
+        if (preselected.length > 0) {
+            setBatchSequence(preselected);
+            setBatchQtyById(orderAllocations.reduce((qtyMap, alloc) => {
+                const batch = designBatches.find((b) => b.batchId === alloc.batchId);
+                if (!batch) return qtyMap;
+                qtyMap[batch.id] = Number(alloc.allocatedQty || 0);
+                return qtyMap;
+            }, {}));
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEditingOrderItem, selectedRes?.stockType, selectedRes?.status, loadingDesignBatches, loadingOrderAllocations, orderAllocations, designBatches])
 
@@ -617,9 +628,49 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
     function toggleBatchInSequence(batch) {
         if (!isEditingOrderItem) return;
         if (getEffectiveAvailableQty(batch) <= 0) return;
-        setBatchSequence(prev => prev.includes(batch.id)
-            ? prev.filter(id => id !== batch.id)
-            : [...prev, batch.id]);
+        setBatchSequence(prev => {
+            if (prev.includes(batch.id)) {
+                setBatchQtyById(qtyMap => {
+                    const next = { ...qtyMap };
+                    delete next[batch.id];
+                    return next;
+                });
+                return prev.filter(id => id !== batch.id);
+            }
+
+            const remainingQty = Math.max(0, Number(approvalQty || 0) - prev.reduce((sum, id) => sum + Number(batchQtyById[id] || 0), 0));
+            const availableQty = getEffectiveAvailableQty(batch);
+            setBatchQtyById(qtyMap => ({
+                ...qtyMap,
+                [batch.id]: Math.max(1, Math.min(availableQty, remainingQty || availableQty)),
+            }));
+            return [...prev, batch.id];
+        });
+    }
+
+    function updateBatchAllocationQty(batch, value) {
+        const availableQty = getEffectiveAvailableQty(batch);
+        const otherSelectedQty = batchSequence
+            .filter((id) => String(id) !== String(batch.id))
+            .reduce((sum, id) => sum + Number(batchQtyById[id] || 0), 0);
+        const remainingApprovalQty = Math.max(0, Number(approvalQty || 0) - otherSelectedQty);
+        const maxQty = Math.min(availableQty, remainingApprovalQty);
+        const nextQty = maxQty <= 0 ? 0 : Math.max(1, Math.min(Number(value || 0), maxQty));
+        setBatchQtyById(prev => ({
+            ...prev,
+            [batch.id]: nextQty,
+        }));
+    }
+
+    function getBatchAllocationPayload() {
+        let remainingQty = Number(approvalQty || 0);
+        return batchSequence.map((id) => {
+            const batch = designBatches.find((item) => String(item.id) === String(id));
+            const availableQty = batch ? getEffectiveAvailableQty(batch) : 0;
+            const selectedQty = Math.max(0, Math.min(Number(batchQtyById[id] || availableQty || 0), availableQty, remainingQty));
+            remainingQty -= selectedQty;
+            return `${id}:${selectedQty}`;
+        }).filter((entry) => !entry.endsWith(':0'));
     }
 
     async function submitApproval(status) {
@@ -654,7 +705,7 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                 selectedRes.userId,
                 dayjs().format('YYYY-MM-DD HH:mm:ss'),
                 selectedReviewDesign.design,
-                path === 'U0.2' && selectedRes.stockType === 'prm' ? batchSequence : [],
+                path === 'U0.2' && selectedRes.stockType === 'prm' ? getBatchAllocationPayload() : [],
             );
             const queryResult = await result.json();
 
@@ -1071,14 +1122,17 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                                         size="sm"
                                         variant="ghost"
                                         className="h-7 px-2 text-xs text-slate-500 hover:text-slate-800"
-                                        onClick={() => setBatchSequence([])}
+                                        onClick={() => {
+                                            setBatchSequence([]);
+                                            setBatchQtyById({});
+                                        }}
                                     >
                                         Clear order
                                     </Button>
                                 ) : null}
                                 {batchSequence.length > 0 ? (() => {
                                     // running total of what the selected batches can supply vs the qty being approved
-                                    const selectedSum = designBatches.filter((b) => batchSequence.includes(b.id)).reduce((sum, b) => sum + getEffectiveAvailableQty(b), 0);
+                                    const selectedSum = batchSequence.reduce((sum, id) => sum + Number(batchQtyById[id] || 0), 0);
                                     const qty = Number(approvalQty || 0);
                                     return (
                                         <span className={`rounded-full px-2 py-1 text-xs font-medium ${selectedSum >= qty ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -1109,6 +1163,11 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                                         const effectiveQty = getEffectiveAvailableQty(batch);
                                         const selectable = effectiveQty > 0;
                                         const reservedQty = Number(reservedQtyByBatch[batch.batchId] || 0);
+                                        const selectedQty = Number(batchQtyById[batch.id] || 0);
+                                        const otherSelectedQty = batchSequence
+                                            .filter((id) => String(id) !== String(batch.id))
+                                            .reduce((sum, id) => sum + Number(batchQtyById[id] || 0), 0);
+                                        const maxSelectedQty = Math.min(effectiveQty, Math.max(0, Number(approvalQty || 0) - otherSelectedQty));
                                         return (
                                         <div
                                             key={batch.id}
@@ -1140,6 +1199,17 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                                                 <span className="font-mono font-medium text-slate-900">
                                                     {Number(batch.availableQty || 0)}<span className="text-slate-400"> / {Number(batch.initialQty || 0)}</span>
                                                 </span>
+                                                {seqIndex >= 0 ? (
+                                                    <Input
+                                                        type="number"
+                                                        min={1}
+                                                        max={maxSelectedQty}
+                                                        value={selectedQty}
+                                                        onClick={(event) => event.stopPropagation()}
+                                                        onChange={(event) => updateBatchAllocationQty(batch, event.target.value)}
+                                                        className="h-8 w-24 text-right text-xs"
+                                                    />
+                                                ) : null}
                                             </div>
                                         </div>
                                         );
