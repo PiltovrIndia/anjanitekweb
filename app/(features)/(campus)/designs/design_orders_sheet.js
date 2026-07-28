@@ -145,7 +145,7 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
 
     // refresh the tab counts for this design
     async function loadCounts() {
-        if (!design) return;
+        if (!design) return {};
         try {
             const result = await getDesignOrderCountsAPI(process.env.NEXT_PUBLIC_API_PASS, design);
             const queryResult = await result.json();
@@ -154,8 +154,10 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                 queryResult.data.forEach(row => { counts[row.status] = Number(row.count || 0); });
             }
             setStatusCounts(counts);
+            return counts;
         } catch (e) {
             setStatusCounts({});
+            return {};
         }
     }
 
@@ -195,10 +197,20 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
             return;
         }
 
-        setActiveStatus('Submitted');
-        setPage(1);
-        loadCounts();
-        loadItems('Submitted', 1);
+        let cancelled = false;
+
+        async function initializeDialog() {
+            const counts = await loadCounts();
+            if (cancelled) return;
+
+            const initialStatus = ORDER_STATUS_TABS.find((status) => Number(counts[status] || 0) > 0) || 'Submitted';
+            setActiveStatus(initialStatus);
+            setPage(1);
+            loadItems(initialStatus, 1);
+        }
+
+        initializeDialog();
+        return () => { cancelled = true; };
     }, [open, design]);
 
     function handleStatusTabChange(status) {

@@ -23,6 +23,7 @@ import { Input } from '@/app/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/app/components/ui/dialog'
 import { Checkbox } from '@/app/components/ui/checkbox'
+import { Switch } from '@/app/components/ui/switch'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/app/components/ui/sheet'
 import { Label } from '@/app/components/ui/label'
 import * as XLSX from 'xlsx';
@@ -36,6 +37,16 @@ const ORDER_PAGE_SIZE = 0;
 // get orders
 const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction) => 
 fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// get waitlisted order items, grouped by cart
+const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction) =>
+fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -120,6 +131,7 @@ export default function OrdersV2() {
     const [totalOrders, setTotalOrders] = useState(0);
     const [orders, setOrders] = useState([]);
     const [resLoading, setResLoading] = useState(false);
+    const [showWaitlist, setShowWaitlist] = useState(false);
     const [isProduction, setisProduction] = useState('All');
     const [downloadingOrders, setDownloadingOrders] = useState(false);
     const [resOffset, setResOffset] = useState(0);
@@ -505,7 +517,7 @@ export default function OrdersV2() {
         return status || '-'
     }
 
-    async function getOrders(val, offsetR, userObj = user, productionFilter = isProduction, append = false){
+    async function getOrders(val, offsetR, userObj = user, productionFilter = isProduction, append = false, waitlistOnly = showWaitlist){
         
         
         setResLoading(true);
@@ -518,7 +530,9 @@ export default function OrdersV2() {
         }
 
         try {    
-            const result  = await getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS,val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter) 
+            const result = await (waitlistOnly
+                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter)
+                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter));
             const queryResult = await result.json() // get data
 
             // check for the status
@@ -536,28 +550,33 @@ export default function OrdersV2() {
                 }
 
                 setResLoading(false);
+                return true;
             }
             else if(queryResult.status == 401) {
                 
                 setResLoading(false);
+                return false;
             }
             else if(queryResult.status == 404 || queryResult.status == 201) {
                 setOrders([]);
                 setResLoading(false);
+                return false;
             }
+            return false;
         }
         catch (e){
             
             toast({
                 description: "Issue loading, try again later!",
-              })
+            })
             setResLoading(false);
+            return false;
         }
     }
 
     function buildOrderDownloadRows(allOrders = []) {
         return allOrders.flatMap((res) => {
-            const buildRow = (batchNo, batchQty) => ({
+            const buildRow = (batchNo, rowApprovedQty = res.approvedQty) => ({
                 // orderId: res.id,
                 dealerName: res.dealer || '-',
                 orderedBy: res.orderedBy || '-',
@@ -568,9 +587,9 @@ export default function OrdersV2() {
                 productName: res.name || '-',
                 // productId: res.productId || '-',
                 requestedQty: Number(res.requestedQty || 0),
-                approvedQty: Number(res.approvedQty || 0),
+                approvedQty: Number(rowApprovedQty || 0),
+                productionQty: Number(res.productionQty || 0),
                 batchNo,
-                batchQty,
                 stockType: res.stockType || '-',
                 waitlistPosition: res.waitlistPosition || res.waitlistSequence || '-',
                 size: res.size || '-',
@@ -583,9 +602,12 @@ export default function OrdersV2() {
 
             const allocations = Array.isArray(res.batchAllocations) ? res.batchAllocations : [];
             if (allocations.length === 0) {
-                return [buildRow('-', '-')];
+                return [buildRow('-')];
             }
-            return allocations.map((alloc) => buildRow(alloc.batchId || 'UNNAMED', Number(alloc.qty || 0)));
+            return allocations.map((alloc) => {
+                const allocatedQty = Number(alloc.qty || 0);
+                return buildRow(alloc.batchId || 'UNNAMED', allocatedQty);
+            });
         });
     }
 
@@ -1219,6 +1241,18 @@ export default function OrdersV2() {
         getOrders(val, 0, user);
     }
 
+    async function handleWaitlistToggle(checked) {
+        if (resLoading || !user) return;
+
+        const previousValue = showWaitlist;
+        setShowWaitlist(checked);
+        setResOffset(0);
+        setExpandedCartGroups({});
+
+        const loaded = await getOrders(resStatus, 0, user, isProduction, false, checked);
+        if (!loaded) setShowWaitlist(previousValue);
+    }
+
     function handleOrdersSort(key) {
         if (ordersSortKey !== key) {
             setOrdersSortKey(key);
@@ -1255,7 +1289,20 @@ return (
              
     <div className={`${inter.className} flex flex-col min-h-screen w-full overflow-auto`} style={{ gap: '8px' }}>
         <div className='flex flex-row gap-2 items-center justify-between' >
-              <h2 className="text-xl font-semibold mr-4">Orders</h2>
+              <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-semibold">Orders</h2>
+                  <div className="flex items-center gap-2">
+                      <Label htmlFor="show-waitlist" className="text-sm font-medium text-slate-600">Show Waitlist</Label>
+                      {resLoading && <SpinnerGap className="h-4 w-4 animate-spin text-slate-500" />}
+                      <Switch
+                          id="show-waitlist"
+                          checked={showWaitlist}
+                          disabled={resLoading || !user}
+                          onCheckedChange={handleWaitlistToggle}
+                          aria-label="Show waitlist orders"
+                      />
+                  </div>
+              </div>
               <div className="flex flex-row gap-2 justify-between items-center">
                     
                     <span className='text-sm text-slate-500'>{totalOrders} Orders listed</span>
@@ -1496,8 +1543,7 @@ return (
                                                             disabled={isDownloadingCart}
                                                             onClick={(e) => downloadCartOrders(group, e)}
                                                         >
-                                                            {isDownloadingCart ? <SpinnerGap className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDown className="mr-2 h-4 w-4" />}
-                                                            Download
+                                                            {isDownloadingCart ? <SpinnerGap className="h-4 w-4 animate-spin" /> : <ArrowDown className="h-4 w-4" />}
                                                         </Button>
                                                     );
                                                     const saleOrderButton = saleOrderEligible ? (
@@ -1516,10 +1562,10 @@ return (
                                                     return hasMultipleRows ? (
                                                         <div className="flex items-center justify-end gap-3">
                                                             {downloadButton}
-                                                            {saleOrderButton}
-                                                            <span className="text-xs font-medium text-slate-500">
+                                                            {/* {saleOrderButton} */}
+                                                            {/* <span className="text-xs font-medium text-slate-500">
                                                                 {isExpanded ? 'Hide items' : 'View items'}
-                                                            </span>
+                                                            </span> */}
                                                         </div>
                                                     ) : (
                                                         <div className="flex justify-end gap-2">
