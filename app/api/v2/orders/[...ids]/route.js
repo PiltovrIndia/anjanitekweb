@@ -1037,8 +1037,6 @@ export async function GET(request,{params}) {
                             },
                         });
                     }
-
-
                 } catch (error) {
                     await connection.rollback();
                     return Response.json({
@@ -1477,12 +1475,13 @@ export async function GET(request,{params}) {
             // /U0/$id/$sortBy - currently used for dealers 2-id = 5, 3-soryBy = 6
             else if(params.ids[1] == 'U0'){
                 const status = params.ids[2];      // All / Submitted / Approved / etc.
-                const offset = params.ids[3];        // GlobalAdmin
+                const offset = params.ids[3];        // 0, 20, 40, etc.
                 const role = params.ids[4];        // GlobalAdmin
                 const userId = params.ids[5];      // Test002
                 const sortBy = params.ids[6] || "createdOn";
 
                 var statusCond = '';
+                var waitListStatusCond = '';
                 // based on the role, manage the join condition to filter orders by userId or dealerId
                 var joinCond = '', nameCond = '';
                 if(role == 'dealer' || role == 'Dealer'){
@@ -1492,15 +1491,17 @@ export async function GET(request,{params}) {
                     
                     if(status != 'All'){
                         statusCond = ` o.status = '`+status+`' AND `
+                        waitListStatusCond = ` AND x.status IN ('${status}') `
                     }
                     statusCond += ` (u.relatedTo LIKE ? OR u.id LIKE ?) AND `
                 }
-                else if(role == 'globaladmin' || role == 'GlobalAdmin'){
+                else if(role == 'globaladmin' || role == 'GlobalAdmin' || role == 'superadmin' || role == 'SuperAdmin'){
                     nameCond += ` u_dealer.name as orderedBy, u.name as dealer, `
                     joinCond += ` LEFT JOIN user u ON o.dealerId = u.id `
                     joinCond += ` LEFT JOIN user u_dealer ON o.userId=u_dealer.id `
                     if(status != 'All'){
                         statusCond = ` o.status = '`+status+`' AND `
+                        waitListStatusCond = ` AND x.status IN ('${status}') `
                     }
                 }
                 else {
@@ -1510,16 +1511,21 @@ export async function GET(request,{params}) {
 
                     if(status != 'All'){
                         statusCond = ` o.status = '`+status+`' AND `
+                        waitListStatusCond = ` AND x.status IN ('${status}') `
                     }
                     statusCond += ` ((u.relatedTo LIKE ? OR u.id LIKE ?) `
 
                     // get the relatedTo of the userId and split it into an array and then add it to the where condition to filter the orders by userId or relatedTo
                     // this is to make sure, if anyone in the hirerchy above has placed order for their dealers.
-                    const [userRows] = await pool.query('SELECT relatedTo FROM user WHERE id = ?', [userId]);
+                    // console.log(`SELECT relatedTo FROM user WHERE id = '${userId}'`);
+                    
+                    const [userRows] = await pool.query(`SELECT relatedTo FROM user WHERE id = '${userId}'`);
+                    
                     if(userRows.length > 0){
                         const relatedTo = userRows[0].relatedTo;
                         if(relatedTo){
                             const relatedToArray = relatedTo.split(',');
+                            
                             if(relatedToArray.length > 0 && relatedToArray[0] != '-'){
                                 var relatedToCond = '';
                                 for (let index = 0; index < relatedToArray.length; index++) {
@@ -1569,7 +1575,8 @@ export async function GET(request,{params}) {
                                         AND x.stockType = o.stockType
                                         AND x.productionQty > 0
                                         AND x.isDeleted = 0
-                                        AND x.status IN ('${status}')
+                                        
+                                        ${waitListStatusCond}
                                         AND (
                                         COALESCE(x.modifiedOn, x.approvedOn, x.createdOn) < COALESCE(o.modifiedOn, o.approvedOn, o.createdOn)
                                             OR (
@@ -1594,6 +1601,7 @@ export async function GET(request,{params}) {
                             `;
                             // console.log(query);
                             
+
 
                             const [rows] = await pool.query(query, [`%${userId}%`, `%${userId}%`]);
 
@@ -1740,7 +1748,7 @@ export async function GET(request,{params}) {
                             ORDER BY o.`+sortBy+` DESC, o.cartId DESC, o.serialId ASC 
                             LIMIT 20 OFFSET `+offset+`
                             `;
-console.log(query);
+// console.log(query);
 
                             const [rows] = await pool.query(query, [`%${userId}%`, `%${userId}%`]);
 
