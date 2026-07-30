@@ -528,8 +528,11 @@ export async function GET(request,{params}) {
                          * orders are approved manually.
                          */
                         if (uploadedBatches.length > 0) {
-                            // upsert uploaded batch quantities on (design, batchId, stockType);
-                            // a re-uploaded batch gets its quantities reset to the new value
+                            // upsert uploaded batch quantities on (design, batchId, stockType).
+                            // The sheet carries only newly produced stock, so an existing
+                            // batch gets the uploaded qty ADDED to what it already holds —
+                            // it is never reset to the uploaded value. receivedOn is left
+                            // untouched so the batch keeps its original allocation order.
                             for (const b of uploadedBatches) {
                                 const batchStatus = b.qty > 0 ? 'Active' : 'Empty';
                                 await connection.query(
@@ -538,9 +541,12 @@ export async function GET(request,{params}) {
                                         (productId, design, batchId, stockType, initialQty, availableQty, status, receivedOn, createdBy)
                                     VALUES (?, ?, ?, 'prm', ?, ?, ?, COALESCE(?, NOW()), ?)
                                     ON DUPLICATE KEY UPDATE
-                                        initialQty = VALUES(initialQty),
-                                        availableQty = VALUES(availableQty),
-                                        status = VALUES(status),
+                                        initialQty = initialQty + VALUES(initialQty),
+                                        availableQty = availableQty + VALUES(availableQty),
+                                        /* assignments run left to right, so availableQty here is
+                                           the post-addition total: a previously Empty batch that
+                                           receives new stock becomes Active again */
+                                        status = IF(availableQty > 0, 'Active', 'Empty'),
                                         modifiedOn = NOW(),
                                         modifiedBy = VALUES(createdBy)
                                     `,
@@ -564,12 +570,17 @@ export async function GET(request,{params}) {
                         if (finalStdStock !== null) {
                             designAllocations.std = {
                             uploadedQty: finalStdStock,
-                            remainingStock: finalStdStock,
+                            previousStock: Number(product.std || 0),
+                            remainingStock: Number(product.std || 0) + finalStdStock,
                             };
                         }
 
                         /**
                          * Update product stock with the uploaded quantities.
+                         * The sheet carries only newly produced stock, so std is ADDED to
+                         * the existing quantity rather than replacing it. prm is already
+                         * the recomputed sum of the (additively updated) batches, so it is
+                         * written as an absolute value.
                          * If prm/std was not provided in Excel, keep existing DB value.
                          */
                         await connection.query(
@@ -577,7 +588,7 @@ export async function GET(request,{params}) {
                             UPDATE products
                             SET
                             prm = CASE WHEN ? IS NULL THEN prm ELSE ? END,
-                            std = CASE WHEN ? IS NULL THEN std ELSE ? END,
+                            std = CASE WHEN ? IS NULL THEN std ELSE COALESCE(std, 0) + ? END,
                             createdOn = COALESCE(?, createdOn)
                             WHERE design = ?
                             `,

@@ -849,7 +849,10 @@ export async function GET(request,{params}) {
                         const batchAllocations = drainPrmBatches(batches, newApprovedQty, batchSequence);
                         await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'ManualAdjustment', adminId });
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId, orderId);
+                        // Approving/editing one order item must never approve anything else:
+                        // stock freed by this edit stays in the batches and is only handed out
+                        // when an admin explicitly approves another item.
+                        const stockAfterAllocation = batches.reduce((sum, b) => sum + b.availableQty, 0);
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
@@ -888,8 +891,8 @@ export async function GET(request,{params}) {
                                 previousStock: availableStock,
                                 batchAllocations: batchAllocations.map((e) => ({ batch: e.batchId, qty: e.qty })),
                                 releasedToBatches: releaseResult,
-                                waitlistAllocations: allocations,
-                                totalAllocatedQty,
+                                waitlistAllocations: [],
+                                totalAllocatedQty: 0,
                                 stockAfterAllocation,
                             },
                         });
@@ -913,7 +916,9 @@ export async function GET(request,{params}) {
                         const shouldUpdateModifiedOn = newRequestedQty >= oldRequestedQty || newProductionQty === 0;
                         await connection.query(`UPDATE orders SET requestedQty = ?, approvedQty = ?, productionQty = ?, modifiedOn = ? WHERE id = ?`, [newRequestedQty, newApprovedQty, newProductionQty, shouldUpdateModifiedOn ? actionDate : order.modifiedOn, orderId]);
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, order.design, order.stockType, newAvailableStock);
+                        // Editing this order item must not approve any other item — stock freed
+                        // here goes back to the pool and waits for an explicit admin approval.
+                        const stockAfterAllocation = newAvailableStock;
 
                         await connection.query(`UPDATE products SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
 
@@ -952,8 +957,8 @@ export async function GET(request,{params}) {
                                 orderId, design: order.design, stockType: order.stockType,
                                 newRequestedQty, newApprovedQty, newProductionQty,
                                 previousStock: availableStock, newAvailableStock,
-                                waitlistAllocations: allocations,
-                                totalAllocatedQty,
+                                waitlistAllocations: [],
+                                totalAllocatedQty: 0,
                                 stockAfterAllocation,
                             },
                         });
@@ -979,7 +984,9 @@ export async function GET(request,{params}) {
                         const batchAllocations = drainPrmBatches(batches, approvedQty, batchSequence);
                         await recordBatchLedger(connection, { orderId, design: order.design, entries: batchAllocations, allocationType: 'InitialApproval', adminId });
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocatePrmWaitlistFromBatches(connection, order.design, batches, adminId, orderId);
+                        // Only this order item is approved — leftover batch stock stays available
+                        // for other items until an admin approves them explicitly.
+                        const stockAfterAllocation = batches.reduce((sum, b) => sum + b.availableQty, 0);
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
@@ -995,8 +1002,8 @@ export async function GET(request,{params}) {
                                 requestedQty, approvedQty, productionQty,
                                 previousStock: availableStock, remainingStock: stockAfterAllocation,
                                 batchAllocations: batchAllocations.map((e) => ({ batch: e.batchId, qty: e.qty })),
-                                waitlistAllocations: allocations,
-                                totalAllocatedQty,
+                                waitlistAllocations: [],
+                                totalAllocatedQty: 0,
                                 stockAfterAllocation,
                             },
                         });
@@ -1016,7 +1023,9 @@ export async function GET(request,{params}) {
                             [approvedQty, productionQty, actionDate, actionDate, orderId]
                         );
 
-                        const { allocations, totalAllocatedQty, remainingStock: stockAfterAllocation } = await allocateStockToWaitlist(connection, order.design, order.stockType, remainingStock);
+                        // Only this order item is approved — the rest of the stock stays in the
+                        // pool for other items until an admin approves them explicitly.
+                        const stockAfterAllocation = remainingStock;
 
                         await connection.query(`UPDATE products SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]
                         );
@@ -1031,8 +1040,8 @@ export async function GET(request,{params}) {
                                 orderId, design: order.design, stockType: order.stockType,
                                 requestedQty, approvedQty, productionQty,
                                 previousStock: availableStock, remainingStock,
-                                waitlistAllocations: allocations,
-                                totalAllocatedQty,
+                                waitlistAllocations: [],
+                                totalAllocatedQty: 0,
                                 stockAfterAllocation,
                             },
                         });
@@ -1088,23 +1097,21 @@ export async function GET(request,{params}) {
 
                         await rejectConnection.query(`UPDATE orders SET status = 'Rejected', productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
 
-                        // if approvedQty > 0, return that stock and hand it to the waitlist
+                        // if approvedQty > 0, return that stock to the available pool. It is NOT
+                        // handed to other orders — no order is ever approved without an admin
+                        // explicitly approving it.
                         const releasedQty = Number(existingOrder.approvedQty || 0);
                         if (releasedQty > 0) {
                             if (existingOrder.stockType === 'prm') {
-                                // return the reserved qty to the batches it came from, then re-allocate
+                                // return the reserved qty to the batches it came from
                                 await releasePrmToBatches(rejectConnection, { orderId, design: existingOrder.design, qty: releasedQty, adminId });
                                 const batches = await lockPrmBatches(rejectConnection, existingOrder.design);
-                                const result = await allocatePrmWaitlistFromBatches(rejectConnection, existingOrder.design, batches, adminId);
-                                await persistPrmBatchDrain(rejectConnection, batches, adminId);
-                                await rejectConnection.query(`UPDATE products SET prm = ? WHERE design = ?`, [result.remainingStock, existingOrder.design]);
-                                waitlistAllocations = result.allocations;
+                                const remainingStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
+                                await rejectConnection.query(`UPDATE products SET prm = ? WHERE design = ?`, [remainingStock, existingOrder.design]);
                             }
                             else {
-                                const result = await allocateStockToWaitlist(rejectConnection, existingOrder.design, existingOrder.stockType, releasedQty);
                                 const stockColumn = getStockColumn(existingOrder.stockType);
-                                await rejectConnection.query(`UPDATE products SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [result.remainingStock, existingOrder.design]);
-                                waitlistAllocations = result.allocations;
+                                await rejectConnection.query(`UPDATE products SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [releasedQty, existingOrder.design]);
                             }
                         }
                     }
@@ -1198,23 +1205,21 @@ export async function GET(request,{params}) {
 
                         await oosConnection.query(`UPDATE orders SET status = 'OutOfStock', approvedQty = 0, productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
 
-                        // if approvedQty > 0, return that stock and hand it to the waitlist
+                        // if approvedQty > 0, return that stock to the available pool. It is NOT
+                        // handed to other orders — no order is ever approved without an admin
+                        // explicitly approving it.
                         const releasedQty = Number(existingOrder.approvedQty || 0);
                         if (releasedQty > 0) {
                             if (existingOrder.stockType === 'prm') {
-                                // return the reserved qty to the batches it came from, then re-allocate
+                                // return the reserved qty to the batches it came from
                                 await releasePrmToBatches(oosConnection, { orderId, design: existingOrder.design, qty: releasedQty, adminId });
                                 const batches = await lockPrmBatches(oosConnection, existingOrder.design);
-                                const result = await allocatePrmWaitlistFromBatches(oosConnection, existingOrder.design, batches, adminId);
-                                await persistPrmBatchDrain(oosConnection, batches, adminId);
-                                await oosConnection.query(`UPDATE products SET prm = ? WHERE design = ?`, [result.remainingStock, existingOrder.design]);
-                                waitlistAllocations = result.allocations;
+                                const remainingStock = batches.reduce((sum, b) => sum + b.availableQty, 0);
+                                await oosConnection.query(`UPDATE products SET prm = ? WHERE design = ?`, [remainingStock, existingOrder.design]);
                             }
                             else {
-                                const result = await allocateStockToWaitlist(oosConnection, existingOrder.design, existingOrder.stockType, releasedQty);
                                 const stockColumn = getStockColumn(existingOrder.stockType);
-                                await oosConnection.query(`UPDATE products SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [result.remainingStock, existingOrder.design]);
-                                waitlistAllocations = result.allocations;
+                                await oosConnection.query(`UPDATE products SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`, [releasedQty, existingOrder.design]);
                             }
                         }
                     }

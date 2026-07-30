@@ -634,8 +634,9 @@ export default function Products() {
                     totalFlatRows = totalFlatRows.concat(filteredRows);
                 }
 
-                // group rows by design: a 'STD' batch value makes the row's
-                // quantity the design's std stock (largest wins if repeated);
+                // group rows by design: a 'STD' batch value adds the row's quantity
+                // to the design's std stock (repeated rows are summed — the sheet
+                // lists newly produced quantities, so two rows mean two lots);
                 // every other batch value is a prm batch with its quantity
                 const groupedByDesign = new Map();
                 totalFlatRows.forEach(r => {
@@ -651,7 +652,7 @@ export default function Products() {
                     if (r.qty == null) return;
 
                     if (r.batch.toUpperCase() === 'STD') {
-                        if (entry.std == null || r.qty > entry.std) entry.std = r.qty;
+                        entry.std = (entry.std == null ? 0 : entry.std) + r.qty;
                     } else {
                         const existing = entry.batches.find(b => b.batch === r.batch);
                         if (existing) existing.qty += r.qty;
@@ -850,7 +851,7 @@ return (
                         <SheetHeader>
                         <SheetTitle>File upload</SheetTitle>
                         <SheetDescription>
-                            Make sure you use the correct format. Click Upload now when file is selected.
+                            Upload only the newly produced quantities — they are added to the existing stock, not replacing it. Make sure you use the correct format. Click Upload now when file is selected.
                         </SheetDescription>
                         </SheetHeader>
                         <div className="grid gap-4 py-4">
