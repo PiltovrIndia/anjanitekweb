@@ -47,14 +47,14 @@ export async function GET(request,{params}) {
                             const role = params.ids[3] ? decodeURIComponent(params.ids[3]).trim() : '';
 
                             // the column collation is case-insensitive, so 'dealer' matches 'Dealer'
-                            const [rows] = await connection.execute('SELECT role, stock FROM role_settings WHERE role = ? LIMIT 1', [role]);
+                            const [rows2] = await connection.execute('SELECT role, stock FROM role_settings WHERE role = ? LIMIT 1', [role]);
 
                             var showStock = 0;
                             // an unconfigured role gets no stock access — the flag has to be
                             // switched on deliberately rather than defaulting open
-                            if (rows.length > 0) {
+                            if (rows2.length > 0) {
                             
-                                showStock = Number(rows[0].stock || 0);
+                                showStock = Number(rows2[0].stock || 0);
 
                             }
                             connection.release();
