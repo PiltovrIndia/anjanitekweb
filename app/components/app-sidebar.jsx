@@ -58,7 +58,7 @@ function getNavigationSections(role) {
   }
 
   if (role === "SuperAdmin") {
-    salesItems.push({ title: "Sales", href: "/sales", icon: ShoppingCart })
+    salesItems.push({ title: "Sales", href: "/sales2", icon: ShoppingCart })
     operationsItems.push(
       { title: "Invoices", href: "/invoices", icon: FileText },
       { title: "Offers", href: "/offers", icon: Megaphone },

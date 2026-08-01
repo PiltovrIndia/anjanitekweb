@@ -3,6 +3,7 @@
 import { Inter } from 'next/font/google'
 import { Check, Info, SpinnerGap, X, Plus, PaperPlaneRight, Checks, CheckCircle } from 'phosphor-react'
 import React, { useCallback, useEffect, useState, useRef } from 'react'
+import { CalendarDays, ImageIcon, Loader2, Megaphone } from 'lucide-react'
 const inter = Inter({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
 import Biscuits from 'universal-cookie'
@@ -26,6 +27,7 @@ import {
   import { Textarea } from "../../../components/ui/textarea"
   import { Popover, PopoverContent, PopoverTrigger, } from "../../../components/ui/popover"
   import { Avatar, AvatarFallback, AvatarImage } from "../../../components/ui/avatar"
+  import { Badge } from "@/app/components/ui/badge"
   
   import { Toaster } from "../../../components/ui/sonner"
 import { useToast } from "@/app/components/ui/use-toast"
@@ -44,8 +46,73 @@ import { useToast } from "@/app/components/ui/use-toast"
 import Image from 'next/image'
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
 import firebase from '@/app/firebase'
-import { Dialog, DialogContent, DialogTrigger } from '@/app/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/app/components/ui/dialog'
 const storage = getStorage(firebase, "gs://anjanitek-communications.firebasestorage.app");
+
+const getInitials = (name) => {
+  const words = String(name || 'Anjani Tek').trim().split(/\s+/).filter(Boolean);
+  return words.slice(0, 2).map((word) => word[0]).join('').toUpperCase();
+};
+
+const getFeedMediaUrl = (media) =>
+  `https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/${media}.webp?alt=media`;
+
+function FeedPostCard({ post, postRef }) {
+  const authorName = post.name || post.sender || 'Anjani Tek';
+  const hasMedia = Boolean(post.media && post.media !== '-');
+  const mediaUrl = hasMedia ? getFeedMediaUrl(post.media) : null;
+
+  return (
+    <Card ref={postRef} tabIndex={-1} className="w-full overflow-hidden rounded-md shadow-sm">
+      <div className={hasMedia ? 'grid min-w-0 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]' : ''}>
+        {hasMedia ? (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" className="group relative order-first h-64 w-full rounded-none p-0 sm:h-80 lg:order-last lg:h-full lg:min-h-[300px]" aria-label={`View image for ${authorName}'s post`}>
+                <Image src={mediaUrl} alt="" fill sizes="(min-width: 1024px) 42vw, 100vw" className="object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
+                <span className="absolute inset-0 flex items-end justify-end bg-black/30 p-4 opacity-0 transition-opacity group-hover:opacity-100">
+                  <ImageIcon className="h-5 w-5 text-white" />
+                </span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[92vh] max-w-5xl overflow-hidden p-0">
+              <DialogHeader className="sr-only">
+                <DialogTitle>{authorName}&apos;s post image</DialogTitle>
+                <DialogDescription>Full-size feed post image.</DialogDescription>
+              </DialogHeader>
+              <Image src={mediaUrl} alt={`${authorName}'s post`} width={1600} height={1200} sizes="92vw" className="max-h-[92vh] w-full object-contain" />
+            </DialogContent>
+          </Dialog>
+        ) : null}
+
+        <CardContent className="flex min-w-0 flex-col p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar className="h-11 w-11 border">
+                <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">{getInitials(authorName)}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-foreground">{authorName}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{post.role || 'Company update'}</p>
+              </div>
+            </div>
+            <Badge variant="outline" className="shrink-0 border-primary/20 bg-primary/5 text-primary">
+              <Megaphone className="mr-1 h-3 w-3" />
+              Update
+            </Badge>
+          </div>
+
+          <p className="mt-6 whitespace-pre-wrap text-base leading-7 text-foreground">{post.message}</p>
+
+          <div className="mt-6 flex items-center gap-2 border-t pt-4 text-xs text-muted-foreground">
+            <CalendarDays className="h-4 w-4" />
+            {dayjs(post.sentAt).add(5, 'hour').add(30, 'minute').format('DD MMM YYYY, h:mm A')}
+          </div>
+        </CardContent>
+      </div>
+    </Card>
+  );
+}
 
 
 // Create a child reference
@@ -531,9 +598,9 @@ const handleFileSelect = async (e) => {
     
   return (
     
-        <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'500vh',gap:'8px'}}>
+        <div className={`${inter.className} flex w-full min-w-0 flex-col gap-4 pb-6`}>
             
-          <div className='flex flex-row gap-2 items-center py-4' >
+          <div className='flex w-full flex-row items-center gap-2 py-4' >
               <h1 className='text-xl font-bold'>Feed</h1>
               
               {(!messaging) ?
@@ -630,11 +697,11 @@ const handleFileSelect = async (e) => {
                 </CardFooter> */}
             </Card> : null}
             <Toaster />
-        <div className={styles.verticalsection} style={{height:'80vh', width:'100%',gap:'8px'}}>
+        <main className="w-full min-w-0">
 
-        <div className={styles.horizontalsection} style={{height:'100%', width:'100%'}}>
+        <div className="w-full">
 
-                <div className='flex flex-row gap-2' key={1234} style={{height:'100%', width:'100%', }}>
+                <div className="w-full" key={1234}>
                        
                     {/* <div className='flex flex-row gap-2' style={{width:'100%',overflow:'scroll'}}> */}
                         
@@ -698,7 +765,7 @@ const handleFileSelect = async (e) => {
                     </ScrollArea> */}
                     
 
-                        <div className="w-[580px] flex flex-col flex-1 gap-4 items-center">
+                        <div className="w-full">
                             {/* <div className="flex flex-1 flex-col gap-2">
                                 {searching ? <Skeleton className="h-4 w-[100px] h-[20px]" /> 
                                 : <CardTitle className="text-blue-600">Feed</CardTitle>}
@@ -707,56 +774,24 @@ const handleFileSelect = async (e) => {
                             
                                 
                                 {/* <div className="grid w-full items-center gap-4"> */}
-                                    {searching ? <Skeleton className="h-4 w-[300px] h-[100px]" /> :
-                                        <div className="w-[580px] flex flex-col flex-auto overflow-scroll justify-stretch gap-2">
-                                        {feedList.length > 0 ?
-                                        feedList.map((message, index) => (
-                                            <div key={index} className="flex flex-col rounded-md border p-2 gap-4" ref={index === feedList.length - 1 ? lastItemRef : null}>
-                                                <Avatar>
-                                                    <AvatarImage src="" alt="dealer_image" />
-                                                    <AvatarFallback>{message.name.split(' ').map(word => word.slice(0, 1)).join('')}</AvatarFallback>
-                                                </Avatar>
-                                                {message.media == '-' ? null :
-                                                // on click of the image, lets open it to show full image
-                                                // <Image src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+message.media+'.webp?alt=media'} alt={message.name} className="w-full h-48 object-cover rounded-lg" width={400} height={200} onClick={} />
-                                                // }
-
-                                                <Dialog>
-        
-                                                    {/* 2. DialogTrigger acts as your clickable thumbnail button */}
-                                                    <DialogTrigger asChild>
-                                                    <button className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 transition-opacity hover:opacity-90 dark:border-slate-800 dark:bg-slate-950">
-                                                        <img 
-                                                        src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+message.media+'.webp?alt=media'}
-                                                        alt={message.name} 
-                                                        className="h-40 w-full object-cover cursor-pointer"
-                                                        />
-                                                    </button>
-                                                    </DialogTrigger>
-
-                                                    {/* 3. DialogContent holds the overlay styling and the full view image */}
-                                                    <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden border-none bg-transparent shadow-none sm:max-w-[85vw]">
-                                                    <div className="flex items-center justify-center w-full h-full p-4">
-                                                        <img 
-                                                        src={'https://firebasestorage.googleapis.com/v0/b/anjanitek-communications.firebasestorage.app/o/'+message.media+'.webp?alt=media'} 
-                                                        alt={`${message.name} - Full View`} 
-                                                        className="max-w-full max-h-[85vh] rounded-md object-contain shadow-2xl animate-in zoom-in-95 duration-200"
-                                                        />
-                                                    </div>
-                                                    </DialogContent>
-
-                                                </Dialog>
-}
-                                                <p className="text-l p-1">{message.message}</p>
-                                                {/* <Label className="text-gray-500 p-1">{message.sender}</Label> */}
-                                                <p className="text-xs text-gray-500 p-1">{dayjs(message.sentAt).add(5, 'hour').add(30, 'minute').format('MMMM D, YYYY h:mm A')}</p>
-                                                
-                                            </div>
-                                        ))
-                                        : <p className="text-xs text-gray-500 p-1">No posts yet!</p>
-                                        }
-                                        </div>
-                                    }
+                                    {searching ? (
+                                      <div className="space-y-4">
+                                        <Skeleton className="h-[260px] w-full rounded-md" />
+                                        <Skeleton className="h-[260px] w-full rounded-md" />
+                                      </div>
+                                    ) : (
+                                      <div className="flex w-full flex-col gap-4">
+                                        {feedList.length > 0 ? feedList.map((message, index) => (
+                                          <FeedPostCard key={message.id || `${message.sender}-${message.sentAt}-${index}`} post={message} postRef={index === feedList.length - 1 ? lastItemRef : undefined} />
+                                        )) : (
+                                          <Card className="w-full rounded-md shadow-none">
+                                            <CardContent className="flex min-h-[240px] items-center justify-center pt-6 text-sm text-muted-foreground">
+                                              No posts yet.
+                                            </CardContent>
+                                          </Card>
+                                        )}
+                                      </div>
+                                    )}
                                     
                                 {/* </div> */}
                             
@@ -782,11 +817,10 @@ const handleFileSelect = async (e) => {
         </div>
                
                 
-        </div>
+        </main>
     
     </div>
     
     
   );
 }
-

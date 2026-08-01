@@ -3,6 +3,7 @@
 import { Inter } from 'next/font/google'
 import { PencilSimpleLine, UserMinus, Check, Info, SpinnerGap, X, Plus, UserPlus, Receipt, ArrowDown, Trash, CalendarPlus } from 'phosphor-react'
 import React, { useCallback, useEffect, useState } from 'react'
+import { CalendarClock, FileText, Loader2, Search, Trash2 } from 'lucide-react'
 import { XAxis, YAxis, Tooltip, Cell, PieChart, Pie, Area, AreaChart } from 'recharts';
 const inter = Inter({ subsets: ['latin'] })
 import styles from '../../../../app/page.module.css'
@@ -51,6 +52,7 @@ import Toast from '../../../../app/components/myui/toast'
 import { useToast } from "@/app/components/ui/use-toast"
 import { Textarea } from "@/app/components/ui/textarea"
 import { Button } from "@/app/components/ui/button"
+import { Badge } from "@/app/components/ui/badge"
 import {
     Table,
     TableBody,
@@ -87,6 +89,15 @@ import {
 const getAllInvoicesDataAPI = async (pass, offset, role) => 
   
 fetch("/api/v2/amount/"+pass+"/U4.2/"+offset+"/"+role, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+const getInvoicesByStatusDataAPI = async (pass, status, invoiceType) =>
+fetch("/api/v2/amount/"+pass+"/U4.3/"+encodeURIComponent(status)+"/"+encodeURIComponent(invoiceType), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -177,8 +188,9 @@ export default function Invoices() {
 
     // user state and requests variable
     const [user, setUser] = useState();
-    const [selectedStatus, setselectedStatus] = useState('All');
-    const [openInvoice, setOpenInvoice] = useState('');
+    const [selectedStatus, setselectedStatus] = useState('NotPaid');
+    const [selectedInvoiceType, setSelectedInvoiceType] = useState('All');
+    const [isInvoiceDetailsOpen, setIsInvoiceDetailsOpen] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState('');
     const [selectedInvoiceForDelete, setSelectedInvoiceForDelete] = useState('');
     const [offset, setOffset] = useState(0);
@@ -203,6 +215,7 @@ export default function Invoices() {
     const [allInvoices, setAllInvoices] = useState([]);
     const [allInvoicesFiltered, setAllInvoicesFiltered] = useState([]);
     const [totalInvoicesCount, setTotalInvoicesCount] = useState(0);
+    const [invoiceSummary, setInvoiceSummary] = useState({});
 
     // State variables for each input field
     const [selectedTotalAmount, setSelectedTotalAmount] = useState(0);
@@ -256,10 +269,10 @@ export default function Invoices() {
 
 
     useEffect(() => {
-        if (user && user.id && !completed) {
-            getAllInvoices(initialDatesValues.from,initialDatesValues.to);
+        if (user && user.id) {
+            getAllInvoices(selectedStatus, selectedInvoiceType);
         }
-    }, [user, completed]);
+    }, [user, selectedStatus, selectedInvoiceType]);
 
     // Create an instance of Intl.NumberFormat for Indian numbering system with two decimal places
     const formatter = new Intl.NumberFormat('en-IN', {
@@ -271,41 +284,25 @@ export default function Invoices() {
 
     // Get requests for a particular role
     // role – SuperAdmin
-    async function getAllInvoices(from, to){
+    async function getAllInvoices(status, invoiceType = selectedInvoiceType){
         
         setSearching(true);
         // setOffset(offset+0); // update the offset for every call
 
         try {    
-            const result  = await getAllInvoicesDataAPI(process.env.NEXT_PUBLIC_API_PASS, offset, JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).role) 
+            const result = await getInvoicesByStatusDataAPI(process.env.NEXT_PUBLIC_API_PASS, status, invoiceType);
             const queryResult = await result.json() // get data
 // console.log(queryResult);
 
             // check for the status
             if(queryResult.status == 200){
 
-                // check if data exits
-                if(queryResult.data.length > 0){
-
-                    if(allInvoices.length > 0){
-                        setAllInvoices(allInvoices.push(queryResult.data));
-                        setAllInvoicesFiltered(allInvoices.push(queryResult.data));
-                        setTotalInvoicesCount(queryResult.total);
-                    }
-                    else{
-                        
-                        setAllInvoices(queryResult.data);
-                        setAllInvoicesFiltered(queryResult.data);
-                        setTotalInvoicesCount(queryResult.total);
-                    }
-                    
-                    setDataFound(true);
-                }
-                else {
-                    setDataFound(false);
-                }
-
-                setSearching(false);
+                const invoices = queryResult.data || [];
+                setAllInvoices(invoices);
+                setAllInvoicesFiltered(invoices);
+                setTotalInvoicesCount(queryResult.total || 0);
+                setInvoiceSummary(queryResult.summary || {});
+                setDataFound(invoices.length > 0);
                 setCompleted(false);
             }
             else if(queryResult.status == 401) {
@@ -316,11 +313,7 @@ export default function Invoices() {
             }
             else if(queryResult.status == 404) {
                 setAllInvoices([]);
-                toast({
-                    description: "No more requests with "+status+" status",
-                  })
-                  
-                setSearching(false);
+                setAllInvoicesFiltered([]);
                 setDataFound(false);
                 setCompleted(true);
             }
@@ -344,6 +337,9 @@ export default function Invoices() {
             //     setResultType('');
             //     setResultMessage('');
             // }, 3000);
+        }
+        finally {
+            setSearching(false);
         }
 }
 
@@ -495,17 +491,14 @@ export default function Invoices() {
     };
 
     
-    // Filter the dealers list by states
-    async function filterByStates(e){
-        
-        setselectedStatus(e);
-        if(e == 'All'){
-            setAllInvoicesFiltered(allInvoices);
-        }
-        else {
-            const filteredDealers = allInvoices.filter(dealer => dealer.status === e);
-            setAllInvoicesFiltered(filteredDealers);
-        }
+    function filterByStates(status){
+        setSearchQuery('');
+        setselectedStatus(status);
+    }
+
+    function filterByInvoiceType(invoiceType){
+        setSearchQuery('');
+        setSelectedInvoiceType(invoiceType);
     }
     
 
@@ -599,26 +592,17 @@ export default function Invoices() {
 
   // Function to handle search input change
   const handleSearchChange = (e) => {
-    if(e.target.value.length == 0){
+    const value = e.target.value;
+    if(value.length == 0){
         setSearchQuery('');
-        setAllInvoices(allInvoices);
         setAllInvoicesFiltered(allInvoices);
     }
     else {
-        const query = e.target.value.toLowerCase();
+        const query = value.toLowerCase();
         setSearchQuery(query);
 
-        // Filter the invoice based on the search query
         const filtered = allInvoices.filter(invoice => invoice.invoiceNo.toLowerCase().includes(query) );
-
-        if(filtered.length > 0){
-            // console.log('OK');
-            setAllInvoicesFiltered(filtered); // Update the filtered dealers list
-        }
-        else {
-            // console.log('NOT OK');
-            getMatchingAllInvoices(e.target.value.toLowerCase());
-        }
+        setAllInvoicesFiltered(filtered);
     }
   };
 
@@ -644,14 +628,14 @@ export default function Invoices() {
 }
     
 
-  // Function to handle row click and open the sheet
+  // Function to handle row click and open the invoice dialog
   const handleRowClick = (invoice) => {
 
     setSelectedTotalAmount(invoice.totalAmount);
     setSelectedAmountPaid(invoice.amountPaid);
     setSelectedPendingAmount(invoice.pending);
-    setSelectedInvoice(invoice); // Set the selected dealer
-    setOpenInvoice(true); // Open the sheet
+    setSelectedInvoice(invoice);
+    setIsInvoiceDetailsOpen(true);
     
   };
 
@@ -736,45 +720,8 @@ export default function Invoices() {
                 // check for the status
                 if(queryResult.status == 200){
                     
-                    var updateStatus = (selectedAmountPaid == 0) ? 'NotPaid' : (selectedTotalAmount - selectedAmountPaid) > 0 ? 'PartialPaid' : 'Paid';
-
-                    setAllInvoicesFiltered((invoices) =>
-                        invoices.map((item) => {
-                          if (item.invoiceNo === selectedInvoice.invoiceNo) {
-                            
-                            return {
-                              ...item,
-                              status: updateStatus,
-                              totalAmount: selectedTotalAmount,
-                              amountPaid: selectedAmountPaid,
-                              pending: selectedPendingAmount,
-                            };
-                          }
-                          return item;
-                        })
-                      );
-                      
-                    setAllInvoices((invoices) =>
-                        invoices.map((item) => {
-                          if (item.invoiceNo === selectedInvoice.invoiceNo) {
-                            
-                            return {
-                              ...item,
-                              status: updateStatus,
-                              totalAmount: selectedTotalAmount,
-                              amountPaid: selectedAmountPaid,
-                              pending: selectedPendingAmount,
-                            };
-                          }
-                          return item;
-                        })
-                      );
-                      
-                    // reset the numbers to 0
-                    setSelectedInvoice('');
-                    setSelectedTotalAmount(0);
-                    setSelectedAmountPaid(0);
-                    setSelectedPendingAmount(0);
+                    handleInvoiceDialogChange(false);
+                    getAllInvoices(selectedStatus);
                     setUpdatingInvoice(false);
                     
                     
@@ -873,18 +820,11 @@ export default function Invoices() {
                 // check for the status
                 if(queryResult.status == 200){
 
-                    setAllInvoicesFiltered((invoices) =>
-                        invoices.filter((item) => item.invoiceNo !== selectedInvoiceForDelete.invoiceNo)
-                      );
-                      setAllInvoices((invoices) =>
-                        invoices.filter((item) => item.invoiceNo !== selectedInvoiceForDelete.invoiceNo)
-                      );
-
-                      setSelectedInvoiceForDelete('');
-                      setIsDialogOpen(false);
-                      toast({ description: "Invoice Deleted!", })
-                    // reset the numbers to 0
+                    setSelectedInvoiceForDelete('');
+                    setIsDialogOpen(false);
+                    toast({ description: "Invoice Deleted!", })
                     setDeletingInvoice(false);
+                    getAllInvoices(selectedStatus);
                     
                     
                 }
@@ -913,20 +853,16 @@ export default function Invoices() {
 
 
 
-  // Function to handle closing the sheet and resetting selectedDealer
-  const handleSheetClose = () => {
-    
-    // reset the numbers to 0
-    setSelectedInvoice('');
-    setSelectedTotalAmount(0);
-    setSelectedAmountPaid(0);
-    setSelectedPendingAmount(0);
-    setUpdatingInvoice(false);
-    
-    // setRemainingCredit(0);
-    // setTotalCredit(0);
-    // setSelectedDealer(null); // Reset the selected dealer
-    setOpenInvoice(false); // Close the sheet
+  const handleInvoiceDialogChange = (isOpen) => {
+    setIsInvoiceDetailsOpen(isOpen);
+
+    if (!isOpen) {
+      setSelectedInvoice('');
+      setSelectedTotalAmount(0);
+      setSelectedAmountPaid(0);
+      setSelectedPendingAmount(0);
+      setUpdatingInvoice(false);
+    }
   };
   
   function navigateToCreate(){
@@ -942,9 +878,9 @@ export default function Invoices() {
             
         //   <div style={{height:'8vh',display:'flex',flexDirection:'column',justifyContent:'space-around'}}>
 
-        <div  className={inter.className} style={{display:'flex',flexDirection:'column', alignItems:'flex-start',height:'100vh',gap:'8px', overflow:'scroll'}}>
+        <div className={`${inter.className} flex w-full min-w-0 flex-col gap-4 pb-6`}>
             
-          <div className='flex flex-row gap-2 items-center py-4' >
+          <div className='flex w-full flex-row items-center gap-2 py-4' >
               <h2 className="text-xl font-semibold mr-4">Invoices</h2>
               
               
@@ -1148,204 +1084,133 @@ export default function Invoices() {
            
           
          
-    <div className={styles.verticalsection} style={{height:'80vh', width:'100%',gap:'8px'}}>
-
-{!searching ?
-<div className="mx-auto" style={{width:'100%',height:'100%'}}>
-{/* <div className="container mx-auto py-10"> */}
-
-<div className='flex flex-row justify-between items-center mb-2'>
-    <div className='pb-2 text-slate-700 font-semibold'>{totalInvoicesCount} Invoices in total</div>
-    
-    {(selectedStatus == 'All') ?
-    <div className='pb-2 text-slate-700 font-semibold'></div>
-    : <div className='pb-2 text-green-700 font-semibold text-xs'>{allInvoicesFiltered.length} Invoices with {selectedStatus} status</div>
-    // : <div className='pb-2 text-green-700 font-semibold'>{allInvoicesFiltered.length} Dealers in {selectedStatus.split('-')[1]}</div>
-    }
-    </div>
-
-    <div className="flex flex-row gap-4 w-full">
-        {Array.from(new Set(allInvoices.map(invoice => invoice.status))).map((status) => (
-            <Card key={status} className="w-full p-2">
-                <CardHeader className="p-2">
-                    <CardTitle className='text-md'>{status}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-2">
-                    <p className="text-2xl font-bold">
-                        {allInvoices.filter(invoice => invoice.status === status).length}
-                    </p>
-                    {(status !='Paid') ?
-                    <p className="text-sm text-red-500 font-semibold">
-                        Total Pending: ₹{formatter.format(allInvoices.filter(invoice => invoice.status === status).reduce((acc, invoice) => acc + invoice.pending, 0))}
-                    </p> :
-                    <p className="text-sm text-blue-500">
-                        {/* Total Pending: ₹{formatter.format(allInvoices.filter(invoice => invoice.status === status).reduce((acc, invoice) => acc + invoice.pending, 0))} */}
-                    </p>}
-                </CardContent>
-            </Card>
-        ))}
-    </div>
-
-    {(allInvoicesFiltered.length > 0) ?
-    <div className='flex flex-row justify-between items-center'>
-        <div className='flex flex-row gap-4 items-center'>
-            <Input
-                type="text"
-                placeholder="Search Invoice Number"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="my-4 w-[300px]" // You can adjust width and margin as needed
-        />
-
-        {(searchQuery.length > 0) ? <div className='pb-2 text-slate-600'>{allInvoicesFiltered.length} matching invoices</div> : ''}
-
-        {!searchingOther ?
-        <div className="flex flex-row m-12">    
-            <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-            <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+    <div className="w-full min-w-0 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-700">{totalInvoicesCount} invoices in total</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Showing {allInvoices.length} {selectedInvoiceType === 'All' ? '' : selectedInvoiceType + ' '}{selectedStatus === 'All' ? 'invoices' : selectedStatus + ' invoices'}
+          </p>
         </div>
-        : ''}
-    </div>
+      </div>
 
-    
-    <div className='flex flex-row gap-4 items-center'>
+      <div className="grid gap-3 md:grid-cols-3">
+        {['NotPaid', 'PartialPaid', 'Paid'].map((status) => {
+          const stat = invoiceSummary[status] || { count: 0, pending: 0 };
+          const isOutstanding = status !== 'Paid';
+          return (
+            <Card key={status} className={selectedStatus === status ? 'border-primary bg-primary/5 shadow-none' : 'shadow-none'}>
+              <CardHeader className="p-4 pb-0">
+                <CardDescription>{status === 'NotPaid' ? 'Not paid' : status === 'PartialPaid' ? 'Partially paid' : 'Paid'}</CardDescription>
+                <CardTitle className="text-2xl">{stat.count}</CardTitle>
+              </CardHeader>
+              <CardContent className={`p-4 pt-3 text-xs font-medium ${isOutstanding ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {isOutstanding ? `Pending: ₹${formatter.format(stat.pending)}` : 'Settled invoices'}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
-        {/* {(selectedStatus == 'All') ?
-            <div className='pb-2 text-slate-700 font-semibold'></div>
-            : <div className='pb-2 text-green-700 font-semibold text-xs'>{allInvoicesFiltered.length} Invoices with {selectedStatus} status</div>
-        } */}
-        {allInvoices.length == 0 ?
-            <div className="flex flex-row m-12">    
-                <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-                <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-            </div>
-            :
-            <Select defaultValue={selectedStatus} onValueChange={(e)=>filterByStates(e)} >
-                <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectGroup>
-                    <SelectItem key={'All'} value={'All'}>All</SelectItem>
-                    {Array.from(new Set(allInvoices.map(invoice => invoice.status))).map((status) => (
-                    <SelectItem key={status} value={status} >{status}</SelectItem>))}
-                    </SelectGroup>
-                </SelectContent>
-            </Select>
-        }
-            {/* // setSelectedMapToPerson(e.target.value) */}
-            {/* <Select defaultValue={selectedStatus} onValueChange={(e)=>filterByStates(e)} >
-                <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by state" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectGroup>
-                    <SelectLabel>All</SelectLabel>
-                    {allStates.map((row) => (
-                    <SelectItem key={row} value={row} >{row}</SelectItem>))}
-                    </SelectGroup>
-                </SelectContent>
-            </Select> */}
-        {/* } */}
-        <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button>
-    </div>
-        {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> InOuting Students</Button> */}
-        {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button> */}
-    </div>
-: ''    
-}
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input type="text" placeholder="Search invoice number" value={searchQuery} onChange={handleSearchChange} className="pl-9" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={selectedInvoiceType} onValueChange={filterByInvoiceType} disabled={searching}>
+            <SelectTrigger className="w-[132px]">
+              <SelectValue placeholder="Invoice type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="All">All types</SelectItem>
+                <SelectItem value="ATL">ATL</SelectItem>
+                <SelectItem value="VCL">VCL</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select value={selectedStatus} onValueChange={filterByStates} disabled={searching}>
+            <SelectTrigger className="w-[168px]">
+              {searching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              <SelectValue placeholder="Payment status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="NotPaid">Not paid</SelectItem>
+                <SelectItem value="PartialPaid">Partially paid</SelectItem>
+                <SelectItem value="Paid">Paid</SelectItem>
+                <SelectItem value="All">All statuses</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={downloadNow} disabled={searching || allInvoicesFiltered.length === 0}>
+            <ArrowDown className="mr-2 h-4 w-4" /> Download
+          </Button>
+        </div>
+      </div>
 
-<Card>
-    <Table>
+      {searching ? (
+        <Card className="w-full rounded-md shadow-none">
+          <CardContent className="flex min-h-[320px] items-center justify-center pt-6">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Loading invoices...</span>
+          </CardContent>
+        </Card>
+      ) : (
+
+<Card className="w-full rounded-md shadow-none">
+    <Table className="min-w-[1080px]">
         <TableHeader>
             <TableRow>
-                <TableHead>Invoice No</TableHead>
+                <TableHead>Invoice</TableHead>
                 <TableHead>Dealer</TableHead>
-                <TableHead>Invoice Date</TableHead>
-                <TableHead>Expiry Date</TableHead>
-                <TableHead>Pending/Total Amount</TableHead>
-                <TableHead>Payment status</TableHead>
-                <TableHead>Boxes</TableHead>
-                <TableHead></TableHead>
+                <TableHead className="text-right">Boxes</TableHead>
+                <TableHead>Due</TableHead>
+                <TableHead>Outstanding</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-12"><span className="sr-only">Actions</span></TableHead>
             </TableRow>
         </TableHeader>
         <TableBody>
             
-            {(allInvoicesFiltered==null) ? '' :
-            allInvoicesFiltered.map((row) => (
+            {allInvoicesFiltered?.length ? allInvoicesFiltered.map((row) => (
                 <TableRow key={row.id} >
                     <TableCell>
-                        <div className='flex flex-row gap-2 items-center text-blue-600 font-semibold py-4 w-max cursor-pointer' onClick={() => handleRowClick(row)}>
-                            {row.invoiceNo} 
-                            {/* <p className="text-sm text-slate-500 bg-slate-50 px-1 py-1 w-fit border border-slate-200 rounded">
-                                {row.invoiceType}
-                            </p> */}
-                            {(row.invoiceType == 'ATL') ?
-                            <div className="text-xs font-bold text-rose-500 px-1.5 w-fit tracking-wider">
-                                ATL
-                            </div>
-                            : <div className="text-xs font-bold text-red-700 px-1.5 w-fit tracking-wider">
-                                VCL
-                            </div>
-                            }
-                            
-                        </div>
+                        <Button variant="link" className="h-auto gap-2 p-0 font-semibold" onClick={() => handleRowClick(row)}>
+                            <FileText className="h-4 w-4" />
+                            <span>{row.invoiceNo}</span>
+                            <span className="text-xs font-semibold text-muted-foreground">{row.invoiceType}</span>
+                        </Button>
                     </TableCell>
                     <TableCell>
-                        <div className="w-fit">
-                            {row.name} 
-                            {/* <br/><span className='text-muted-foreground text-xs font-normal'>{row.billTo}</span>  */}
+                        <div className="max-w-[260px]">
+                            <p className="truncate font-medium">{row.name}</p>
+                            <p className="text-xs text-muted-foreground">Issued {dayjs(row.invoiceDate).format("DD MMM YY")}</p>
                         </div>
                     </TableCell>
-                    <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY")}</TableCell>
-                    {/* <TableCell>{dayjs(row.invoiceDate).format("DD/MM/YY hh:mm A")}</TableCell> */}
+                    <TableCell className="text-right font-medium">
+                        {row.sales !== '-' && row.sales != null ? row.sales : '—'}
+                    </TableCell>
                     <TableCell>
-                        <div className='flex flex-col gap-1 w-max items-start'>
-                            {dayjs(row.expiryDate).format("DD/MM/YY")} 
-                            {(row.status != 'Paid') ?
-                            dayjs(row.expiryDate).diff(dayjs(new Date()), 'days') > 0 ?
-                                <p className="text-xs text-yellow-700 bg-yellow-100 px-0.5 py-0.25 w-fit mb-1 border border-yellow-400 rounded">
-                                    {dayjs(row.expiryDate).diff(dayjs(new Date()), 'days')+'-days left'}
-                                </p>
-                                : <p className="text-xs text-red-500 bg-red-50 px-0.5 py-0.25 w-fit mb-1 border border-red-200 rounded">
-                                   {'Expired'+dayjs(row.expiryDate).diff(dayjs(new Date()), 'days') +' days ago'}
-                                </p>
-
-                             : null }
+                        <div className="flex flex-col gap-1">
+                            <span className="text-sm font-medium">{dayjs(row.expiryDate).format("DD MMM YY")}</span>
+                            <Badge variant="outline" className={dayjs(row.expiryDate).diff(dayjs(), 'days') >= 0 ? 'w-fit border-amber-200 bg-amber-50 text-amber-700' : 'w-fit border-rose-200 bg-rose-50 text-rose-700'}>
+                              <CalendarClock className="mr-1 h-3 w-3" />
+                              {dayjs(row.expiryDate).diff(dayjs(), 'days') >= 0 ? `${dayjs(row.expiryDate).diff(dayjs(), 'days')} days left` : `${Math.abs(dayjs(row.expiryDate).diff(dayjs(), 'days'))} days overdue`}
+                            </Badge>
                         </div>
                     </TableCell>
                         <TableCell>
-                            <div className="flex flex-row items-center gap-2">
-                                <p className="text-sm font-semibold text-red-500">
-                                ₹{formatter.format(row.pending)}
-                                </p>
-                                /<p className="text-sm font-semibold">
-                                ₹{formatter.format(row.totalAmount)}
-                                </p>
+                            <div>
+                                <p className={row.status === 'Paid' ? 'font-semibold text-emerald-600' : 'font-semibold text-rose-600'}>₹{formatter.format(row.pending)}</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">of ₹{formatter.format(row.totalAmount)}</p>
                             </div>
                         </TableCell>
                         <TableCell>
-                            <div className="flex flex-row items-center gap-2">
-                            {(row.status == 'Paid') ?
-                                <p className="text-sm font-semibold text-green-600">
-                                    {row.status}
-                                </p>
-                                : 
-                                <p className="text-sm font-semibold text-amber-600">
-                                    {row.status}
-                                </p>
-                                }
-                            </div>
-                        </TableCell>
-                        <TableCell>
-                            <div className="flex flex-row items-center gap-2">
-                            {(row.sales != '-') ?
-                                <p>
-                                    {row.sales}
-                                    </p>
-                                : '-'
-                                }
-                            </div>
+                            <Badge variant="outline" className={row.status === 'Paid' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : row.status === 'PartialPaid' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-rose-200 bg-rose-50 text-rose-700'}>
+                                {row.status === 'PartialPaid' ? 'Partially paid' : row.status === 'NotPaid' ? 'Not paid' : row.status}
+                            </Badge>
                         </TableCell>
                         <TableCell>
                             {deletingInvoice ?
@@ -1355,7 +1220,9 @@ export default function Invoices() {
                             </div>
                             :
                             <div className="flex flex-row items-center gap-2">
-                                <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{handleDeleteClick(row)}}><Trash size={24} className="text-red-600"/> </Button>            
+                                <Button variant='ghost' size='icon' className="text-destructive hover:text-destructive" onClick={()=>{handleDeleteClick(row)}} aria-label={`Delete ${row.invoiceNo}`}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
                                 {/* <Button variant='outline' className="mx-2 px-2 text-red-600" onClick={()=>{setSelectedInvoice(row),setIsDialogOpen(true)}}><Trash size={24} className="text-red-600"/> &nbsp;Delete</Button>             */}
                                 {/* Dialog Component */}
                                 
@@ -1432,10 +1299,17 @@ export default function Invoices() {
                         } */}
                     {/* </TableCell> */}
                 </TableRow>
-            ))}
+            )) : (
+                <TableRow>
+                    <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                        No invoices found for this status.
+                    </TableCell>
+                </TableRow>
+            )}
         </TableBody>
     </Table>
 </Card>
+      )}
 
 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
     <DialogContent>
@@ -1456,157 +1330,73 @@ export default function Invoices() {
     </DialogContent>
 </Dialog>
 
-{/* Sheet to show selected invoice details */}
-{(selectedInvoice ) && (
-        <Sheet open={open}>
-            
-          <SheetContent className='flex flex-col min-w-[800px]'>
-            
-            <div className="flex-none justify-between items-center mb-2">
-              <h2 className="text-lg font-bold">{selectedInvoice.invoiceNo}</h2>
-              <p className='text-muted-foreground'>{selectedInvoice.billTo}</p>
-            </div>
-            
-            <div className="flex flex-col mb-2">
-                <div className="flex flex-row items-end gap-2 mb-8">
-                    <div className="flex flex-col items-start gap-2">
-                        <Label htmlFor="amount" className="text-right">
-                        Invoice Amount:
-                        </Label>
-                        <Input type="number" id="totalAmount" value={selectedTotalAmount} onChange={handleTotalAmountChange} className="col-span-3 text-black" placeholder="Enter amount" />
-                    </div>
-                    <p className='text-blue-600'>Previous Invoice Amount: {selectedInvoice.totalAmount}</p>
-                </div>
-                
-                <div className="flex flex-row items-end gap-2 mb-8">
-                    <div className="flex flex-col items-start gap-2">
-                        <Label htmlFor="amount" className="text-right">
-                        Amount Paid:
-                        </Label>
-                        <Input type="number" id="amountPaid" value={selectedAmountPaid}  onChange={handleAmountPaidChange} className="col-span-3 text-black" placeholder="Enter amount" />
-                    </div>
-                    <p className='text-blue-600'>Previous amount paid: {selectedInvoice.amountPaid}</p>
-                </div>
-                
-                <div className="flex flex-row items-end gap-2 mb-2">
-                    <div className="flex flex-col items-start gap-2">
-                        <Label htmlFor="amount" className="text-right">
-                        Pending:
-                        </Label>
-                        <Input disabled type="number" id="pendingAmount" value={selectedPendingAmount} className="col-span-3 text-black" placeholder="Enter amount" />
-                        {/* <Input type="number" id="pendingAmount" value={selectedPendingAmount}  onChange={(e) => setSelectedPendingAmount(parseFloat(e.target.value) || 0)} className="col-span-3 text-black" placeholder="Enter amount" /> */}
-                    </div>
-                    <p className='text-blue-600'>Previous pending: {selectedInvoice.pending}</p>
-                </div>
-                
-                
-            </div>
-            
-            {updatingInvoice ?
-            <div className={styles.horizontalsection}>
-                <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-            </div>
-            :
-            ''
-            }
-            <div className='flex flex-row gap-4'>
-                        <Button onClick={() => updateSelectedInvoices()}>Update</Button>
-                        <Button variant="secondary" onClick={handleSheetClose}>Close</Button>
-            </div>
-          </SheetContent>
-          </Sheet>
-      )}
+<Dialog open={isInvoiceDetailsOpen} onOpenChange={handleInvoiceDialogChange}>
+  <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+    {selectedInvoice ? (
+      <>
+        <DialogHeader>
+          <div className="flex items-center gap-2 pr-8">
+            <FileText className="h-5 w-5 text-primary" />
+            <DialogTitle>{selectedInvoice.invoiceNo}</DialogTitle>
+            <Badge variant="outline">{selectedInvoice.invoiceType}</Badge>
+          </div>
+          <DialogDescription>{selectedInvoice.name} · Issued {dayjs(selectedInvoice.invoiceDate).format('DD MMM YYYY')}</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 border-y py-4 sm:grid-cols-4">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">Due date</p>
+            <p className="mt-1 font-medium">{dayjs(selectedInvoice.expiryDate).format('DD MMM YYYY')}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">Current status</p>
+            <Badge variant="outline" className="mt-1">{selectedInvoice.status}</Badge>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">Dealer ID</p>
+            <p className="mt-1 font-medium">{selectedInvoice.billTo}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">Boxes</p>
+            <p className="mt-1 font-medium">{selectedInvoice.sales !== '-' && selectedInvoice.sales != null ? selectedInvoice.sales : '—'}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="invoice-total-amount">Invoice amount</Label>
+            <Input type="number" id="invoice-total-amount" value={selectedTotalAmount} onChange={handleTotalAmountChange} placeholder="Enter amount" />
+            <p className="text-xs text-muted-foreground">Previous: ₹{formatter.format(selectedInvoice.totalAmount)}</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="invoice-amount-paid">Amount paid</Label>
+            <Input type="number" id="invoice-amount-paid" value={selectedAmountPaid} onChange={handleAmountPaidChange} placeholder="Enter amount" />
+            <p className="text-xs text-muted-foreground">Previous: ₹{formatter.format(selectedInvoice.amountPaid)}</p>
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="invoice-pending-amount">Outstanding amount</Label>
+            <Input disabled type="number" id="invoice-pending-amount" value={selectedPendingAmount} />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => handleInvoiceDialogChange(false)} disabled={updatingInvoice}>Close</Button>
+          <Button onClick={updateSelectedInvoices} disabled={updatingInvoice}>
+            {updatingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Update invoice
+          </Button>
+        </DialogFooter>
+      </>
+    ) : null}
+  </DialogContent>
+</Dialog>
 
       {/* <DataTable data={allInvoices} dataOffset={offset} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset} loadingIds={loadingIds} handleMessageSendClick={handleMessageSendClick}/> */}
       {/* <DataTable columns={columns} data={allInvoices} status={currentStatus} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset}/> */}
-      
+
     </div>
-:
-<Skeleton className="h-4 w-[500px] h-[120px]" >
-    <div className="flex flex-row m-12">    
-        <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-        <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
+
     </div>
-</Skeleton> 
-    
 
-
-}
-
-    {/* : null} */}
-
-
-
- {/* <div className="md:hidden">
-        <Image
-          src="/examples/tasks-light.png"
-          width={1280}
-          height={998}
-          alt="Playground"
-          className="block dark:hidden"
-        />
-        <Image
-          src="/examples/tasks-dark.png"
-          width={1280}
-          height={998}
-          alt="Playground"
-          className="hidden dark:block"
-        />
-      </div>
-      <div className="hidden h-full flex-1 flex-col space-y-8 p-8 md:flex">
-        <div className="flex items-center justify-between space-y-2">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">Welcome back!</h2>
-            <p className="text-muted-foreground">
-              Here&apos;s a list of your tasks for this month!
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <UserNav />
-          </div>
-        </div>
-        <DataTable data={allInvoices} columns={columns} />
-      </div> 
-
-                 <div className={styles.carddatasection} key={12345} style={{height:'100%',overflow:'scroll'}}>
-                       
-                    <div className={styles.verticalsection} >
-                        <p className={`${inter.className} ${styles.text3_heading}`}>Students</p>
-                        <div className={styles.horizontalsection}>
-                            <p className={`${inter.className} ${styles.text3_heading}`}>Total:</p>
-                            <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px'}}>
-                                
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                <h1>{studentsInCampus}</h1>
-                            </div>
-                            
-                            <div className={`${inter.className}`} style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:'8px'}}>
-                                
-                                <p className={`${inter.className} ${styles.text3_heading}`}>Registered:</p>
-                                {searching ? <div className={styles.horizontalsection}>
-                                    <SpinnerGap className={`${styles.icon} ${styles.load}`} />
-                                    <p className={`${inter.className} ${styles.text3}`}>Loading ...</p> 
-                                </div> : ''}
-                                <h1>{totalStudents}</h1>
-                            </div>
-                        </div>
-                      </div>
-                <div>
-                    
-                </div>
-            </div>  */}
-        {/* </div> */}
-               
-                
-        </div>
-    
-    </div>
-    
-    
   );
 }
-

@@ -266,6 +266,50 @@ export async function GET(request,{params}) {
                 // return Response.json({data:rows},{data1:fields}, {status: 200})
                 return Response.json({status: 200, data: rows, total: rows1[0].count, message:'Details found!'}, {status: 200})
               }
+              else if(params.ids[1] == 'U4.3'){ // get invoices for selected payment status and type in web
+                const requestedStatus = decodeURIComponent(params.ids[2] || 'NotPaid');
+                const requestedInvoiceType = decodeURIComponent(params.ids[3] || 'All');
+                const supportedStatuses = ['All', 'NotPaid', 'PartialPaid', 'Paid'];
+                const supportedInvoiceTypes = ['All', 'ATL', 'VCL'];
+
+                if(!supportedStatuses.includes(requestedStatus) || !supportedInvoiceTypes.includes(requestedInvoiceType)){
+                  connection.release();
+                  return Response.json({status: 400, message:'Unsupported invoice filter'}, {status: 200})
+                }
+
+                const statusClause = requestedStatus === 'All' ? '' : ' AND i.status = ?';
+                const invoiceTypeClause = requestedInvoiceType === 'All' ? '' : ' AND i.invoiceType = ?';
+                const queryValues = [
+                  ...(requestedStatus === 'All' ? [] : [requestedStatus]),
+                  ...(requestedInvoiceType === 'All' ? [] : [requestedInvoiceType]),
+                ];
+                const summaryValues = requestedInvoiceType === 'All' ? [] : [requestedInvoiceType];
+                const [rows] = await connection.execute(
+                  'SELECT i.*, u.name FROM invoices i JOIN user u ON i.billTo = u.id WHERE i.isActive = 1' + statusClause + invoiceTypeClause + ' ORDER BY i.invoiceDate DESC',
+                  queryValues
+                );
+                const [summaryRows] = await connection.execute(
+                  'SELECT i.status, COUNT(*) AS count, COALESCE(SUM(i.pending), 0) AS pending FROM invoices i JOIN user u ON i.billTo = u.id WHERE i.isActive = 1' + invoiceTypeClause + ' GROUP BY i.status',
+                  summaryValues
+                );
+                connection.release();
+
+                const summary = summaryRows.reduce((result, row) => {
+                  result[row.status] = { count: Number(row.count), pending: Number(row.pending) };
+                  return result;
+                }, {});
+                const total = summaryRows.reduce((count, row) => count + Number(row.count), 0);
+
+                return Response.json({
+                  status: 200,
+                  data: rows,
+                  total,
+                  summary,
+                  selectedStatus: requestedStatus,
+                  selectedInvoiceType: requestedInvoiceType,
+                  message:'Details found!'
+                }, {status: 200})
+              }
             else if(params.ids[1] == 'U5'){ // get total outstanding of the business for admin
                 
                 const [rows, fields] = await connection.execute('SELECT * FROM `invoices` where status!="Paid"');
@@ -708,4 +752,3 @@ export async function POST(request, {params}) {
     }
 }
   
-

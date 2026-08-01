@@ -1305,7 +1305,7 @@ return (
               </div>
               <div className="flex flex-row gap-2 justify-between items-center">
                     
-                    <span className='text-sm text-slate-500'>{totalOrders} Orders listed</span>
+                    <span className='text-sm text-slate-500'>{totalOrders}</span>
                     <div className="flex flex-row items-center gap-3">
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

@@ -43,7 +43,7 @@ export default function CampusLayout({ children }) {
     <SidebarProvider defaultOpen>
       {showSidebar ? <AppSidebar userData={userData} /> : null}
       <SidebarInset>
-        <div className='flex flex-1 flex-col overflow-hidden px-4 py-4 md:px-6 md:py-6'>
+        <div className='campus-page-shell'>
           {showSidebar ? (
             <div className='campus-sidebar-toggle'>
               <SidebarTrigger />

@@ -177,6 +177,11 @@ export default function Products() {
         
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [ordersSheetProduct, setOrdersSheetProduct] = useState(null); // design whose orders sheet is open
+    const [batchesProduct, setBatchesProduct] = useState(null); // design whose stock batches are open
+    const [designBatches, setDesignBatches] = useState([]);
+    const [loadingDesignBatches, setLoadingDesignBatches] = useState(false);
+    const [designBatchesError, setDesignBatchesError] = useState('');
+    const [showEmptyBatches, setShowEmptyBatches] = useState(false);
     const [deletingDesign, setDeletingDesign] = useState(false);
     const [newProductOn, setNewProductOn] = useState(false);
     const [creatingProduct, setCreatingProduct] = useState(false);
@@ -248,6 +253,44 @@ export default function Products() {
                 getReservations(); // Fetch reservations on load
             }
         }, [user]);
+
+    // Load the prm stock batches for the design whose Active Batches count was clicked
+    useEffect(() => {
+        const design = batchesProduct?.design;
+        if (!design) {
+            setDesignBatches([]);
+            setLoadingDesignBatches(false);
+            setDesignBatchesError('');
+            setShowEmptyBatches(false);
+            return;
+        }
+
+        const controller = new AbortController();
+        setLoadingDesignBatches(true);
+        setDesignBatchesError('');
+        setShowEmptyBatches(false);
+
+        fetch(`/api/v2/designs/${process.env.NEXT_PUBLIC_API_PASS}/U11/${encodeURIComponent(design)}`, {
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+        })
+        .then(r => r.json())
+        .then(data => {
+            // U11 returns 201 with an empty list when the design has no batches
+            setDesignBatches(data.status === 200 && Array.isArray(data.data) ? data.data : []);
+            if (data.status !== 200 && data.status !== 201) {
+                setDesignBatchesError(data.message || 'Could not load batches');
+            }
+        })
+        .catch(err => {
+            if (err.name !== 'AbortError') setDesignBatchesError('Could not load batches');
+        })
+        .finally(() => {
+            if (!controller.signal.aborted) setLoadingDesignBatches(false);
+        });
+
+        return () => controller.abort();
+    }, [batchesProduct?.design]);
 
     async function getProductTags(){
         
@@ -1573,7 +1616,18 @@ return (
                                 <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">{Number(product.prm || 0)}
                                 </span>
                             </TableCell>
-                            <TableCell className='font-mono text-right'>{Number(product.activeBatches) > 0 ? product.activeBatches : '-'}</TableCell>
+                            <TableCell className='font-mono text-right'>
+                                {Number(product.activeBatches) > 0 ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setBatchesProduct(product)}
+                                        title="View active batches"
+                                        className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-200 hover:underline"
+                                    >
+                                        {product.activeBatches}
+                                    </button>
+                                ) : '-'}
+                            </TableCell>
                             
                             <TableCell className='font-mono text-right'>
                                 {Number(product.orderCount) > 0 ? (
@@ -1660,6 +1714,99 @@ return (
             open={!!ordersSheetProduct}
             onClose={() => setOrdersSheetProduct(null)}
           />
+
+          {/* PRM stock batches for a design, opened from the Active Batches count */}
+          <Dialog open={!!batchesProduct} onOpenChange={(open) => { if (!open) setBatchesProduct(null); }}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle className="font-mono">{batchesProduct?.design} — Stock Batches</DialogTitle>
+                    <DialogDescription>
+                        Premium stock batches for this design.
+                    </DialogDescription>
+                </DialogHeader>
+
+                {loadingDesignBatches ? (
+                    <div className="flex flex-row items-center gap-2 py-8 justify-center text-slate-500">
+                        <SpinnerGap className="animate-spin" /> Loading batches ...
+                    </div>
+                ) : designBatchesError ? (
+                    <div className="py-8 text-center text-sm text-red-600">{designBatchesError}</div>
+                ) : (() => {
+                    const activeBatches = designBatches.filter(b => b.status === 'Active' && Number(b.availableQty || 0) > 0);
+                    const emptyBatches = designBatches.filter(b => !(b.status === 'Active' && Number(b.availableQty || 0) > 0));
+                    const totalAvailable = activeBatches.reduce((sum, b) => sum + Number(b.availableQty || 0), 0);
+                    const visibleBatches = showEmptyBatches ? [...activeBatches, ...emptyBatches] : activeBatches;
+
+                    return (
+                        <div className="flex flex-col gap-3">
+                            <div className="flex flex-row items-center justify-between text-xs text-slate-600">
+                                <span>
+                                    <span className="font-medium">{activeBatches.length}</span> active {activeBatches.length === 1 ? 'batch' : 'batches'}
+                                </span>
+                                <span className="font-mono">
+                                    Available <span className="rounded-full bg-purple-100 px-2 py-1 font-medium text-purple-700">{totalAvailable}</span>
+                                </span>
+                            </div>
+
+                            {visibleBatches.length === 0 ? (
+                                <div className="py-8 text-center text-sm text-slate-500">No active batches for this design.</div>
+                            ) : (
+                                <div className="max-h-[55vh] overflow-y-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Batch</TableHead>
+                                                <TableHead>Received</TableHead>
+                                                <TableHead className="text-right">Received Qty</TableHead>
+                                                <TableHead className="text-right">Allocated</TableHead>
+                                                <TableHead className="text-right">Available</TableHead>
+                                                <TableHead>Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {visibleBatches.map((batch) => {
+                                                const initialQty = Number(batch.initialQty || 0);
+                                                const availableQty = Number(batch.availableQty || 0);
+                                                const allocatedQty = Math.max(0, initialQty - availableQty);
+                                                const isActive = batch.status === 'Active' && availableQty > 0;
+
+                                                return (
+                                                    <TableRow key={batch.id} className={isActive ? '' : 'text-slate-400'}>
+                                                        <TableCell className="font-mono">{batch.batchId || '(unnamed)'}</TableCell>
+                                                        <TableCell className="font-mono text-xs">
+                                                            {batch.receivedOn ? dayjs(batch.receivedOn).format('DD/MM/YYYY') : '-'}
+                                                        </TableCell>
+                                                        <TableCell className="font-mono text-right">{initialQty}</TableCell>
+                                                        <TableCell className="font-mono text-right">{allocatedQty}</TableCell>
+                                                        <TableCell className="font-mono text-right font-medium">{availableQty}</TableCell>
+                                                        <TableCell>
+                                                            <span className={`rounded-full px-2 py-1 text-xs font-medium ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                                {isActive ? 'Active' : batch.status}
+                                                            </span>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+
+                            {emptyBatches.length > 0 ? (
+                                <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="self-start px-0 text-slate-500"
+                                    onClick={() => setShowEmptyBatches(prev => !prev)}
+                                >
+                                    {showEmptyBatches ? 'Hide' : 'Show'} {emptyBatches.length} empty {emptyBatches.length === 1 ? 'batch' : 'batches'}
+                                </Button>
+                            ) : null}
+                        </div>
+                    );
+                })()}
+            </DialogContent>
+          </Dialog>
 
     </div>
 );

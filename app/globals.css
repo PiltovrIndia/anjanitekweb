@@ -101,23 +101,53 @@
 }
 
 @layer components {
-  .campus-sidebar-toggle {
-    position: sticky;
-    top: 1rem;
-    z-index: 50;
-    width: fit-content;
-    margin-bottom: -2.5rem;
+  .campus-page-shell {
+    position: relative;
+    display: flex;
+    height: 100svh;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-inline: 1rem;
   }
 
-  .campus-page-content > * > :first-child {
+  @media (min-width: 768px) {
+    .campus-page-shell {
+      padding-inline: 1.5rem;
+    }
+  }
+
+  .campus-sidebar-toggle {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    height: 0;
+    width: fit-content;
+    margin: 0;
+  }
+
+  .campus-sidebar-toggle > button {
+    margin-top: 1rem;
+  }
+
+  .campus-page-content > * {
+    min-width: 0;
+    overflow: visible !important;
+  }
+
+  .campus-page-content > * > :is(:has(> h1), :has(> h2)),
+  .campus-page-content > * > * > :is(:has(> h1), :has(> h2)) {
     position: sticky;
     top: 0;
     z-index: 40;
-    min-height: 3rem;
+    box-sizing: border-box;
+    display: flex;
+    min-height: 4.5rem;
     width: 100%;
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
-    padding-left: 3rem;
+    align-items: center;
+    padding: 0.75rem 0 0.75rem 3.5rem !important;
     background: hsl(var(--background));
     border-bottom: 1px solid hsl(var(--border));
   }

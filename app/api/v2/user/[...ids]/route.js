@@ -14,6 +14,8 @@ const client = new OneSignal.Client(process.env.ONE_SIGNAL_APPID, process.env.ON
 // U4 – Search user – by Username
 // U5 – Search user requests(active) – by CollegeId
 // U16 – Search user – by phoneNumber
+// U7.1 – Get the complete sales hierarchy for the web hierarchy explorer
+// U17 – Update approved contact fields or active state for a user
 export async function GET(request,{params}) {
 
     // get the pool connection to db
@@ -41,8 +43,22 @@ export async function GET(request,{params}) {
                         // we record the user log only if the user is active
                         if(rows.length > 0 && rows[0].isActive == 1){
                             const [rows1, fields1] = await connection.execute('INSERT INTO user_logs (userId, role) values ("'+params.ids[2]+'", "'+params.ids[3]+'")');
+                            
+                            const role = params.ids[3] ? decodeURIComponent(params.ids[3]).trim() : '';
+
+                            // the column collation is case-insensitive, so 'dealer' matches 'Dealer'
+                            const [rows] = await connection.execute('SELECT role, stock FROM role_settings WHERE role = ? LIMIT 1', [role]);
+
+                            var showStock = 0;
+                            // an unconfigured role gets no stock access — the flag has to be
+                            // switched on deliberately rather than defaulting open
+                            if (rows.length > 0) {
+                            
+                                showStock = Number(rows[0].stock || 0);
+
+                            }
                             connection.release();
-                            return Response.json({status: 200, message:'Updated!', data:rows[0].isActive}, {status: 200})
+                            return Response.json({status: 200, message:'Updated!', data:rows[0].isActive, stock: showStock}, {status: 200})
                         }
                         else {
                             return Response.json({status: 200, message:'User is not active!',data:0}, {status: 200})
@@ -655,6 +671,33 @@ export async function GET(request,{params}) {
                     return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
                 }
             }
+            // get the complete reporting hierarchy, including mapped dealers
+            // This is intentionally separate from U7 so existing sales listings keep their response shape.
+            else if(params.ids[1] == 'U7.1'){
+                try {
+                    const [rows] = await connection.execute(`
+                        SELECT id, name, email, mobile, designation, role, mapTo, isActive
+                        FROM user
+                        WHERE role IN ('StateHead', 'SalesManager', 'SalesExecutive', 'Dealer')
+                        ORDER BY
+                            CASE role
+                                WHEN 'StateHead' THEN 1
+                                WHEN 'SalesManager' THEN 2
+                                WHEN 'SalesExecutive' THEN 3
+                                WHEN 'Dealer' THEN 4
+                                ELSE 5
+                            END,
+                            name ASC,
+                            id ASC
+                    `)
+
+                    connection.release()
+                    return Response.json({status: 200, length: rows.length, data: rows, message:'Sales hierarchy found!'}, {status: 200})
+                } catch (error) {
+                    connection.release()
+                    return Response.json({status: 404, message:'Unable to load sales hierarchy!'}, {status: 200})
+                }
+            }
             // get ALL PEOPLE mapped to single person for listing in web
             // used for viewing who is assigned to whom
             // proper loading to be taken care
@@ -1028,6 +1071,53 @@ export async function POST(request, {params}) {
                     return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
                 }
             }
+            // Update the sales hierarchy user's editable fields.
+            // Kept as a separate POST option to avoid the broad U13 update surface.
+            else if(params.ids[1] == 'U17'){
+                try {
+                    const userUpdate = await request.json()
+                    const userId = String(userUpdate?.id || '').trim()
+
+                    if(!userId){
+                        return Response.json({status: 400, message:'User ID is required!'}, {status: 200})
+                    }
+
+                    const fields = []
+                    const values = []
+                    const editableFields = ['mobile', 'email', 'designation']
+
+                    editableFields.forEach((field) => {
+                        if(Object.prototype.hasOwnProperty.call(userUpdate, field)){
+                            fields.push(`\`${field}\` = ?`)
+                            values.push(String(userUpdate[field] ?? '').trim())
+                        }
+                    })
+
+                    if(Object.prototype.hasOwnProperty.call(userUpdate, 'isActive')){
+                        const isActive = Number(userUpdate.isActive)
+                        if(![0, 1].includes(isActive)){
+                            return Response.json({status: 400, message:'Invalid active state!'}, {status: 200})
+                        }
+                        fields.push('`isActive` = ?')
+                        values.push(isActive)
+                    }
+
+                    if(fields.length === 0){
+                        return Response.json({status: 400, message:'No editable fields were provided!'}, {status: 200})
+                    }
+
+                    values.push(userId)
+                    await connection.execute(`UPDATE user SET ${fields.join(', ')} WHERE id = ?`, values)
+
+                    const [rows] = await connection.execute('SELECT id, name, email, mobile, designation, role, mapTo, isActive FROM user WHERE id = ? LIMIT 1', [userId])
+                    if(rows.length === 0){
+                        return Response.json({status: 201, message:'User not found!'}, {status: 200})
+                    }
+                    return Response.json({status: 200, data: rows[0], message:'User updated successfully!'}, {status: 200})
+                } catch (error) {
+                    return Response.json({status: 404, message:'Unable to update user!'}, {status: 200})
+                }
+            }
             else {
                 return Response.json({status: 404, message:'Not found!'}, {status: 200})
             }
@@ -1077,4 +1167,3 @@ export async function POST(request, {params}) {
         await connection.release();
     }
 }
-  
