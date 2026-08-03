@@ -682,6 +682,7 @@ export default function Products() {
                 // lists newly produced quantities, so two rows mean two lots);
                 // every other batch value is a prm batch with its quantity
                 const groupedByDesign = new Map();
+                const skippedRows = []; // rows we can't route to std or to a batch
                 totalFlatRows.forEach(r => {
                     if (!groupedByDesign.has(r.design)) {
                         groupedByDesign.set(r.design, {
@@ -692,10 +693,18 @@ export default function Products() {
                         });
                     }
                     const entry = groupedByDesign.get(r.design);
-                    if (r.qty == null) return;
+
+                    if (r.qty == null) {
+                        skippedRows.push(`${r.design} (no QUANTITY)`);
+                        return;
+                    }
 
                     if (r.batch.toUpperCase() === 'STD') {
                         entry.std = (entry.std == null ? 0 : entry.std) + r.qty;
+                    } else if (!r.batch) {
+                        // a blank BATCH names neither std nor a premium batch — routing it
+                        // by guesswork would move the wrong stock, so flag it instead
+                        skippedRows.push(`${r.design} (no BATCH — use STD or a batch number)`);
                     } else {
                         const existing = entry.batches.find(b => b.batch === r.batch);
                         if (existing) existing.qty += r.qty;
@@ -703,7 +712,18 @@ export default function Products() {
                     }
                 });
 
-                const totalSheetData = Array.from(groupedByDesign.values());
+                const totalSheetData = Array.from(groupedByDesign.values())
+                    .filter(entry => entry.std != null || entry.batches.length > 0);
+
+                if (skippedRows.length > 0) {
+                    console.warn('Skipped rows:', skippedRows);
+                    toast({ description: `${skippedRows.length} row(s) skipped — ${skippedRows.slice(0, 3).join(', ')}${skippedRows.length > 3 ? ' …' : ''}` });
+                }
+
+                if (totalSheetData.length === 0) {
+                    toast({ description: 'No usable rows found. Each row needs DESIGN, QUANTITY and BATCH (STD or a batch number).' });
+                    return;
+                }
                 
                 // Replace '/' with '***' in the invoiceNo field for each item in the data array
                 // const updatedData = data.map(item => {
@@ -746,6 +766,8 @@ export default function Products() {
         const userId = JSON.parse(decodeURIComponent(biscuits.get('sc_user_detail'))).id;
         let totalSucceeded = 0;
         let totalFailed = 0;
+        let totalQtyMoved = 0;   // units actually added/removed, so a no-op is visible
+        const problems = [];     // per-design reasons a removal did not fully apply
         const totalRows = items1.length;
         let hasError = false;
         let errorMsg = '';
@@ -768,6 +790,19 @@ export default function Products() {
                     const summary = queryResult.data || [];
                     totalSucceeded += summary.filter(r => r.success).length;
                     totalFailed += summary.filter(r => !r.success).length;
+
+                    summary.forEach(entry => {
+                        if (mode === 'remove') {
+                            totalQtyMoved += Number(entry?.std?.removedQty || 0) + Number(entry?.prm?.removedQty || 0);
+                            const shortfall = Number(entry?.std?.shortfall || 0) + Number(entry?.prm?.shortfall || 0);
+                            if (entry?.message) problems.push(`${entry.design}: ${entry.message}`);
+                            else if (shortfall > 0) problems.push(`${entry.design}: ${shortfall} short${entry?.prm?.notes?.length ? ` (${entry.prm.notes.join(', ')})` : ''}`);
+                        } else {
+                            totalQtyMoved += Number(entry?.std?.uploadedQty || 0)
+                                + (entry?.prm?.uploadedBatches || []).reduce((sum, b) => sum + Number(b.qty || 0), 0);
+                            if (!entry?.success && entry?.message) problems.push(`${entry.design}: ${entry.message}`);
+                        }
+                    });
                 } else {
                     hasError = true;
                     errorMsg = queryResult.message || 'Upload failed. Please try again!';
@@ -786,10 +821,23 @@ export default function Products() {
             toast({ description: errorMsg });
         } else {
             const verb = mode === 'remove' ? 'removed' : 'uploaded';
-            const msg = totalFailed > 0
-                ? `Stock ${verb} for ${totalSucceeded} of ${totalRows} designs (${totalFailed} not found). Refresh to view.`
-                : `Stock ${verb} successfully. Refresh to view updated data.`;
-            toast({ description: msg });
+
+            // a run that touched nothing used to report success — say so plainly
+            if (totalQtyMoved === 0) {
+                toast({
+                    description: `No stock was ${verb}. ${problems.length > 0 ? problems.slice(0, 3).join(' | ') : 'Check the DESIGN and BATCH values in the sheet.'}`,
+                });
+            } else {
+                const msg = `${totalQtyMoved} units ${verb} across ${totalSucceeded} of ${totalRows} designs`
+                    + (totalFailed > 0 ? ` (${totalFailed} not applied)` : '')
+                    + '. Refresh to view updated data.';
+                toast({ description: msg });
+
+                if (problems.length > 0) {
+                    console.warn('Stock ' + verb + ' issues:', problems);
+                    toast({ description: `${problems.length} design(s) not fully ${verb}: ${problems.slice(0, 3).join(' | ')}${problems.length > 3 ? ' …' : ''}` });
+                }
+            }
         }
     }
 

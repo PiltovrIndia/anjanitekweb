@@ -713,20 +713,18 @@ export async function GET(request,{params}) {
                         }
 
                         /**
-                         * PRM removal: comes out of the stock batches. A named
-                         * batch is drained first; any shortfall (or an unnamed
-                         * row) falls back to best fit across the other batches.
+                         * PRM removal: comes out of the batch named in the sheet and
+                         * nothing else. A row that names no batch, or names one this
+                         * design does not have, removes nothing and is reported as a
+                         * shortfall — quantities are never silently taken from a
+                         * different batch than the one the admin listed.
                          */
-                        let removalBatches = (Array.isArray(row.batches) ? row.batches : [])
+                        const removalBatches = (Array.isArray(row.batches) ? row.batches : [])
                             .map((b) => ({
                                 batch: String(b.batch == null ? '' : b.batch).trim(),
                                 qty: normalizeQty(b.qty),
                             }))
-                            .filter((b) => b.qty !== null && b.qty > 0);
-
-                        if (removalBatches.length === 0 && normalizeQty(row.prm) !== null && normalizeQty(row.prm) > 0) {
-                            removalBatches = [{ batch: '', qty: normalizeQty(row.prm) }];
-                        }
+                            .filter((b) => b.batch && b.qty !== null && b.qty > 0);
 
                         if (removalBatches.length > 0) {
                             const [batchRows] = await connection.query(
@@ -753,36 +751,31 @@ export async function GET(request,{params}) {
                             const totalRequested = removalBatches.reduce((sum, b) => sum + b.qty, 0);
                             let totalRemoved = 0;
                             const breakdown = [];
-
-                            const takeFrom = (batch, wanted) => {
-                                const takeQty = Math.min(batch.availableQty, wanted);
-                                if (takeQty <= 0) return 0;
-                                batch.availableQty -= takeQty;
-                                batch.removedQty += takeQty;
-                                totalRemoved += takeQty;
-                                breakdown.push({ batch: batch.batchId, qty: takeQty });
-                                return takeQty;
-                            };
+                            const notes = [];
 
                             for (const removal of removalBatches) {
-                                let remaining = removal.qty;
+                                // batchId is case-insensitive in the DB, so match the same way
+                                const target = batches.find(
+                                    (b) => String(b.batchId).toLowerCase() === removal.batch.toLowerCase()
+                                );
 
-                                // drain the named batch first when it exists
-                                const target = batches.find((b) => b.batchId === removal.batch);
-                                if (target) remaining -= takeFrom(target, remaining);
-
-                                // shortfall or unnamed row: best fit across the rest
-                                while (remaining > 0) {
-                                    const candidates = batches.filter((b) => b.availableQty > 0);
-                                    if (candidates.length === 0) break;
-
-                                    const fitting = candidates
-                                        .filter((b) => b.availableQty >= remaining)
-                                        .sort((a, b) => a.availableQty - b.availableQty);
-                                    const pick = fitting[0] || candidates.sort((a, b) => a.availableQty - b.availableQty)[0];
-
-                                    remaining -= takeFrom(pick, remaining);
+                                if (!target) {
+                                    notes.push(`Batch ${removal.batch} has no available stock for this design`);
+                                    breakdown.push({ batch: removal.batch, requestedQty: removal.qty, qty: 0 });
+                                    continue;
                                 }
+
+                                // never take more than the batch holds
+                                const takeQty = Math.min(target.availableQty, removal.qty);
+                                target.availableQty -= takeQty;
+                                target.removedQty += takeQty;
+                                totalRemoved += takeQty;
+
+                                if (takeQty < removal.qty) {
+                                    notes.push(`Batch ${removal.batch} had only ${takeQty} of ${removal.qty}`);
+                                }
+
+                                breakdown.push({ batch: target.batchId, requestedQty: removal.qty, qty: takeQty });
                             }
 
                             // persist drained batches; fully consumed ones become Empty
@@ -795,12 +788,25 @@ export async function GET(request,{params}) {
                                 }
                             }
 
-                            // keep products.prm in step with the batch sum
-                            const remainingPrm = batches.reduce((sum, b) => sum + b.availableQty, 0);
-                            await connection.query(
-                                `UPDATE products SET prm = ? WHERE design = ?`,
-                                [remainingPrm, design]
-                            );
+                            /**
+                             * Keep products.prm in step with the batches, but only when
+                             * something was actually removed. Summing the locked rows
+                             * when nothing matched would write a total that ignores every
+                             * batch this removal never looked at.
+                             */
+                            let remainingPrm = Number(product.prm || 0);
+                            if (totalRemoved > 0) {
+                                const [sumRows] = await connection.query(
+                                    `SELECT COALESCE(SUM(availableQty), 0) as totalQty FROM product_stock_batches WHERE design = ? AND stockType = 'prm' AND status = 'Active'`,
+                                    [design]
+                                );
+                                remainingPrm = Number(sumRows[0].totalQty || 0);
+
+                                await connection.query(
+                                    `UPDATE products SET prm = ? WHERE design = ?`,
+                                    [remainingPrm, design]
+                                );
+                            }
 
                             summaryEntry.prm = {
                                 requestedQty: totalRequested,
@@ -808,7 +814,22 @@ export async function GET(request,{params}) {
                                 remainingStock: remainingPrm,
                                 shortfall: totalRequested - totalRemoved,
                                 batches: breakdown,
+                                notes,
                             };
+                        }
+
+                        // nothing asked for, or nothing could be taken — don't report success
+                        const requestedTotal = Number(summaryEntry.std?.requestedQty || 0) + Number(summaryEntry.prm?.requestedQty || 0);
+                        const removedTotal = Number(summaryEntry.std?.removedQty || 0) + Number(summaryEntry.prm?.removedQty || 0);
+                        if (requestedTotal === 0) {
+                            summaryEntry.success = false;
+                            summaryEntry.message = 'Nothing to remove for this design';
+                        }
+                        else if (removedTotal === 0) {
+                            summaryEntry.success = false;
+                            summaryEntry.message = summaryEntry.prm?.notes?.length
+                                ? summaryEntry.prm.notes.join('; ')
+                                : 'No stock available to remove';
                         }
 
                         removalSummary.push(summaryEntry);
