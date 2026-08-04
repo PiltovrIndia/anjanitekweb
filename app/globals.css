@@ -101,6 +101,24 @@
 }
 
 @layer components {
+  @keyframes operation-progress {
+    0% {
+      transform: translateX(-150%);
+    }
+
+    50% {
+      transform: translateX(125%);
+    }
+
+    100% {
+      transform: translateX(275%);
+    }
+  }
+
+  .operation-progress-indicator {
+    animation: operation-progress 1.6s ease-in-out infinite;
+  }
+
   .campus-page-shell {
     position: relative;
     display: flex;

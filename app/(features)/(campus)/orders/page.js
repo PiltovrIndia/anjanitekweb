@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
 import { Input } from '@/app/components/ui/input'
+import { Textarea } from '@/app/components/ui/textarea'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/app/components/ui/dialog'
 import { Checkbox } from '@/app/components/ui/checkbox'
@@ -76,14 +77,17 @@ fetch("/api/v2/orders_test/"+pass+"/U2/"+encodeURIComponent(design), {
 });
 
 // update order status
-const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate, design, batchSeq) =>
-fetch("/api/v2/orders_test/"+pass+"/"+path+"/"+orderId+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design)+(Array.isArray(batchSeq) && batchSeq.length > 0 ? "?batchSeq="+batchSeq.join(',') : ""), {
+const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate, design, batchSeq, notes) => {
+const searchParams = new URLSearchParams({ notes: notes || '' })
+if (Array.isArray(batchSeq) && batchSeq.length > 0) searchParams.set('batchSeq', batchSeq.join(','))
+return fetch("/api/v2/orders_test/"+pass+"/"+path+"/"+orderId+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design)+"?"+searchParams.toString(), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
     },
 });
+};
 
 // mark all order items of a cart as sale order
 const markCartAsSaleOrderAPI = async (pass, cartId, adminId, actionDate) =>
@@ -152,6 +156,7 @@ export default function OrdersV2() {
     const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
     const [selectedRes, setSelectedRes] = useState(null);
     const [approvalQty, setApprovalQty] = useState('');
+    const [orderNotes, setOrderNotes] = useState('');
     const [reviewDesignQuery, setReviewDesignQuery] = useState('')
     const [reviewDesignResults, setReviewDesignResults] = useState([])
     const [searchingReviewDesigns, setSearchingReviewDesigns] = useState(false)
@@ -834,6 +839,7 @@ export default function OrdersV2() {
         setSelectedRes(reviewRes);
 
         setApprovalQty(reviewRes.requestedQty); // Default to requested quantity
+        setOrderNotes(reviewRes.notes || '');
         setSelectedReviewDesign(reviewRes)
         setReviewDesignQuery('')
         setReviewDesignResults([])
@@ -1112,6 +1118,7 @@ export default function OrdersV2() {
                 dayjs().format('YYYY-MM-DD HH:mm:ss'),
                 selectedReviewDesign.design,
                 path === 'U0.2' && selectedRes.stockType === 'prm' ? getBatchAllocationPayload() : [],
+                orderNotes,
             );
             const queryResult = await result.json();
 
@@ -1126,6 +1133,7 @@ export default function OrdersV2() {
                         approvedQty: data.newApprovedQty ?? data.approvedQty,
                         productionQty: data.newProductionQty ?? data.productionQty,
                         requestedQty: data.newRequestedQty ?? data.requestedQty,
+                        notes: orderNotes || null,
                         status: status === 'Rejected' ? 'Rejected' : status === 'OutOfStock' ? 'OutOfStock' : 'Approved',
                     };
 
@@ -1727,6 +1735,12 @@ return (
                             </div>
                             ) : null}
                         </div>
+                        {orderNotes ? (
+                        <div className="mt-3 border-t border-slate-200 pt-3 text-sm">
+                            <div className="mb-1 text-xs font-medium text-slate-500">Notes</div>
+                            <p className="whitespace-pre-wrap text-slate-700">{orderNotes}</p>
+                        </div>
+                        ) : null}
                     </div>
                     ) : null}
 
@@ -1864,6 +1878,21 @@ return (
                                 </>
                             );
                         })()}
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                            <Label htmlFor="review-order-notes">Notes</Label>
+                            <span className="text-xs text-slate-500">Saved with your next action</span>
+                        </div>
+                        <Textarea
+                            id="review-order-notes"
+                            value={orderNotes}
+                            onChange={(event) => setOrderNotes(event.target.value)}
+                            placeholder="Add context for this order item"
+                            disabled={resLoading}
+                            className="min-h-[88px] resize-y"
+                        />
                     </div>
 
                     {selectedRes?.stockType === 'prm' ? (

@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import { Toaster } from "../../../components/ui/sonner"
 import { useToast } from "@/app/components/ui/use-toast"
 import { Button } from '@/app/components/ui/button'
+import { OperationProgress } from '@/app/components/operation-progress'
 import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
@@ -671,22 +672,7 @@ return (
                 </Sheet>
                 
 
-                {uploadProgress ? <Card className="w-[350px]">
-                    <CardHeader>
-                        <CardTitle>Uploading ...</CardTitle>
-                        <CardDescription>Do not close</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form>
-                        <div className="grid w-full items-center gap-4">
-                            <div className="flex flex-col space-y-1.5">
-                                <Skeleton className="h-4 w-[100px] h-[20px]" />
-                            </div>
-                            
-                        </div>
-                        </form>
-                    </CardContent>
-                </Card> : null}
+                {uploadProgress ? <OperationProgress title="Updating stock" description="Applying stock changes. Keep this page open." /> : null}
 
               <Toaster />
           </div>
@@ -1445,4 +1431,3 @@ return (
     </div>
 );
 }
-

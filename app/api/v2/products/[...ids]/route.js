@@ -404,6 +404,117 @@ export async function GET(request,{params}) {
           if(await Keyverify(params.ids[0])){
 
 
+              if(params.ids[1] == 'U13'){ // Create designs in bulk
+                    const payload = await request.json();
+                    const designType = Number(payload?.designType);
+                    const products = Array.isArray(payload?.products) ? payload.products : [];
+
+                    if (![1, 2].includes(designType)) {
+                        return Response.json({status: 400, success: false, message: 'Design type must be ATL or VCL.'}, {status: 200})
+                    }
+
+                    if (products.length === 0 || products.length > 500) {
+                        return Response.json({status: 400, success: false, message: 'Provide between 1 and 500 designs.'}, {status: 200})
+                    }
+
+                    const normalizedProducts = products.map((product) => ({
+                        design: String(product?.design || '').trim(),
+                        name: String(product?.name || '').trim(),
+                        size: String(product?.size || '').trim(),
+                        tagId: Number(product?.tagId),
+                    }));
+
+                    const invalidProduct = normalizedProducts.find((product) => (
+                        !product.design || product.design.length > 100 ||
+                        !product.name || product.name.length > 255 ||
+                        !product.size || product.size.length > 50 ||
+                        !Number.isInteger(product.tagId) || product.tagId <= 0
+                    ));
+                    if (invalidProduct) {
+                        return Response.json({status: 400, success: false, message: 'Every design must include valid design, name, size, and tag values.'}, {status: 200})
+                    }
+
+                    const seenDesigns = new Set();
+                    const duplicateInUpload = normalizedProducts.find((product) => {
+                        const key = product.design.toLowerCase();
+                        if (seenDesigns.has(key)) return true;
+                        seenDesigns.add(key);
+                        return false;
+                    });
+                    if (duplicateInUpload) {
+                        return Response.json({status: 400, success: false, message: `Design ${duplicateInUpload.design} appears more than once.`}, {status: 200})
+                    }
+
+                    try {
+                        const tagIds = [...new Set(normalizedProducts.map((product) => product.tagId))];
+                        const tagPlaceholders = tagIds.map(() => '?').join(',');
+                        const [tagRows] = await connection.query(
+                            `SELECT tagId, name, type FROM product_tags WHERE tagId IN (${tagPlaceholders})`,
+                            tagIds
+                        );
+
+                        if (tagRows.length !== tagIds.length) {
+                            return Response.json({status: 400, success: false, message: 'One or more selected size tags are no longer available.'}, {status: 200})
+                        }
+
+                        const tagMap = new Map(tagRows.map((tag) => [Number(tag.tagId), tag]));
+                        const mismatchedTag = normalizedProducts.find((product) => {
+                            const tag = tagMap.get(product.tagId);
+                            return !tag || String(tag.type || '').trim().toLowerCase() !== 'size' ||
+                                normalizeSizeTagValue(tag.name) !== normalizeSizeTagValue(product.size);
+                        });
+                        if (mismatchedTag) {
+                            return Response.json({status: 400, success: false, message: `The size tag for ${mismatchedTag.design} no longer matches ${mismatchedTag.size}.`}, {status: 200})
+                        }
+
+                        await connection.beginTransaction();
+                        const designs = normalizedProducts.map((product) => product.design);
+                        const designPlaceholders = designs.map(() => '?').join(',');
+                        const [existingRows] = await connection.query(
+                            `SELECT design FROM products WHERE design IN (${designPlaceholders}) FOR UPDATE`,
+                            designs
+                        );
+
+                        if (existingRows.length > 0) {
+                            await connection.rollback();
+                            return Response.json({
+                                status: 409,
+                                success: false,
+                                message: `These designs already exist: ${existingRows.map((row) => row.design).join(', ')}.`,
+                            }, {status: 200})
+                        }
+
+                        const values = normalizedProducts.flatMap((product) => [
+                            product.design,
+                            product.name,
+                            '-',
+                            product.size,
+                            String(product.tagId),
+                            '-',
+                            designType,
+                        ]);
+                        const valuePlaceholders = normalizedProducts.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(',');
+                        const [insertResult] = await connection.query(
+                            `INSERT INTO products (design, name, description, size, tags, media, designType) VALUES ${valuePlaceholders}`,
+                            values
+                        );
+
+                        await connection.commit();
+                        return Response.json({
+                            status: 200,
+                            success: true,
+                            message: 'Designs created successfully.',
+                            createdCount: insertResult.affectedRows,
+                        }, {status: 200})
+                    } catch (error) {
+                        try {
+                            await connection.rollback();
+                        } catch (_) {}
+                        console.error('Bulk design creation error:', error);
+                        return Response.json({status: 500, success: false, message: 'Could not create designs.'}, {status: 200})
+                    }
+              }
+
               if(params.ids[1] == 'U0'){ // Upload stock in bulk
 
                     const items = await request.json();
@@ -687,4 +798,12 @@ export async function GET(request,{params}) {
         }
 
         return qty;
+    }
+
+    function normalizeSizeTagValue(value) {
+        return String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s*mm\s*$/, '')
+            .replace(/\s+/g, '');
     }

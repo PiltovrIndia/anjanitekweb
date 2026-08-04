@@ -31,6 +31,7 @@ import {
   
   import { Toaster } from "../../../components/ui/sonner"
 import { useToast } from "@/app/components/ui/use-toast"
+import { OperationProgress } from '@/app/components/operation-progress'
 
 
   import {
@@ -677,25 +678,7 @@ const handleFileSelect = async (e) => {
                 </div>
                
             </div> */}
-           {uploadProgress ? <Card className="w-[350px]">
-                <CardHeader>
-                    <CardTitle>Uploading ...</CardTitle>
-                    <CardDescription>Do not close</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form>
-                    <div className="grid w-full items-center gap-4">
-                        <div className="flex flex-col space-y-1.5">
-                            <Skeleton className="h-4 w-[100px] h-[20px]" />
-                        </div>
-                        
-                    </div>
-                    </form>
-                </CardContent>
-                {/* <CardFooter className="flex justify-between">
-                    <Button>Send messages</Button>
-                </CardFooter> */}
-            </Card> : null}
+           {uploadProgress ? <OperationProgress title="Uploading update" description="Publishing your update. Keep this page open." /> : null}
             <Toaster />
         <main className="w-full min-w-0">
 

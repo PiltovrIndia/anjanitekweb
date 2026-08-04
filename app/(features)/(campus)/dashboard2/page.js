@@ -33,6 +33,7 @@ import {
   import { Skeleton } from "../../../components/ui/skeleton"
   import { Toaster } from "../../../components/ui/sonner"
   import { toast, ToastAction } from "sonner"
+  import { OperationProgress } from '@/app/components/operation-progress'
 
   import {
     Sheet,
@@ -524,25 +525,7 @@ const processData = (e) => {
                 </div>
                
             </div> */}
-           {uploadProgress ? <Card className="w-[350px]">
-                <CardHeader>
-                    <CardTitle>Uploading ...</CardTitle>
-                    <CardDescription>Do not close</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form>
-                    <div className="grid w-full items-center gap-4">
-                        <div className="flex flex-col space-y-1.5">
-                            <Skeleton className="h-4 w-[100px] h-[20px]" />
-                        </div>
-                        
-                    </div>
-                    </form>
-                </CardContent>
-                {/* <CardFooter className="flex justify-between">
-                    <Button>Send messages</Button>
-                </CardFooter> */}
-            </Card> : null}
+           {uploadProgress ? <OperationProgress title="Uploading data" description="Processing your file. Keep this page open." /> : null}
             <Toaster />
         <div className={styles.verticalsection} style={{height:'80vh', width:'100%',gap:'8px'}}>
 
@@ -629,4 +612,3 @@ const processData = (e) => {
     
   );
 }
-

@@ -29,6 +29,7 @@ import { Toaster } from "../../../components/ui/sonner"
 import { useToast } from "@/app/components/ui/use-toast"
 import { Textarea } from "@/app/components/ui/textarea"
 import { Button } from "@/app/components/ui/button"
+import { OperationProgress } from '@/app/components/operation-progress'
 
   
 // import {columns} from "./columns"
@@ -833,25 +834,7 @@ export default function AppReports() {
                                             </div>
                                         )}
                                         
-            {uploadProgress ? <Card className="w-[350px]">
-                <CardHeader>
-                    <CardTitle>Uploading ...</CardTitle>
-                    <CardDescription>Do not close</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form>
-                    <div className="grid w-full items-center gap-4">
-                        <div className="flex flex-col space-y-1.5">
-                            <Skeleton className="h-4 w-[100px] h-[20px]" />
-                        </div>
-                        
-                    </div>
-                    </form>
-                </CardContent>
-                {/* <CardFooter className="flex justify-between">
-                    <Button>Send messages</Button>
-                </CardFooter> */}
-            </Card> : null}
+            {uploadProgress ? <OperationProgress title="Uploading report data" description="Processing the report file. Keep this page open." /> : null}
             {/* {(!messaging) ?
               <Sheet>
                 <SheetTrigger asChild>
@@ -1175,4 +1158,3 @@ export default function AppReports() {
     
   );
 }
-

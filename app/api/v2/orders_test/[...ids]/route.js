@@ -145,6 +145,7 @@ export async function GET(request,{params}) {
                         o.productionQty,
                         o.stockType,
                         o.status,
+                        o.notes,
                         o.createdOn,
                         o.approvedOn,
                         o.modifiedOn,
@@ -766,6 +767,7 @@ export async function GET(request,{params}) {
                 var toBeApprovedQty = params.ids[3];
                 var adminId = params.ids[4];
                 var actionDate = params.ids[5];
+                const notes = getOrderNotes(request);
 
                 // optional admin-chosen batch allocation order (?batchSeq=id1,id2,... or id1:qty,id2:qty,...)
                 var batchSequence = [];
@@ -814,6 +816,10 @@ export async function GET(request,{params}) {
                     if (!product) {
                     await connection.rollback();
                     return Response.json({ status: 404, success: false, message: "Product not found" });
+                    }
+
+                    if (notes !== undefined) {
+                        await connection.query(`UPDATE orders SET notes = ? WHERE id = ?`, [notes, orderId]);
                     }
 
                     if (order.status === "Approved" && order.stockType === 'prm') {
@@ -1064,6 +1070,7 @@ export async function GET(request,{params}) {
                 var orderId = params.ids[2];
                 var adminId = params.ids[4];
                 var actionDate = params.ids[5];
+                const notes = getOrderNotes(request);
 
                 if (!orderId) {
                 return Response.json({
@@ -1092,6 +1099,10 @@ export async function GET(request,{params}) {
                     const existingOrder = existingRows[0];
                     const currentStatus = existingOrder.status;
                     let waitlistAllocations = [];
+
+                    if (notes !== undefined) {
+                        await rejectConnection.query(`UPDATE orders SET notes = ? WHERE id = ?`, [notes, orderId]);
+                    }
 
                     if (["Approved"].includes(currentStatus)) {
 
@@ -1172,6 +1183,7 @@ export async function GET(request,{params}) {
                 var orderId = params.ids[2];
                 var adminId = params.ids[4];
                 var actionDate = params.ids[5];
+                const notes = getOrderNotes(request);
 
                 if (!orderId) {
                 return Response.json({
@@ -1200,6 +1212,10 @@ export async function GET(request,{params}) {
                     const existingOrder = existingRows[0];
                     const currentStatus = existingOrder.status;
                     let waitlistAllocations = [];
+
+                    if (notes !== undefined) {
+                        await oosConnection.query(`UPDATE orders SET notes = ? WHERE id = ?`, [notes, orderId]);
+                    }
 
                     if (["Approved"].includes(currentStatus)) {
 
@@ -2405,6 +2421,7 @@ function groupAdminOrders(rows) {
       std: Number(row.std || 0),
 
       status: row.status,
+      notes: row.notes,
       waitlistPosition: row.waitlistPosition,
       batchAllocations: row.batchAllocations || [],
 
@@ -2924,4 +2941,16 @@ function getDesignOrderStatus({
   }
 
   return "In Progress";
+}
+
+function getOrderNotes(request) {
+  try {
+    const value = new URL(request.url).searchParams.get('notes');
+    if (value === null) return undefined;
+
+    const notes = value.trim();
+    return notes ? notes.slice(0, 2000) : null;
+  } catch (_) {
+    return undefined;
+  }
 }

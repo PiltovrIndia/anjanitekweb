@@ -25,6 +25,7 @@ import { Checkbox } from "@/app/components/ui/checkbox"
 import { Input } from "@/app/components/ui/input"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/app/components/ui/dialog"
+import { OperationProgress } from '@/app/components/operation-progress'
 
 import { Calendar } from "@/app/components/ui/calendar";
 import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group";
@@ -1026,39 +1027,9 @@ export default function Invoices() {
                     </SheetContent>
                 </Sheet>
 
-                {uploadProgress ? <Card className="w-[350px]">
-                    <CardHeader>
-                        <CardTitle>Uploading ...</CardTitle>
-                        <CardDescription>Do not close</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form>
-                        <div className="grid w-full items-center gap-4">
-                            <div className="flex flex-col space-y-1.5">
-                                <Skeleton className="h-4 w-[100px] h-[20px]" />
-                            </div>
-                            
-                        </div>
-                        </form>
-                    </CardContent>
-                </Card> : null}
+                {uploadProgress ? <OperationProgress title="Uploading invoices" description="Processing the invoice file. Keep this page open." /> : null}
 
-                {createProgress ? <Card className="w-[350px]">
-                    <CardHeader>
-                        <CardTitle>Creating ...</CardTitle>
-                        <CardDescription>Do not close</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form>
-                        <div className="grid w-full items-center gap-4">
-                            <div className="flex flex-col space-y-1.5">
-                                <Skeleton className="h-4 w-[100px] h-[20px]" />
-                            </div>
-                            
-                        </div>
-                        </form>
-                    </CardContent>
-                </Card> : null}
+                {createProgress ? <OperationProgress title="Creating invoice" description="Saving the invoice. Keep this page open." /> : null}
 
               <Toaster />
           </div>      

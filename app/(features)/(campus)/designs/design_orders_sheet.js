@@ -9,6 +9,7 @@ import * as xlsx from 'xlsx'
 import { Button } from '@/app/components/ui/button'
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
+import { Textarea } from '@/app/components/ui/textarea'
 import { useToast } from '@/app/components/ui/use-toast'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog'
@@ -54,14 +55,18 @@ fetch("/api/v2/orders_test/"+pass+"/U2/"+encodeURIComponent(design), {
     signal,
 });
 
-const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate, design, batchSeq) =>
-fetch("/api/v2/orders_test/"+pass+"/"+path+"/"+orderId+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design)+(Array.isArray(batchSeq) && batchSeq.length > 0 ? "?batchSeq="+batchSeq.join(',') : ""), {
+const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate, design, batchSeq, notes) => {
+    const searchParams = new URLSearchParams({ notes: notes || '' })
+    if (Array.isArray(batchSeq) && batchSeq.length > 0) searchParams.set('batchSeq', batchSeq.join(','))
+
+    return fetch("/api/v2/orders_test/"+pass+"/"+path+"/"+orderId+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design)+"?"+searchParams.toString(), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
     },
-});
+    })
+};
 
 const markOrderInReviewAPI = async (pass, orderId) =>
 fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId, {
@@ -123,6 +128,7 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
     const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
     const [selectedRes, setSelectedRes] = useState(null);
     const [approvalQty, setApprovalQty] = useState('');
+    const [orderNotes, setOrderNotes] = useState('')
     const [actionLoading, setActionLoading] = useState(false);
     const [reviewDesignQuery, setReviewDesignQuery] = useState('')
     const [reviewDesignResults, setReviewDesignResults] = useState([])
@@ -518,6 +524,7 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
         setSelectedRes(reviewRes);
 
         setApprovalQty(reviewRes.requestedQty); // Default to requested quantity
+        setOrderNotes(reviewRes.notes || '')
         setSelectedReviewDesign(reviewRes)
         setReviewDesignQuery('')
         setReviewDesignResults([])
@@ -718,6 +725,7 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                 dayjs().format('YYYY-MM-DD HH:mm:ss'),
                 selectedReviewDesign.design,
                 path === 'U0.2' && selectedRes.stockType === 'prm' ? getBatchAllocationPayload() : [],
+                orderNotes,
             );
             const queryResult = await result.json();
 
@@ -1238,6 +1246,23 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                     ) : null}
                     </>
                     ) : null}
+
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                            <Label htmlFor="review-order-notes">Notes</Label>
+                            <span className="text-xs text-slate-500">
+                                {isEditingOrderItem ? 'Saved with your next action' : 'Shown from the order item'}
+                            </span>
+                        </div>
+                        <Textarea
+                            id="review-order-notes"
+                            value={orderNotes}
+                            onChange={(event) => setOrderNotes(event.target.value)}
+                            placeholder="Add context for this order item"
+                            disabled={!isEditingOrderItem || actionLoading}
+                            className="min-h-[88px] resize-y"
+                        />
+                    </div>
 
                     {(!isEditingOrderItem || ['Submitted', 'InReview'].includes(selectedRes?.status)) ? (
                     <div className="rounded-lg border border-slate-200 bg-white">

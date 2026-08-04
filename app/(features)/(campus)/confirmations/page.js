@@ -32,6 +32,7 @@ const xlsx = require('xlsx');
 import { Toaster } from "../../../../app/components/ui/sonner"
 import { useToast } from "@/app/components/ui/use-toast"
 import { Button } from "@/app/components/ui/button"
+import { OperationProgress } from '@/app/components/operation-progress'
 import {
     Table,
     TableBody,
@@ -589,22 +590,7 @@ console.log(queryResult);
                     </SheetContent>
                 </Sheet>
 
-                {confirmationCreationLoading ? <Card className="w-[350px]">
-                    <CardHeader>
-                        <CardTitle>Creating ...</CardTitle>
-                        <CardDescription>Do not close</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form>
-                        <div className="grid w-full items-center gap-4">
-                            <div className="flex flex-col space-y-1.5">
-                                <Skeleton className="h-4 w-[100px] h-[20px]" />
-                            </div>
-                            
-                        </div>
-                        </form>
-                    </CardContent>
-                </Card> : null}
+                {confirmationCreationLoading ? <OperationProgress title="Creating confirmation" description="Saving the confirmation. Keep this page open." /> : null}
 
               <Toaster />
           </div>      
@@ -1029,4 +1015,3 @@ console.log(queryResult);
     
   );
 }
-

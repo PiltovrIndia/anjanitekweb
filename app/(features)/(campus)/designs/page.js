@@ -12,16 +12,17 @@ import { useRouter } from 'next/navigation'
 import { Toaster } from "../../../components/ui/sonner"
 import { useToast } from "@/app/components/ui/use-toast"
 import { Button } from '@/app/components/ui/button'
+import { OperationProgress } from '@/app/components/operation-progress'
 import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
-import { ArrowDown, ArrowUp, ArrowUpDown, CheckIcon, HeartIcon, Pencil, ScrollText, Search, Trash } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, CheckIcon, HeartIcon, Loader2, Pencil, ScrollText, Search, Trash } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
 import { Input } from '@/app/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/app/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/app/components/ui/dialog'
 import { Checkbox } from '@/app/components/ui/checkbox'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/app/components/ui/sheet'
 import { Label } from '@/app/components/ui/label'
@@ -32,10 +33,16 @@ import DesignOrdersDialog from './design_orders_sheet'
 const xlsx = require('xlsx');
 // Child references can also take paths delimited by '/'
 
+const normalizeSizeTagValue = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s*mm\s*$/, '')
+    .replace(/\s+/g, '');
+
 
 // get tags for the products
 const getTags = async (pass) => 
-    fetch("/api/v2/designs/"+pass+"/U0/", {
+    fetch("/api/v2/products/"+pass+"/U0/", {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -185,6 +192,11 @@ export default function Products() {
     const [deletingDesign, setDeletingDesign] = useState(false);
     const [newProductOn, setNewProductOn] = useState(false);
     const [creatingProduct, setCreatingProduct] = useState(false);
+    const [newDesignFile, setNewDesignFile] = useState(null);
+    const [newDesignType, setNewDesignType] = useState('1');
+    const [newDesignRows, setNewDesignRows] = useState([]);
+    const [newDesignUploadError, setNewDesignUploadError] = useState('');
+    const [downloadingDesigns, setDownloadingDesigns] = useState(false);
     const [offerCreationLoading, setOfferCreationLoading] = useState(false);
     const [tagUpdateKey, setTagUpdateKey] = useState(0);
 
@@ -400,6 +412,200 @@ export default function Products() {
             toast({
                 description: "Issue loading, try again later!",
               })
+        }
+    }
+
+    async function downloadAllDesigns() {
+        setDownloadingDesigns(true);
+
+        try {
+            const result = await getProducts(
+                process.env.NEXT_PUBLIC_API_PASS,
+                user?.role || 'superadmin',
+                0
+            );
+            const queryResult = await result.json();
+
+            if (queryResult.status !== 200) {
+                throw new Error(queryResult.message || 'Failed to fetch designs for download.');
+            }
+
+            const designs = Array.isArray(queryResult.data) ? queryResult.data : [];
+            if (designs.length === 0) {
+                toast({ description: 'No designs are available to download.' });
+                return;
+            }
+
+            const exportRows = designs.map((product) => ({
+                design: product.design || '-',
+                name: product.name || '-',
+                size: product.size || '-',
+                designType: Number(product.designType) === 1 ? 'ATL' : 'VCL',
+                // tags: product.tags || '-',
+                premiumStock: Number(product.prm || 0),
+                standardStock: Number(product.std || 0),
+                activeBatches: Number(product.activeBatches || 0),
+                orders: Number(product.orderCount || 0),
+                latestOrder: product.latestOrderOn ? dayjs(product.latestOrderOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+                // createdOn: product.createdOn ? dayjs(product.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',
+            }));
+            const worksheet = xlsx.utils.json_to_sheet(exportRows);
+            worksheet['!cols'] = [
+                { wch: 18 }, { wch: 32 }, { wch: 14 }, { wch: 12 }, { wch: 24 },
+                { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 21 }, { wch: 21 },
+            ];
+
+            const workbook = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(workbook, worksheet, 'Designs');
+            xlsx.writeFile(workbook, `designs_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`);
+
+            toast({ description: `${exportRows.length} designs downloaded successfully.` });
+        } catch (error) {
+            console.error('Error downloading designs:', error);
+            toast({ description: error.message || 'Failed to download designs.' });
+        } finally {
+            setDownloadingDesigns(false);
+        }
+    }
+
+    function resetNewDesignUpload() {
+        setNewDesignFile(null);
+        setNewDesignType('1');
+        setNewDesignRows([]);
+        setNewDesignUploadError('');
+    }
+
+    function handleNewDesignDialogChange(open) {
+        if (!open && !creatingProduct) {
+            resetNewDesignUpload();
+        }
+        setNewProductOn(open);
+    }
+
+    function handleNewDesignFileSelect(event) {
+        const selectedFile = event.target.files?.[0];
+        setNewDesignFile(selectedFile || null);
+        setNewDesignRows([]);
+        setNewDesignUploadError('');
+
+        if (!selectedFile) return;
+
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+            try {
+                const workbook = XLSX.read(loadEvent.target.result, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+
+                if (!firstSheetName) {
+                    throw new Error('The workbook does not contain a sheet.');
+                }
+
+                const spreadsheetRows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { defval: '' });
+                if (spreadsheetRows.length === 0) {
+                    throw new Error('The first sheet does not contain any designs.');
+                }
+
+                const headers = Object.keys(spreadsheetRows[0]).reduce((result, header) => {
+                    result[String(header).trim().toLowerCase()] = header;
+                    return result;
+                }, {});
+                const requiredColumns = ['design', 'name', 'size'];
+                const missingColumns = requiredColumns.filter((column) => !headers[column]);
+
+                if (missingColumns.length > 0) {
+                    throw new Error(`Missing required column${missingColumns.length > 1 ? 's' : ''}: ${missingColumns.join(', ')}.`);
+                }
+
+                const rows = spreadsheetRows.map((row, index) => ({
+                    rowNumber: index + 2,
+                    design: String(row[headers.design] ?? '').trim(),
+                    name: String(row[headers.name] ?? '').trim(),
+                    size: String(row[headers.size] ?? '').trim(),
+                })).filter((row) => row.design || row.name || row.size);
+
+                if (rows.length === 0) {
+                    throw new Error('The first sheet does not contain any usable design rows.');
+                }
+
+                const incompleteRow = rows.find((row) => !row.design || !row.name || !row.size);
+                if (incompleteRow) {
+                    throw new Error(`Row ${incompleteRow.rowNumber} must include design, name, and size.`);
+                }
+
+                const seenDesigns = new Set();
+                const duplicateDesign = rows.find((row) => {
+                    const key = row.design.toLowerCase();
+                    if (seenDesigns.has(key)) return true;
+                    seenDesigns.add(key);
+                    return false;
+                });
+                if (duplicateDesign) {
+                    throw new Error(`Design ${duplicateDesign.design} appears more than once in the sheet.`);
+                }
+
+                const sizeTags = tagsList.filter((tag) => String(tag.type || '').trim().toLowerCase() === 'size');
+                if (sizeTags.length === 0) {
+                    throw new Error('Size tags have not loaded yet. Please try again shortly.');
+                }
+
+                const unmatchedRow = rows.find((row) => !sizeTags.some((tag) => (
+                    normalizeSizeTagValue(tag.name) === normalizeSizeTagValue(row.size)
+                )));
+                if (unmatchedRow) {
+                    throw new Error(`Row ${unmatchedRow.rowNumber} has no matching size tag for "${unmatchedRow.size}".`);
+                }
+
+                setNewDesignRows(rows.map((row) => ({
+                    ...row,
+                    tagId: sizeTags.find((tag) => normalizeSizeTagValue(tag.name) === normalizeSizeTagValue(row.size)).tagId,
+                })));
+            } catch (error) {
+                setNewDesignFile(null);
+                setNewDesignUploadError(error.message || 'Could not read the workbook.');
+            }
+        };
+        reader.onerror = () => {
+            setNewDesignFile(null);
+            setNewDesignUploadError('Could not read the selected file.');
+        };
+        reader.readAsArrayBuffer(selectedFile);
+    }
+
+    async function createNewDesigns() {
+        if (newDesignRows.length === 0) {
+            setNewDesignUploadError('Select a valid spreadsheet before creating designs.');
+            return;
+        }
+
+        setCreatingProduct(true);
+        setNewDesignUploadError('');
+
+        try {
+            const response = await fetch(`/api/v2/products/${process.env.NEXT_PUBLIC_API_PASS}/U13`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    designType: Number(newDesignType),
+                    products: newDesignRows.map(({ design, name, size, tagId }) => ({ design, name, size, tagId })),
+                }),
+            });
+            const result = await response.json();
+
+            if (result.status !== 200 || !result.success) {
+                throw new Error(result.message || 'Could not create designs.');
+            }
+
+            toast({ description: `${result.createdCount} design${result.createdCount === 1 ? '' : 's'} created successfully.` });
+            resetNewDesignUpload();
+            setNewProductOn(false);
+            getAllProducts();
+        } catch (error) {
+            setNewDesignUploadError(error.message || 'Could not create designs.');
+        } finally {
+            setCreatingProduct(false);
         }
     }
     
@@ -930,6 +1136,99 @@ return (
     <div className={`${inter.className} flex flex-col flex-1 min-h-0 w-full overflow-y-auto`} style={{ gap: '8px' }}>
         <div className='flex flex-row gap-2 items-center py-4' >
               <h2 className="text-xl font-semibold mr-4">Designs</h2>
+
+              <Dialog open={newProductOn} onOpenChange={handleNewDesignDialogChange}>
+                    <DialogTrigger asChild>
+                        <Button size="xs" className="bg-blue-600 hover:bg-blue-700 text-white font-mono uppercase text-sm tracking-wider px-3 py-2">
+                            <Plus className="mr-2 h-4 w-4" />
+                            New Design
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>New designs</DialogTitle>
+                            <DialogDescription>
+                                Upload an Excel file whose first sheet contains the string columns design, name, and size. Each size is matched to its existing size tag, ignoring a trailing mm.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid gap-5 py-2">
+                            <div className="grid gap-2">
+                                <Label htmlFor="new-design-type">Design type</Label>
+                                <Select value={newDesignType} onValueChange={setNewDesignType} disabled={creatingProduct}>
+                                    <SelectTrigger id="new-design-type">
+                                        <SelectValue placeholder="Select design type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">ATL</SelectItem>
+                                        <SelectItem value="2">VCL</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <div className="flex items-center justify-between gap-3">
+                                    <Label htmlFor="new-design-file">Excel file</Label>
+                                    <Button asChild variant="link" size="sm" className="h-auto px-0 text-xs">
+                                        <a href="/design-upload-template.xlsx" download>
+                                            <ArrowDown className="mr-1 h-3.5 w-3.5" />
+                                            Download template
+                                        </a>
+                                    </Button>
+                                </div>
+                                <Input
+                                    id="new-design-file"
+                                    type="file"
+                                    accept=".xlsx,.xls"
+                                    onChange={handleNewDesignFileSelect}
+                                    disabled={creatingProduct}
+                                />
+                                {newDesignFile ? <p className="text-xs text-muted-foreground">{newDesignFile.name}</p> : null}
+                            </div>
+
+                            {newDesignUploadError ? <p role="alert" className="text-sm text-destructive">{newDesignUploadError}</p> : null}
+
+                            {newDesignRows.length > 0 ? (
+                                <div className="overflow-hidden rounded-md border">
+                                    <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2 text-sm">
+                                        <span className="font-medium">{newDesignRows.length} designs ready to create</span>
+                                        <span className="text-muted-foreground">{newDesignType === '1' ? 'ATL' : 'VCL'}</span>
+                                    </div>
+                                    <div className="max-h-56 overflow-y-auto">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Design</TableHead>
+                                                    <TableHead>Name</TableHead>
+                                                    <TableHead>Size</TableHead>
+                                                    <TableHead className="text-right">Tag ID</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {newDesignRows.map((row) => (
+                                                    <TableRow key={`${row.design}-${row.rowNumber}`}>
+                                                        <TableCell className="font-mono">{row.design}</TableCell>
+                                                        <TableCell>{row.name}</TableCell>
+                                                        <TableCell>{row.size}</TableCell>
+                                                        <TableCell className="text-right font-mono">{row.tagId}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => handleNewDesignDialogChange(false)} disabled={creatingProduct}>Cancel</Button>
+                            <Button onClick={createNewDesigns} disabled={creatingProduct || newDesignRows.length === 0}>
+                                {creatingProduct ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                                Create designs
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
               
               <Sheet>
                     <SheetTrigger asChild>
@@ -990,22 +1289,7 @@ return (
                 </Sheet>
 
 
-                {uploadProgress ? <Card className="w-[350px]">
-                    <CardHeader>
-                        <CardTitle>Uploading ...</CardTitle>
-                        <CardDescription>Do not close</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form>
-                        <div className="grid w-full items-center gap-4">
-                            <div className="flex flex-col space-y-1.5">
-                                <Skeleton className="h-4 w-[100px] h-[20px]" />
-                            </div>
-                            
-                        </div>
-                        </form>
-                    </CardContent>
-                </Card> : null}
+                {uploadProgress ? <OperationProgress title="Updating stock" description="Applying stock changes. Keep this page open." /> : null}
 
               <Toaster />
           </div>
@@ -1086,13 +1370,22 @@ return (
                         </Select>
                     }
                     
-                    <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button>
+                    <Button variant="outline" onClick={downloadAllDesigns} disabled={downloadingDesigns}>
+                        {downloadingDesigns ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDown className="mr-2 h-4 w-4" />}
+                        {downloadingDesigns ? 'Preparing export' : 'Download'}
+                    </Button>
                 </div>
                 {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> InOuting Students</Button> */}
                 {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> Download</Button> */}
             </div>
             : ''    
             }
+
+        {downloadingDesigns ? (
+            <div className="my-2 flex justify-end">
+                <OperationProgress title="Preparing designs export" description="Collecting every design for your download." />
+            </div>
+        ) : null}
 
         <Card>
             {/* <div> */}
@@ -1859,4 +2152,3 @@ return (
     </div>
 );
 }
-

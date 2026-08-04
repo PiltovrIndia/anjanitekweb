@@ -14,6 +14,7 @@ const client = new OneSignal.Client(process.env.ONE_SIGNAL_APPID, process.env.ON
 // U4 – Search user – by Username
 // U5 – Search user requests(active) – by CollegeId
 // U16 – Search user – by phoneNumber
+// U9.2 – Search active customers
 // U7.1 – Get the complete sales hierarchy for the web hierarchy explorer
 // U17 – Update approved contact fields or active state for a user
 export async function GET(request,{params}) {
@@ -769,6 +770,35 @@ export async function GET(request,{params}) {
                     }
                 } catch (error) { // error updating
                     return Response.json({status: 404, message:'No user found!'+error}, {status: 200})
+                }
+            }
+            // Search active customers by name, mobile number, or customer ID.
+            else if(params.ids[1] == 'U9.2'){
+                try {
+                    const searchTerm = decodeURIComponent(String(params.ids[2] || '')).trim()
+
+                    if (!searchTerm) {
+                        connection.release()
+                        return Response.json({status: 200, length: 0, data: [], message: 'No search term provided!'}, {status: 200})
+                    }
+
+                    const like = `%${searchTerm}%`
+                    const [rows] = await connection.execute(
+                        `SELECT id, name, mobile, email, designation, role, mapTo, relatedTo, isActive
+                         FROM user
+                         WHERE LOWER(role) = 'customer'
+                           AND isActive = 1
+                           AND (name LIKE ? OR id LIKE ? OR mobile LIKE ?)
+                         ORDER BY name ASC
+                         LIMIT 20`,
+                        [like, like, like]
+                    )
+
+                    connection.release()
+                    return Response.json({status: 200, length: rows.length, data: rows, message: rows.length ? 'Data found!' : 'No data found!'}, {status: 200})
+                } catch (error) {
+                    connection.release()
+                    return Response.json({status: 404, message:'No customer found!'+error}, {status: 200})
                 }
             }
             // update the mapping of the user

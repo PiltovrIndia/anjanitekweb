@@ -29,6 +29,7 @@ import {
     CardFooter,
     CardHeader,
     CardTitle, } from "@/app/components/ui/card"
+import { OperationProgress } from '@/app/components/operation-progress'
 import { Checkbox } from "@/app/components/ui/checkbox"
 const storage = getStorage(firebase, "gs://smartcampusimages-1.appspot.com");
 import Image from 'next/image'
@@ -1142,25 +1143,7 @@ const sendMessageNow = async (e) => {
                 </SheetContent>
             </Sheet>
 
-            {uploadProgress ? <Card className="w-[350px]">
-                <CardHeader>
-                    <CardTitle>Uploading ...</CardTitle>
-                    <CardDescription>Do not close</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form>
-                    <div className="grid w-full items-center gap-4">
-                        <div className="flex flex-col space-y-1.5">
-                            <Skeleton className="h-4 w-[100px] h-[20px]" />
-                        </div>
-                        
-                    </div>
-                    </form>
-                </CardContent>
-                {/* <CardFooter className="flex justify-between">
-                    <Button>Send messages</Button>
-                </CardFooter> */}
-            </Card> : null}
+            {uploadProgress ? <OperationProgress title="Uploading data" description="Processing your file. Keep this page open." /> : null}
             {/* {(!messaging) ?
               <Sheet>
                 <SheetTrigger asChild>
@@ -1585,4 +1568,3 @@ const sendMessageNow = async (e) => {
     
   );
 }
-
