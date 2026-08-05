@@ -27,6 +27,7 @@ import { Checkbox } from '@/app/components/ui/checkbox'
 import { Switch } from '@/app/components/ui/switch'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/app/components/ui/sheet'
 import { Label } from '@/app/components/ui/label'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog'
 import * as XLSX from 'xlsx';
 import StockOrderDialog from '../products/stock_order_dialog'
 
@@ -77,9 +78,10 @@ fetch("/api/v2/orders_test/"+pass+"/U2/"+encodeURIComponent(design), {
 });
 
 // update order status
-const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate, design, batchSeq, notes) => {
+const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate, design, batchSeq, notes, allocationMode) => {
 const searchParams = new URLSearchParams({ notes: notes || '' })
 if (Array.isArray(batchSeq) && batchSeq.length > 0) searchParams.set('batchSeq', batchSeq.join(','))
+if (allocationMode === 'production') searchParams.set('allocationMode', 'production')
 return fetch("/api/v2/orders_test/"+pass+"/"+path+"/"+orderId+"/"+qty+"/"+userId+"/"+actionDate+"/"+encodeURIComponent(design)+"?"+searchParams.toString(), {
     method: "GET",
     headers: {
@@ -173,6 +175,7 @@ export default function OrdersV2() {
     const [batchQtyById, setBatchQtyById] = useState({}) // admin-chosen qty per selected batch id
     const [orderAllocations, setOrderAllocations] = useState([]) // batches allocated to the approved order under review
     const [loadingOrderAllocations, setLoadingOrderAllocations] = useState(false)
+    const [showAutoApproveChoice, setShowAutoApproveChoice] = useState(false)
     const [saleOrderCartId, setSaleOrderCartId] = useState(null) // cartId currently being marked as Sale Order
     const reviewDesignTimer = useRef(null)
     const reviewDesignRef = useRef(null)
@@ -1084,7 +1087,11 @@ export default function OrdersV2() {
         }).filter((entry) => !entry.endsWith(':0'));
     }
 
-    async function submitApproval(status) {
+    function getApprovalStatus() {
+        return ['Approved', 'Modified', 'Rejected'].includes(selectedRes?.status) ? 'Modified' : 'Approved';
+    }
+
+    async function submitApproval(status, allocationMode) {
         if (!approvalQty || isNaN(approvalQty)) {
             toast({ description: "Please enter a valid quantity" });
             return;
@@ -1119,6 +1126,7 @@ export default function OrdersV2() {
                 selectedReviewDesign.design,
                 path === 'U0.2' && selectedRes.stockType === 'prm' ? getBatchAllocationPayload() : [],
                 orderNotes,
+                allocationMode,
             );
             const queryResult = await result.json();
 
@@ -2009,7 +2017,7 @@ return (
                                 <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                                     {batchSequence.length > 0
                                         ? 'Stock will be taken from the numbered batches in order; any remainder moves to production.'
-                                        : 'Tap batches to set the allocation order — otherwise stock is taken from the smallest batches first, and any excess moves to production.'}
+                                        : 'Tap batches to set the allocation order. Auto Approve lets you allocate available stock or send the full quantity to production.'}
                                 </div>
                             </>
                         )}
@@ -2116,29 +2124,17 @@ return (
                                 <Button variant="outline" onClick={() => setIsEditingOrderItem(false)} disabled={resLoading}>Cancel Edit</Button>
                             )}
 
-                            {/* {(selectedRes?.stockType === 'std' && Number(selectedReviewDesign?.std || 0) === 0) ?
-                            null :
-                            
-                                ( */}
-                                {/* prm: 'Auto Approve' (smallest batches first, leftover to production) when
-                                    nothing is selected; 'Approve' (selected batches only, shortfall to
-                                    production) once at least one batch is picked */}
-                                
-                                
-                                {
-                                    selectedRes?.stockType === 'prm' && batchSequence.length === 0 ?
-                                    (
-                                        <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
-                                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                                                Auto Approve
-                                        </Button>
-                                    ) : (
-                                        <Button className="bg-green-600 text-white" onClick={() => submitApproval((selectedRes?.status === 'Approved' || selectedRes?.status === 'Modified' || selectedRes?.status === 'Rejected') ? 'Modified' :'Approved')} disabled={resLoading}>
-                                            {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                                            Approve
-                                        </Button>
-                                    )
-                                }
+                            {selectedRes?.stockType === 'prm' && batchSequence.length === 0 ? (
+                                <Button className="bg-green-600 text-white" onClick={() => setShowAutoApproveChoice(true)} disabled={resLoading}>
+                                    {resLoading ? <SpinnerGap className="mr-2 animate-spin" /> : null}
+                                    Auto Approve
+                                </Button>
+                            ) : (
+                                <Button className="bg-green-600 text-white" onClick={() => submitApproval(getApprovalStatus())} disabled={resLoading}>
+                                    {resLoading ? <SpinnerGap className="mr-2 animate-spin" /> : null}
+                                    Approve
+                                </Button>
+                            )}
                                    
                            
                             
@@ -2165,6 +2161,25 @@ return (
                         </>
                     )}
                 </div>
+                <AlertDialog open={showAutoApproveChoice} onOpenChange={setShowAutoApproveChoice}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Choose PRM approval method</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Allocate available stock uses PRM batches, starting with the smallest suitable batch. Send to production reserves no batches and routes the full requested quantity to production.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="gap-2 sm:space-x-0">
+                            <AlertDialogCancel disabled={resLoading}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction className="bg-amber-600 text-white hover:bg-amber-700" onClick={() => submitApproval(getApprovalStatus(), 'production')} disabled={resLoading}>
+                                Send to production
+                            </AlertDialogAction>
+                            <AlertDialogAction className="bg-green-600 text-white hover:bg-green-700" onClick={() => submitApproval(getApprovalStatus())} disabled={resLoading}>
+                                Allocate stock
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </DialogContent>
           </Dialog>
           

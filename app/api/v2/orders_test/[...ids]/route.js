@@ -768,6 +768,8 @@ export async function GET(request,{params}) {
                 var adminId = params.ids[4];
                 var actionDate = params.ids[5];
                 const notes = getOrderNotes(request);
+                const allocationMode = getPrmAllocationMode(request);
+                const sendAllToProduction = allocationMode === 'production';
 
                 // optional admin-chosen batch allocation order (?batchSeq=id1,id2,... or id1:qty,id2:qty,...)
                 var batchSequence = [];
@@ -841,7 +843,9 @@ export async function GET(request,{params}) {
                         // when the admin manually picked batches, only their stock counts toward
                         // approvedQty — the rest of the design's stock is off-limits and any
                         // shortfall goes to production instead of being silently backfilled
-                        const availableStock = batchSequence.length > 0
+                        const availableStock = sendAllToProduction
+                            ? 0
+                            : batchSequence.length > 0
                             ? getManualBatchAvailableStock(batches, batchSequence)
                             : batches.reduce((sum, b) => sum + b.availableQty, 0);
 
@@ -975,7 +979,9 @@ export async function GET(request,{params}) {
                         // when the admin manually picked batches, only their stock counts toward
                         // approvedQty — the rest of the design's stock is off-limits and any
                         // shortfall goes to production instead of being silently backfilled
-                        const availableStock = batchSequence.length > 0
+                        const availableStock = sendAllToProduction
+                            ? 0
+                            : batchSequence.length > 0
                             ? getManualBatchAvailableStock(batches, batchSequence)
                             : batches.reduce((sum, b) => sum + b.availableQty, 0);
                         const requestedQty = Number(order.requestedQty || 0);
@@ -2952,5 +2958,15 @@ function getOrderNotes(request) {
     return notes ? notes.slice(0, 2000) : null;
   } catch (_) {
     return undefined;
+  }
+}
+
+function getPrmAllocationMode(request) {
+  try {
+    return new URL(request.url).searchParams.get('allocationMode') === 'production'
+      ? 'production'
+      : 'allocate';
+  } catch (_) {
+    return 'allocate';
   }
 }
