@@ -600,6 +600,7 @@ export default function OrdersV2() {
                 batchNo,
                 stockType: res.stockType || '-',
                 waitlistPosition: res.waitlistPosition || res.waitlistSequence || '-',
+                notes: res.notes || '-',
                 size: res.size || '-',
                 status: res.status || '-',
                 submittedOn: res.createdOn ? dayjs(res.createdOn).format('YYYY-MM-DD HH:mm:ss') : '-',

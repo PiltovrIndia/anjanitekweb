@@ -60,6 +60,15 @@ fetch("/api/v2/designs/"+pass+"/U1.1/"+role+"/"+offset, {
     },
 });
 
+const getProductsWithBatches = async (pass) =>
+fetch("/api/v2/designs/"+pass+"/U13", {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
 // update product
 const upateProduct = async (pass, productId, tags, size) => 
 fetch("/api/v2/designs/"+pass+"/U5/"+productId+"/"+tags+"/"+size, {
@@ -197,6 +206,7 @@ export default function Products() {
     const [newDesignRows, setNewDesignRows] = useState([]);
     const [newDesignUploadError, setNewDesignUploadError] = useState('');
     const [downloadingDesigns, setDownloadingDesigns] = useState(false);
+    const [downloadingDesignsWithBatches, setDownloadingDesignsWithBatches] = useState(false);
     const [offerCreationLoading, setOfferCreationLoading] = useState(false);
     const [tagUpdateKey, setTagUpdateKey] = useState(0);
 
@@ -465,6 +475,62 @@ export default function Products() {
             toast({ description: error.message || 'Failed to download designs.' });
         } finally {
             setDownloadingDesigns(false);
+        }
+    }
+
+    async function downloadDesignsWithBatches() {
+        setDownloadingDesignsWithBatches(true);
+
+        try {
+            const result = await getProductsWithBatches(process.env.NEXT_PUBLIC_API_PASS);
+            const queryResult = await result.json();
+
+            if (queryResult.status !== 200) {
+                throw new Error(queryResult.message || 'Failed to fetch design batches for download.');
+            }
+
+            const rows = Array.isArray(queryResult.data) ? queryResult.data : [];
+            if (rows.length === 0) {
+                toast({ description: 'No design stock is ready to download.' });
+                return;
+            }
+
+            const exportRows = rows.map((product) => {
+                const initialQty = Number(product.initialQty || 0);
+                const availableQty = Number(product.availableQty || 0);
+                const isPremium = product.stockType === 'prm';
+
+                return {
+                    design: product.design || '-',
+                    stockType: product.stockType || '-',
+                    stockQty: Number(product.stockQty || 0),
+                    batchNo: isPremium ? (product.batchId || '(unnamed)') : '',
+                    batchReceivedOn: isPremium && product.receivedOn ? dayjs(product.receivedOn).format('YYYY-MM-DD') : '',
+                    batchInitialQty: isPremium ? initialQty : '',
+                    batchAllocatedQty: isPremium ? Math.max(0, initialQty - availableQty) : '',
+                    batchAvailableQty: isPremium ? availableQty : '',
+                    batchStatus: isPremium ? (product.batchStatus || '-') : '',
+                };
+            });
+
+            const worksheet = xlsx.utils.json_to_sheet(exportRows);
+            worksheet['!cols'] = [
+                { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 21 },
+                { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 14 },
+            ];
+
+            const workbook = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(workbook, worksheet, 'Design Batches');
+            xlsx.writeFile(workbook, `designs_with_batches_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`);
+
+            const designCount = new Set(rows.map((row) => row.design)).size;
+            const batchCount = rows.filter((row) => row.stockType === 'prm').length;
+            toast({ description: `${designCount} designs and ${batchCount} available batches downloaded successfully.` });
+        } catch (error) {
+            console.error('Error downloading designs with batches:', error);
+            toast({ description: error.message || 'Failed to download designs with batches.' });
+        } finally {
+            setDownloadingDesignsWithBatches(false);
         }
     }
 
@@ -1370,9 +1436,13 @@ return (
                         </Select>
                     }
                     
-                    <Button variant="outline" onClick={downloadAllDesigns} disabled={downloadingDesigns}>
+                    <Button variant="outline" onClick={downloadAllDesigns} disabled={downloadingDesigns || downloadingDesignsWithBatches}>
                         {downloadingDesigns ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDown className="mr-2 h-4 w-4" />}
                         {downloadingDesigns ? 'Preparing export' : 'Download'}
+                    </Button>
+                    <Button variant="outline" onClick={downloadDesignsWithBatches} disabled={downloadingDesigns || downloadingDesignsWithBatches}>
+                        {downloadingDesignsWithBatches ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDown className="mr-2 h-4 w-4" />}
+                        {downloadingDesignsWithBatches ? 'Preparing export' : 'Download with batches'}
                     </Button>
                 </div>
                 {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> InOuting Students</Button> */}
@@ -1381,9 +1451,12 @@ return (
             : ''    
             }
 
-        {downloadingDesigns ? (
+        {downloadingDesigns || downloadingDesignsWithBatches ? (
             <div className="my-2 flex justify-end">
-                <OperationProgress title="Preparing designs export" description="Collecting every design for your download." />
+                <OperationProgress
+                    title={downloadingDesignsWithBatches ? 'Preparing design and batch export' : 'Preparing designs export'}
+                    description={downloadingDesignsWithBatches ? 'Collecting every design, its standard stock, and available premium batches.' : 'Collecting every design for your download.'}
+                />
             </div>
         ) : null}
 

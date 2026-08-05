@@ -341,6 +341,51 @@ export async function GET(request,{params}) {
                 }
             }
 
+            // Export-ready stock list: a standard row for every design and one row per non-empty PRM batch.
+            else if(params.ids[1] == 'U13'){
+                try {
+                    const [rows] = await connection.execute(
+                        `SELECT
+                            p.design,
+                            'std' AS stockType,
+                            p.std AS stockQty,
+                            NULL AS batchId,
+                            NULL AS initialQty,
+                            NULL AS availableQty,
+                            NULL AS batchStatus,
+                            NULL AS receivedOn,
+                            NULL AS stockBatchId
+                         FROM products p
+                         WHERE p.isActive = 1
+                         UNION ALL
+                         SELECT
+                            p.design,
+                            'prm' AS stockType,
+                            batches.availableQty AS stockQty,
+                            batches.batchId,
+                            batches.initialQty,
+                            batches.availableQty,
+                            batches.status AS batchStatus,
+                            batches.receivedOn,
+                            batches.id AS stockBatchId
+                         FROM products p
+                         INNER JOIN product_stock_batches batches
+                            ON batches.design = p.design
+                            AND batches.stockType = 'prm'
+                            AND batches.status != 'Cancelled'
+                            AND batches.availableQty > 0
+                         WHERE p.isActive = 1
+                         ORDER BY design ASC, stockType ASC, receivedOn ASC, stockBatchId ASC`
+                    )
+                    connection.release()
+
+                    return Response.json({status: 200, data: rows, message: rows.length ? 'Data found!' : 'No batches found!'}, {status: 200})
+                } catch (error) {
+                    connection.release()
+                    return Response.json({status: 404, message:'No batches found!'+error}, {status: 200})
+                }
+            }
+
             else {
                 return Response.json({status: 404, message:'No product found!'}, {status: 200})
             }
