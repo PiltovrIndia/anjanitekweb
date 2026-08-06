@@ -2,8 +2,10 @@
 
 import Image from "next/image"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import {
   BarChart3,
+  BookOpen,
   CheckCircle,
   FileText,
   LayoutDashboard,
@@ -99,6 +101,8 @@ export function AppSidebar({ userData, ...props }) {
   const sidebarUser = buildSidebarUser(userData)
   const sections = getNavigationSections(userData?.role)
   const homeHref = getHomeHref(userData?.role)
+  const pathname = usePathname()
+  const isDocumentationActive = pathname === "/documentation"
 
   return (
     <Sidebar variant="inset" collapsible="icon" {...props}>
@@ -123,6 +127,21 @@ export function AppSidebar({ userData, ...props }) {
         <NavMain sections={sections} />
       </SidebarContent>
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip="Documentation"
+              isActive={isDocumentationActive}
+              className="data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:hover:bg-sidebar-primary data-[active=true]:hover:text-sidebar-primary-foreground"
+            >
+              <Link href="/documentation">
+                <BookOpen />
+                <span>Documentation</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <NavUser user={sidebarUser} />
       </SidebarFooter>
       <SidebarRail />

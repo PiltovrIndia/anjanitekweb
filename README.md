@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+## Workspace Documentation
+
+User-facing changes must update the in-app Workspace guide in the same change. See [Workspace Documentation Maintenance](docs/WORKSPACE_DOCUMENTATION.md) for the required checklist and the canonical guide location.
+
 ## Getting Started
 
 First, run the development server:
