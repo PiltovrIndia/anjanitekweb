@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,} from "@/app/components/ui/dialog"
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger,} from "@/app/components/ui/drawer"
 import { Separator } from "@/app/components/ui/separator"
+import { Badge } from "@/app/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group"
 import { Label } from "@/app/components/ui/label"
 import { Skeleton } from "@/app/components/ui/skeleton"
@@ -85,6 +86,90 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/pop
 import { Calendar } from '@/app/components/ui/calendar';
 // Child references can also take paths delimited by '/'
 const spaceRef = ref(storage, '/');
+
+function OutstandingSummaryCards({ summary, formatter, dateScoped = false }) {
+    if (!summary) {
+        return (
+            <Card className="w-full shadow-none">
+                <CardContent className="flex min-h-[132px] items-center justify-center text-sm text-muted-foreground">
+                    No outstanding data is available for this selection.
+                </CardContent>
+            </Card>
+        )
+    }
+
+    const atlOutstanding = Number(summary.pendingATL || 0)
+    const vclOutstanding = Number(summary.pendingVCL || 0)
+    const totalOutstanding = atlOutstanding + vclOutstanding
+    const dueDealers = Number(summary.dealersDue || 0)
+    const totalDealers = Number(summary.dealers || 0)
+    const metrics = [
+        {
+            label: 'Total outstanding',
+            value: `₹${formatter.format(totalOutstanding)}`,
+            detail: 'ATL and VCL combined',
+            badge: 'Current view',
+            className: 'border-slate-200 bg-card',
+        },
+        {
+            label: 'ATL outstanding',
+            value: `₹${formatter.format(atlOutstanding)}`,
+            detail: 'Pending ATL invoice value',
+            badge: 'ATL',
+            className: 'border-rose-200 bg-rose-50/40',
+            badgeClassName: 'border-rose-200 bg-rose-100 text-rose-700',
+        },
+        {
+            label: 'VCL outstanding',
+            value: `₹${formatter.format(vclOutstanding)}`,
+            detail: 'Pending VCL invoice value',
+            badge: 'VCL',
+            className: 'border-orange-200 bg-orange-50/40',
+            badgeClassName: 'border-orange-200 bg-orange-100 text-orange-700',
+        },
+        {
+            label: 'Pending invoices',
+            value: Number(summary.invoices || 0).toLocaleString('en-IN'),
+            detail: 'Invoices awaiting payment',
+            badge: 'Invoices',
+            className: 'border-blue-200 bg-blue-50/40',
+            badgeClassName: 'border-blue-200 bg-blue-100 text-blue-700',
+        },
+        {
+            label: dateScoped ? 'Dealers due' : 'Dealers due / total',
+            value: dateScoped ? dueDealers.toLocaleString('en-IN') : `${dueDealers.toLocaleString('en-IN')} / ${totalDealers.toLocaleString('en-IN')}`,
+            detail: dateScoped ? 'Dealers due on the selected date' : 'Dealers requiring payment follow-up',
+            badge: 'Dealers',
+            className: 'border-amber-200 bg-amber-50/40',
+            badgeClassName: 'border-amber-200 bg-amber-100 text-amber-800',
+        },
+    ]
+
+    return (
+        <div className="grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {metrics.map((metric) => (
+                <Card key={metric.label} className={`min-h-[144px] shadow-none ${metric.className}`}>
+                    <CardHeader className="flex-row items-start justify-between space-y-0 p-4 pb-2">
+                        <CardDescription className="pr-2 text-xs font-medium leading-5 text-foreground/70">{metric.label}</CardDescription>
+                        <Badge variant="outline" className={`shrink-0 text-[11px] ${metric.badgeClassName || 'bg-background/70 text-muted-foreground'}`}>{metric.badge}</Badge>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-1">
+                        <p className="text-xl font-semibold tracking-normal text-foreground">{metric.value}</p>
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">{metric.detail}</p>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    )
+}
+
+function OutstandingSummarySkeleton() {
+    return (
+        <div className="grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-36 w-full" />)}
+        </div>
+    )
+}
 
 // get dealer count by location
 const getStats = async (pass, role, id) => 
@@ -269,6 +354,8 @@ export default function Outing() {
         minimumFractionDigits: 2,  // Minimum number of digits after the decimal
         maximumFractionDigits: 2   // Maximum number of digits after the decimal
     });
+    const currentRegionSummary = regionsList.find((item) => item.state === currentState) || regionsList[0] || null
+    const selectedDateSummary = outstandingListByDate.find((item) => item.state === currentState) || outstandingListByDate[0] || null
 
     ///////////////////////////////
     // IMPORTANT
@@ -476,8 +563,9 @@ export default function Outing() {
 }
 
 const handleDateChange = (date) => {
-    setSelectedDate(dayjs(date).format('YYYY-MM-DD'));
-    getDealerStatsByDate();
+    if (date) {
+        setSelectedDate(dayjs(date).format('YYYY-MM-DD'));
+    }
 };
 
     async function getDealerStatsByDate(){
@@ -1024,7 +1112,7 @@ const sendMessageNow = async (e) => {
             
         //   <div style={{height:'8vh',display:'flex',flexDirection:'column',justifyContent:'space-around'}}>
 
-        <div  className={inter.className} style={{display:'flex',flexDirection:'row', alignItems:'flex-start',height:'100vh',gap:'8px'}}>
+        <div className={`${inter.className} flex min-h-full w-full items-start gap-4`}>
             
             
           {/* <div className='flex flex-row gap-2 items-center py-4' >
@@ -1086,9 +1174,9 @@ const sendMessageNow = async (e) => {
            
           
          
-    <div className={styles.verticalsection} style={{height:'90vh', width:'100%',gap:'8px',overflow: 'auto', scrollBehavior:'smooth'}}>
+    <div className="flex min-h-full min-w-0 flex-1 flex-col gap-6 pb-6">
 
-    <div className='flex flex-row gap-2 items-center py-4' >
+    <div className='flex min-h-[72px] w-full flex-wrap items-center gap-3' >
         <h2 className="text-lg font-semibold mr-4">Dashboard</h2>
 
             {/* <Sheet>
@@ -1179,211 +1267,93 @@ const sendMessageNow = async (e) => {
               <Toaster />
           </div>
 
-        {(viewTypeSelection == 'college') ? 
-            <div className="flex items-center py-2" style={{gap:'10px'}}>       
-            </div>
-        :
-            <div className="flex items-center py-2" style={{gap:'10px'}}>
-            </div>
-        }
+       
 
 
 
 {/* {(allRequests.length !=0) ? */}
-<div className="mx-auto" style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',gap:'10px'}}>
+<section className="flex w-full min-w-0 flex-col gap-6">
 {/* <div className="container mx-auto py-10"> */}
 {/* <div>{allRequests.length}</div> */}
     
-<div className={cn("grid gap-2 mb-4")} style={{display:'flex', flexDirection:'column', alignItems:'start'}}>
-<p className='font-bold text-black text-xl mb-4'>Total Outstanding</p>
-<Tabs defaultValue={currentState} className="w-[400px]">
-    <TabsList>
-      {/* <TabsTrigger value="All" onClick={()=>updateStatus('All')}>All States</TabsTrigger> */}
-
-      {regionsList.map(regionItem => (
-        <TabsTrigger key={regionItem.state} value={regionItem.state} onClick={()=>updateStatus(regionItem.state)}>{regionItem.state}</TabsTrigger>
-        // <TabsTrigger value={regionItem.state} onClick={()=>updateStatus(regionItem.state)}>{regionItem.state.split('-')[1]}</TabsTrigger>
-      ))}
-    </TabsList>
-  </Tabs>
-
-
-    {searchingStats ? <Skeleton className="h-4 w-[300px] h-[100px]" /> :
-        <div className="flex flex-col gap-2 mb-4" >
-            
-            {(regionsList.length > 0) ?
-                <div  className="flex flex-row gap-2">
-                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
-                        <div className="flex flex-row gap-2 items-center">
-                            <p className='text-s text-gray-600 font-normal'>Total Outstanding</p>
-                        </div>
-                        <p className='text-xl text-black font-semibold tracking-wider'>₹{formatter.format(regionsList.find(item => item.state === currentState).pendingATL + regionsList.find(item => item.state === currentState).pendingVCL)}</p>
-                    </Card>
-                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
-                        <div className="flex flex-row gap-2 items-center">
-                            <p className='text-s text-gray-600 font-normal'>Outstanding </p>
-                            <div className="text-sm font-semibold bg-rose-500 text-rose-100 px-1.5 w-fit border border-rose-600 rounded-2xl tracking-wider">
-                                ATL
-                            </div>
-                        </div>
-                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>₹{formatter.format(regionsList.find(item => item.state === currentState).pendingATL)}</p>
-                    </Card>
-                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={1}>
-                        <div className="flex flex-row gap-2 items-center">
-                            <p className='text-s text-gray-600 font-normal'>Outstanding </p>
-                            <div className="text-sm font-semibold bg-red-700 text-red-100 px-1.5 w-fit border border-red-800 rounded-2xl tracking-wider">
-                                VCL
-                            </div>
-                        </div>
-                        <p className='text-xl text-red-700 font-semibold tracking-wider'>₹{formatter.format(regionsList.find(item => item.state === currentState).pendingVCL)}</p>
-                    </Card>
-                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={2}>
-                        <p className='text-s text-gray-600 font-normal'>Pending Invoices</p>
-                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).invoices}</p>
-                    </Card>
-                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={3}>
-                        <p className='text-s text-gray-600 font-normal'>Due / Total Dealers</p>
-                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).dealersDue} / {regionsList.find(item => item.state === currentState).dealers}</p>
-                    </Card>
-                    {/* <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={4}>
-                        <p className='text-s text-gray-600 font-normal'>Total Dealers</p>
-                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).dealers}</p>
-                    </Card> */}
-                </div>
-                    : null}
+<section className="space-y-4">
+    <div className="flex flex-col gap-3 lg:flex-col lg:items-start lg:justify-between">
+        <div >
+            <p className="text-sm font-semibold">Total outstanding</p>
+            <p className="mt-1 text-sm text-muted-foreground">Outstanding invoice value for the selected state.</p>
         </div>
-            }
-</div>
-            <Separator/>
+        <Tabs value={currentState} onValueChange={updateStatus} className="w-full lg:w-auto">
+            <TabsList className="w-full justify-start overflow-x-auto lg:w-auto">
+                {regionsList.map(regionItem => <TabsTrigger key={regionItem.state} value={regionItem.state}>{regionItem.state}</TabsTrigger>)}
+            </TabsList>
+        </Tabs>
+    </div>
+    {searchingStats ? <OutstandingSummarySkeleton /> : <OutstandingSummaryCards summary={currentRegionSummary} formatter={formatter} />}
+</section>
 
+<Separator/>
+
+<section className="space-y-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p className="text-sm font-semibold">Outstanding by date</p>
+            <p className="mt-1 text-sm text-muted-foreground">Choose a date to see the payment exposure due on that day.</p>
+        </div>
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    className={cn("w-full justify-start text-left font-normal sm:w-[280px]", !selectedDate && "text-muted-foreground")}
+                >
+                    <CalendarBlank className="mr-2 h-4 w-4" />
+                    {selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : <span>Pick a date</span>}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-4">
+                <Calendar mode="single" selected={selectedDate} onSelect={handleDateChange} initialFocus />
+                <Button type="button" className="mt-3 w-full" onClick={getDealerStatsByDate}>Apply date</Button>
+            </PopoverContent>
+        </Popover>
+    </div>
+    {searchingStatsByDate ? <OutstandingSummarySkeleton /> : <OutstandingSummaryCards summary={selectedDateSummary} formatter={formatter} dateScoped />}
+</section>
+
+<Separator/>
+        
+        <section className="space-y-4">
             <div>
-                <p className='font-bold text-black text-xl my-4'>Outstanding by date <span className='text-slate-600 text-sm font-normal'>(Choose a date)</span></p>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button
-                        variant={"outline"}
-                        className={cn(
-                            "w-[280px] justify-start text-left font-normal",
-                            !selectedDate && "text-muted-foreground"
+                <p className="text-sm font-semibold">Outstanding dealers by days</p>
+                <p className="mt-1 text-sm text-muted-foreground">Set the due window, then load the dealer list that needs follow-up.</p>
+            </div>
+            <Card className="w-full shadow-none">
+                <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-end">
+                    <div className="min-w-0 flex-1">
+                        {days === 0 ? (
+                            <p className="mb-4 text-sm font-medium text-destructive">Dealers with an expired due date</p>
+                        ) : (
+                            <p className="mb-4 text-sm text-muted-foreground">Dealers with due in <span className="font-semibold text-foreground">{days} days</span></p>
                         )}
-                        >
-                        <CalendarBlank className="mr-2 h-4 w-4" />
-                        {selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : <span>Pick a date</span>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-4">
-                        <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={handleDateChange}
-                        initialFocus
+                        <Slider
+                            max={100}
+                            step={1}
+                            value={[days]}
+                            onValueChange={updateDays}
+                            className="relative z-10"
+                            aria-label="Due days from 0 to 100"
                         />
-                        <Button type="submit" onClick={getDealerStatsByDate}>Submit</Button>
-                    </PopoverContent>
-                    </Popover>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {searching ? <span className="flex items-center gap-2 text-sm text-muted-foreground"><SpinnerGap className={`${styles.icon} ${styles.load}`} /> Loading dealers</span> : null}
+                        <Button size="sm" onClick={() => getAllRequests(days, currentState)} disabled={searching}>Apply</Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </section>
 
-
-
-
-                    {searchingStatsByDate ? <Skeleton className="h-4 w-[300px] h-[100px] mt-2" /> :
-                        <div className="flex flex-col gap-2 mt-2 mb-4" >
-                            
-                            {(outstandingListByDate.length > 0) ?
-                                <div  className="flex flex-row gap-2">
-                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
-                                        <div className="flex flex-row gap-2 items-center">
-                                            <p className='text-s text-gray-600 font-normal'>Total Outstanding</p>
-                                        </div>
-                                        <p className='text-xl text-black font-semibold tracking-wider'>₹{formatter.format(outstandingListByDate.find(item => item.state === currentState).pendingATL + outstandingListByDate.find(item => item.state === currentState).pendingVCL)}</p>
-                                    </Card>
-                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={0}>
-                                        <div className="flex flex-row gap-2 items-center">
-                                            <p className='text-s text-gray-600 font-normal'>Outstanding </p>
-                                            <div className="text-sm font-semibold bg-rose-500 text-rose-100 px-1.5 w-fit border border-rose-600 rounded-2xl tracking-wider">
-                                                ATL
-                                            </div>
-                                        </div>
-                                        <p className='text-xl text-rose-500 font-semibold tracking-wider'>₹{formatter.format(outstandingListByDate.find(item => item.state === currentState).pendingATL)}</p>
-                                    </Card>
-                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={1}>
-                                        <div className="flex flex-row gap-2 items-center">
-                                            <p className='text-s text-gray-600 font-normal'>Outstanding </p>
-                                            <div className="text-sm font-semibold bg-red-700 text-red-100 px-1.5 w-fit border border-red-800 rounded-2xl tracking-wider">
-                                                VCL
-                                            </div>
-                                        </div>
-                                        <p className='text-xl text-red-700 font-semibold tracking-wider'>₹{formatter.format(outstandingListByDate.find(item => item.state === currentState).pendingVCL)}</p>
-                                    </Card>
-                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={2}>
-                                        <p className='text-s text-gray-600 font-normal'>Pending Invoices</p>
-                                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{outstandingListByDate.find(item => item.state === currentState).invoices}</p>
-                                    </Card>
-                                    <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={3}>
-                                        <p className='text-s text-gray-600 font-normal'>Dealers Due</p>
-                                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{outstandingListByDate.find(item => item.state === currentState).dealersDue} </p>
-                                    </Card>
-                                    {/* <Card className="w-[200px] px-3 py-3 flex flex-col gap-4" key={4}>
-                                        <p className='text-s text-gray-600 font-normal'>Total Dealers</p>
-                                        <p className='text-xl text-black-700 font-semibold tracking-wider'>{regionsList.find(item => item.state === currentState).dealers}</p>
-                                    </Card> */}
-                                </div>
-                                    : null}
-                        </div>
-                            }
-            </div>
-            
-            <Separator/>
-        
-            <p className='font-bold text-black text-xl my-4'>Outstanding Dealers by days</p>
-        <Card className="w-fit px-3 py-3 flex flex-row justify-between items-center gap-8">
-            
-            <div>
-            
-                {/* <p className='text-m text-green-700'>{regionItem.state.split('-')[1]}</p>
-                <Label className='text-l font-semibold'>₹{formatter.format(regionItem.pending)}</Label> */}
-                {days == 0 ?
-                    <p className="text-m font-semibold text-red-600 pb-4">Dealers with due date expired</p>
-                    :
-                    <p className="text-m text-slate-500 pb-4">Dealers with due in:<span className="text-red-600 font-semibold"> {days} days</span></p>
-                }
-                <Slider 
-                    // defaultValue={[45]} 
-                    max={100} 
-                    step={1} 
-                    value={[days]}
-                    onValueChange={updateDays}
-                    className="relative z-10"
-                    aria-label="Counter from 0 to 100"
-                    />
-            </div>
-            <Button variant="outline" className="bg-black text-white" size="sm" onClick={() => getAllRequests(days, currentState)} >Apply</Button>
-            {searching ? 
-            <div className="flex flex-row px-4">    
-                <SpinnerGap className={`${styles.icon} ${styles.load}`} /> &nbsp;
-                <p className='text-black '>Loading...</p> 
-            </div>
-            :
-            ''}
-            
-        </Card>
-
-        {/* <p className="text-m text-slate-500">Due in {days} days</p>
-            <Slider 
-                // defaultValue={[45]} 
-                max={100} 
-                step={1} 
-                value={[days]}
-                onValueChange={updateDays}
-                className="relative z-10"
-                aria-label="Counter from 0 to 100"
-                /> */}
-        
-        <div className="flex flex-row">
-
+        <section className="min-w-0">
             <DataTable data={allRequests} dataOffset={offset} status={currentState} changeSelectedDealer={selectDealer} showPaymentView={selectPaymentView} downloadNow={downloadRequestsNow} requestAgain={updateOffset} loadingIds={loadingIds} handleMessageSendClick={handleMessageSendClick}/>
-        
-        
-      </div>
+        </section>
+      </section>
       {/* <DataTable columns={columns} data={allRequests} status={currentState} changeStatus={updateStatus} downloadNow={downloadRequestsNow} initialDates={initialDatesValues} dates={changeDatesSelection} requestAgain={updateOffset}/> */}
       
     </div>
@@ -1455,9 +1425,6 @@ const sendMessageNow = async (e) => {
         {/* </div> */}
                
                 
-        </div>
-
-
         {!searching && showMessageView && allRequests.length > 0 ?
             <div className="flex flex-col flex-1 rounded-md border p-4 gap-4 min-w-96" style={{height: '90vh',position: 'sticky'}}>
                 <div className="flex flex-1 flex-col gap-2">
