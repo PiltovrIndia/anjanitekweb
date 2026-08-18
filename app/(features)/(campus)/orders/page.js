@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/app/components/ui/dialog'
 import { Checkbox } from '@/app/components/ui/checkbox'
 import { Switch } from '@/app/components/ui/switch'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/app/components/ui/hover-card'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/app/components/ui/sheet'
 import { Label } from '@/app/components/ui/label'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog'
@@ -37,24 +38,32 @@ const xlsx = require('xlsx');
 const ORDER_PAGE_SIZE = 0;
 
 // get orders
-const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction) => 
-fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction, {
+const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', signal) => {
+const searchParams = new URLSearchParams()
+if (search.trim()) searchParams.set('search', search.trim())
+return fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
     },
+    signal,
 });
+};
 
 // get waitlisted order items, grouped by cart
-const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction) =>
-fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction, {
+const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', signal) => {
+const searchParams = new URLSearchParams()
+if (search.trim()) searchParams.set('search', search.trim())
+return fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
     },
+    signal,
 });
+};
 
 // get report specific listing
 const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction) =>
@@ -111,6 +120,40 @@ fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId, {
     },
 });
 
+function OrderNotesPreview({ entries = [] }) {
+    if (entries.length === 0) {
+        return <span className="text-xs text-slate-300">-</span>;
+    }
+
+    const preview = entries.length === 1 ? entries[0].note : `${entries.length} notes`;
+
+    return (
+        <HoverCard openDelay={250} closeDelay={100}>
+            <HoverCardTrigger asChild>
+                <button
+                    type="button"
+                    className="block max-w-40 truncate text-left text-xs text-slate-500 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                    onClick={(event) => event.stopPropagation()}
+                    aria-label="View order notes"
+                >
+                    {preview}
+                </button>
+            </HoverCardTrigger>
+            <HoverCardContent align="start" className="w-80 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Notes</div>
+                <div className="max-h-56 space-y-3 overflow-y-auto pr-1">
+                    {entries.map((entry) => (
+                        <div key={entry.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                            {entry.label ? <div className="mb-1 text-xs font-medium text-slate-700">{entry.label}</div> : null}
+                            <p className="whitespace-pre-wrap break-words text-sm leading-5 text-slate-600">{entry.note}</p>
+                        </div>
+                    ))}
+                </div>
+            </HoverCardContent>
+        </HoverCard>
+    );
+}
+
 // pass state variable and the method to update state variable
 export default function OrdersV2() {
     
@@ -137,12 +180,15 @@ export default function OrdersV2() {
     const [totalOrders, setTotalOrders] = useState(0);
     const [orders, setOrders] = useState([]);
     const [resLoading, setResLoading] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [showWaitlist, setShowWaitlist] = useState(false);
     const [isProduction, setisProduction] = useState('All');
     const [downloadingOrders, setDownloadingOrders] = useState(false);
     const [resOffset, setResOffset] = useState(0);
     const [resStatus, setResStatus] = useState('All');
     const [resSearch, setResSearch] = useState('');
+    const [activeSearchQuery, setActiveSearchQuery] = useState('');
+    const [isSearchingOrders, setIsSearchingOrders] = useState(false);
     const [downloadFromDate, setDownloadFromDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
     const [downloadToDate, setDownloadToDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [showDownloadPopover, setShowDownloadPopover] = useState(false);
@@ -181,6 +227,10 @@ export default function OrdersV2() {
     const reviewDesignRef = useRef(null)
     const ordersEndRef = useRef(null)
     const loadMoreOrdersRef = useRef(null)
+    const isLoadingMoreRef = useRef(false)
+    const orderSearchTimerRef = useRef(null)
+    const orderSearchControllerRef = useRef(null)
+    const ordersRequestVersionRef = useRef(0)
 
     // var groupedTags = [];
     const [imgSrc, setImgSrc] = useState(``);
@@ -525,23 +575,49 @@ export default function OrdersV2() {
         return status || '-'
     }
 
-    async function getOrders(val, offsetR, userObj = user, productionFilter = isProduction, append = false, waitlistOnly = showWaitlist){
-        
-        
-        setResLoading(true);
+    async function getOrders(
+        val,
+        offsetR,
+        userObj = user,
+        productionFilter = isProduction,
+        append = false,
+        waitlistOnly = showWaitlist,
+        searchQuery = activeSearchQuery,
+        { signal, keepRows = false } = {}
+    ){
+        const requestVersion = append ? ordersRequestVersionRef.current : ordersRequestVersionRef.current + 1;
+        if (!append) {
+            ordersRequestVersionRef.current = requestVersion;
+            isLoadingMoreRef.current = false;
+            setIsLoadingMore(false);
+            if (keepRows) setResLoading(false);
+            else setIsSearchingOrders(false);
+        }
+
+        const isCurrentRequest = () => !signal?.aborted && requestVersion === ordersRequestVersionRef.current;
+        const setOrdersLoading = append
+            ? (loading) => {
+                isLoadingMoreRef.current = loading;
+                setIsLoadingMore(loading);
+            }
+            : keepRows ? setIsSearchingOrders : setResLoading;
+
+        setOrdersLoading(true);
         // setOffset(offset+0); // update the offset for every call
         
 
         if (!userObj?.role || !userObj?.id) {
-            setResLoading(false);
+            if (isCurrentRequest()) setOrdersLoading(false);
             return;
         }
 
         try {    
             const result = await (waitlistOnly
-                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter)
-                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter));
+                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, signal)
+                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, signal));
             const queryResult = await result.json() // get data
+
+            if (!isCurrentRequest()) return false;
 
             // check for the status
             if(queryResult.status == 200){
@@ -551,40 +627,42 @@ export default function OrdersV2() {
                     const normalized = normalizeCartOrders(queryResult.data);
                     append ? setOrders(prev => [...prev, ...normalized]) : setOrders(normalized);
                     setTotalOrders(queryResult.totalOrders ?? queryResult.count ?? queryResult.data.length);
-                    setResLoading(false);
                 }
                 else {
                     if (!append) { setOrders([]); setTotalOrders(0); }
                 }
 
-                setResLoading(false);
                 return true;
             }
             else if(queryResult.status == 401) {
-                
-                setResLoading(false);
                 return false;
             }
             else if(queryResult.status == 404 || queryResult.status == 201) {
-                setOrders([]);
-                setResLoading(false);
+                if (!append) setOrders([]);
                 return false;
             }
+            toast({
+                description: queryResult.message || "Issue loading orders, try again later!",
+            });
             return false;
         }
         catch (e){
-            
+            if (e.name === 'AbortError' || signal?.aborted) return false;
+
             toast({
                 description: "Issue loading, try again later!",
             })
-            setResLoading(false);
             return false;
+        }
+        finally {
+            if (isCurrentRequest()) setOrdersLoading(false);
         }
     }
 
     function buildOrderDownloadRows(allOrders = []) {
         return allOrders.flatMap((res) => {
             const buildRow = (batchNo, rowApprovedQty = res.approvedQty) => ({
+                Basket: res.cartId || '-',
                 // orderId: res.id,
                 dealerName: res.dealer || '-',
                 orderedBy: res.orderedBy || '-',
@@ -1180,7 +1258,7 @@ export default function OrdersV2() {
                         };
                     }));
                 } else {
-                    getOrders(resStatus, resOffset, user);
+                    getOrders(resStatus, resOffset, user, isProduction, false, showWaitlist, activeSearchQuery, { keepRows: Boolean(activeSearchQuery) });
                 }
             } else {
                 toast({ description: queryResult.message || `Failed to ${status.toLowerCase()}` });
@@ -1199,29 +1277,71 @@ export default function OrdersV2() {
         }))
     }
 
-    const filteredOrders = useMemo(() => {
-        return orders.filter((group) => {
-            if (!resSearch.trim()) return true
-            const q = resSearch.trim().toLowerCase()
-            const rows = Array.isArray(group.rows) ? group.rows : []
+    function getEligibleOrderSearchQuery(value = resSearch) {
+        const query = value.trim();
+        return query.length >= 3 ? query : '';
+    }
 
-            return (
-                (group.dealer || '').toLowerCase().includes(q) ||
-                (group.orderedBy || '').toLowerCase().includes(q) ||
-                String(group.userId || '').toLowerCase().includes(q) ||
-                String(group.cartId || '').toLowerCase().includes(q) ||
-                rows.some((res) => (
-                    (res.design || '').toLowerCase().includes(q) ||
-                    (res.name || '').toLowerCase().includes(q) ||
-                    (res.status || '').toLowerCase().includes(q)
-                ))
-            )
-        })
-    }, [orders, resSearch])
+    function cancelOrderSearch() {
+        clearTimeout(orderSearchTimerRef.current);
+        orderSearchTimerRef.current = null;
+        orderSearchControllerRef.current?.abort();
+        orderSearchControllerRef.current = null;
+        ordersRequestVersionRef.current += 1;
+        isLoadingMoreRef.current = false;
+        setIsLoadingMore(false);
+        setIsSearchingOrders(false);
+    }
+
+    function handleOrderSearchChange(event) {
+        const nextValue = event.target.value;
+        const nextQuery = getEligibleOrderSearchQuery(nextValue);
+
+        cancelOrderSearch();
+        setResSearch(nextValue);
+
+        if (!nextQuery) {
+            setActiveSearchQuery('');
+        }
+
+        if (!nextValue.trim() && user) {
+            setResOffset(0);
+            setExpandedCartGroups({});
+            getOrders(resStatus, 0, user, isProduction, false, showWaitlist, '', { keepRows: true });
+        }
+    }
+
+    function clearOrderSearch() {
+        handleOrderSearchChange({ target: { value: '' } });
+    }
+
+    useEffect(() => {
+        const query = getEligibleOrderSearchQuery();
+        if (!user || !query) return;
+
+        const controller = new AbortController();
+        orderSearchControllerRef.current = controller;
+        orderSearchTimerRef.current = setTimeout(() => {
+            setActiveSearchQuery(query);
+            setResOffset(0);
+            setExpandedCartGroups({});
+            getOrders(resStatus, 0, user, isProduction, false, showWaitlist, query, {
+                signal: controller.signal,
+                keepRows: true,
+            });
+        }, 300);
+
+        return () => {
+            clearTimeout(orderSearchTimerRef.current);
+            controller.abort();
+        };
+        // Search requests are cancelled explicitly before status or waitlist filters reload.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resSearch, user]);
 
     const groupedOrders = useMemo(() => {
-        if (!ordersSortKey || !ordersSortDir) return filteredOrders;
-        return [...filteredOrders].sort((a, b) => {
+        if (!ordersSortKey || !ordersSortDir) return orders;
+        return [...orders].sort((a, b) => {
             let aVal, bVal;
             if (ordersSortKey === 'designs') {
                 aVal = Number(a.totalDesigns || a.rows?.length || 0);
@@ -1248,25 +1368,31 @@ export default function OrdersV2() {
             if (aVal > bVal) return ordersSortDir === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [filteredOrders, ordersSortKey, ordersSortDir])
+    }, [orders, ordersSortKey, ordersSortDir])
 
     function handleStatusChange(val) {
+        cancelOrderSearch();
+        const searchQuery = getEligibleOrderSearchQuery();
         setResStatus(val);
+        setActiveSearchQuery(searchQuery);
         setResOffset(0);
         setExpandedCartGroups({});
 
-        getOrders(val, 0, user);
+        getOrders(val, 0, user, isProduction, false, showWaitlist, searchQuery, { keepRows: true });
     }
 
     async function handleWaitlistToggle(checked) {
-        if (resLoading || !user) return;
+        if (resLoading || isLoadingMore || isSearchingOrders || !user) return;
 
+        cancelOrderSearch();
+        const searchQuery = getEligibleOrderSearchQuery();
         const previousValue = showWaitlist;
         setShowWaitlist(checked);
+        setActiveSearchQuery(searchQuery);
         setResOffset(0);
         setExpandedCartGroups({});
 
-        const loaded = await getOrders(resStatus, 0, user, isProduction, false, checked);
+        const loaded = await getOrders(resStatus, 0, user, isProduction, false, checked, searchQuery, { keepRows: true });
         if (!loaded) setShowWaitlist(previousValue);
     }
 
@@ -1288,12 +1414,12 @@ export default function OrdersV2() {
     };
 
     loadMoreOrdersRef.current = () => {
-        if (resLoading || orders.length >= totalOrders) return;
+        if (resLoading || isSearchingOrders || isLoadingMore || isLoadingMoreRef.current || resSearch.trim() !== activeSearchQuery || orders.length >= totalOrders) return;
         // const next = resOffset + ORDER_PAGE_SIZE;
         const next = resOffset + 20;
         
         setResOffset(next);
-        getOrders(resStatus, next, user, isProduction, true);
+        getOrders(resStatus, next, user, isProduction, true, showWaitlist, activeSearchQuery);
     };
 
 return (
@@ -1314,7 +1440,7 @@ return (
                       <Switch
                           id="show-waitlist"
                           checked={showWaitlist}
-                          disabled={resLoading || !user}
+                          disabled={resLoading || isLoadingMore || isSearchingOrders || !user}
                           onCheckedChange={handleWaitlistToggle}
                           aria-label="Show waitlist orders"
                       />
@@ -1325,13 +1451,29 @@ return (
                     <span className='text-sm text-slate-500'>{totalOrders}</span>
                     <div className="flex flex-row items-center gap-3">
                         <div className="relative">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            {isSearchingOrders ? (
+                                <SpinnerGap className="absolute left-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            )}
                             <Input
                                 placeholder='Search cart, dealer, or design'
                                 value={resSearch}
-                                onChange={e => setResSearch(e.target.value)}
-                                className="pl-8 w-56"
+                                onChange={handleOrderSearchChange}
+                                className="w-56 pl-8 pr-8"
                             />
+                            {resSearch ? (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0.5 top-0.5 h-8 w-8 text-muted-foreground hover:text-foreground"
+                                    onClick={clearOrderSearch}
+                                    aria-label="Clear order search"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            ) : null}
                         </div>
                         <Select value={resStatus} onValueChange={handleStatusChange}>
                             <SelectTrigger className="w-[180px]  font-mono uppercase text-sm tracking-wider">
@@ -1423,6 +1565,7 @@ return (
                                 <TableHead className="text-right">Waitlist</TableHead>
                                 <TableHead>Stock</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead className="w-40">Notes</TableHead>
                                 <TableHead>Order Type</TableHead>
                                 <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('submittedOn')}>
                                     <span className="flex items-center">Submitted On{sortIcon('submittedOn', ordersSortKey, ordersSortDir)}</span>
@@ -1432,12 +1575,23 @@ return (
                         </TableHeader>
                         <TableBody>
                             {resLoading ? (
-                                <TableRow><TableCell colSpan={12} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={14} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
                             ) : groupedOrders.length === 0 ? (
-                                <TableRow><TableCell colSpan={12} className="text-center py-10">No orders listed</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={14} className="text-center py-10">No orders listed</TableCell></TableRow>
                             ) : groupedOrders.map((group) => {
                                 const isExpanded = Boolean(expandedCartGroups[group.cartId])
                                 const hasMultipleRows = group.rows.length > 0
+                                const groupNotes = group.rows.reduce((entries, row) => {
+                                    const note = typeof row.notes === 'string' ? row.notes.trim() : '';
+                                    if (note && note !== '-') {
+                                        entries.push({
+                                            id: `${group.cartId}-${row.id}`,
+                                            label: row.design ? `${row.design}${row.name ? ` - ${row.name}` : ''}` : '',
+                                            note,
+                                        });
+                                    }
+                                    return entries;
+                                }, []);
 
                                 const percentage1 = ((group.totalApprovedQty === 0 ? 0 : group.totalApprovedQty / group.totalRequestedQty) * 100)
                                 const percentage = percentage1 > 0 ? percentage1.toFixed(1) : 0
@@ -1536,6 +1690,9 @@ return (
                                                         </span>
                                                     ))}
                                                 </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <OrderNotesPreview entries={groupNotes} />
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1">
@@ -1648,6 +1805,13 @@ return (
                                                     </span>
                                                 </TableCell>
                                                 <TableCell>
+                                                    <OrderNotesPreview
+                                                        entries={typeof res.notes === 'string' && res.notes.trim() && res.notes.trim() !== '-'
+                                                            ? [{ id: res.id, label: '', note: res.notes.trim() }]
+                                                            : []}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
                                                     <span className={`px-2 py-1 font-mono uppercase rounded-full text-xs font-bold ${(res.isProduction == 1) ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
                                                         {(res.isProduction == 1) ? 'P' : 'C'}
                                                     </span>
@@ -1675,9 +1839,9 @@ return (
                         </TableBody>
                     </Table>
                 </Card>
-                <div ref={ordersEndRef} className="py-3 text-center text-sm text-slate-400">
-                    {resLoading && orders.length > 0 && <><SpinnerGap className="animate-spin inline-block mr-2 h-4 w-4" />Loading more orders...</>}
-                    {!resLoading && orders.length > 0 && orders.length >= totalOrders && <span>All {totalOrders} orders loaded</span>}
+                <div ref={ordersEndRef} className="flex min-h-12 items-center justify-center py-3 text-center text-sm text-slate-400">
+                    {isLoadingMore && orders.length > 0 && <><SpinnerGap className="mr-2 inline-block h-4 w-4 animate-spin" />Loading more orders...</>}
+                    {!isLoadingMore && orders.length > 0 && orders.length >= totalOrders && <span>All {totalOrders} orders loaded</span>}
                 </div>
             </div>
           
@@ -1687,7 +1851,10 @@ return (
               onClose={() => setStockOrderOpen(false)}
               pass={process.env.NEXT_PUBLIC_API_PASS}
               role={user?.role}
-              onSuccess={(msg) => { toast({ description: msg }); getOrders(resStatus, resOffset, user); }}
+              onSuccess={(msg) => {
+                  toast({ description: msg });
+                  getOrders(resStatus, resOffset, user, isProduction, false, showWaitlist, activeSearchQuery, { keepRows: Boolean(activeSearchQuery) });
+              }}
           />
 
           {/* Approval Confirmation Dialog */}

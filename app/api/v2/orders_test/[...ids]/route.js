@@ -26,7 +26,7 @@ export async function GET(request,{params}) {
                     const userId = params.ids[5];      // Test002
                     const sortBy = params.ids[6] || "createdOn";
 
-                    const search = "";
+                    const search = (new URL(request.url).searchParams.get("search") || "").trim().slice(0, 100);
                     // const page = 1;
                     const page = params.ids[3];
                     const limit = 20;
@@ -70,10 +70,16 @@ export async function GET(request,{params}) {
                         OR o.userId LIKE ?
                         OR o.dealerId LIKE ?
                         OR u.name LIKE ?
+                        OR u_dealer.name LIKE ?
+                        OR p.name LIKE ?
+                        OR o.status LIKE ?
                         )
                     `);
 
                     queryParams.push(
+                        `%${search}%`,
+                        `%${search}%`,
+                        `%${search}%`,
                         `%${search}%`,
                         `%${search}%`,
                         `%${search}%`,
@@ -99,7 +105,9 @@ export async function GET(request,{params}) {
                         o.cartId,
                         MIN(o.createdOn) AS createdOn
                     FROM orders o
+                    LEFT JOIN products p ON o.design = p.design
                     LEFT JOIN user u ON o.userId = u.id
+                    LEFT JOIN user u_dealer ON o.dealerId = u_dealer.id
                     ${whereSql}
                     GROUP BY o.cartId
                     ORDER BY ${orderBySql}
@@ -248,7 +256,9 @@ export async function GET(request,{params}) {
                     FROM (
                         SELECT o.cartId
                         FROM orders o
+                        LEFT JOIN products p ON o.design = p.design
                         LEFT JOIN user u ON o.userId = u.id
+                        LEFT JOIN user u_dealer ON o.dealerId = u_dealer.id
                         ${whereSql}
                         GROUP BY o.cartId
                     ) t
