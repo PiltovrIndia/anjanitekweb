@@ -68,8 +68,8 @@ const updateOrderStatusAPI = async (pass, path, orderId, qty, userId, actionDate
     })
 };
 
-const markOrderInReviewAPI = async (pass, orderId) =>
-fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId, {
+const markOrderInReviewAPI = async (pass, orderId, actorId) =>
+fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId+"?"+new URLSearchParams({ actorId: actorId || '' }).toString(), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -105,7 +105,7 @@ const PAGE_SIZE = 50;
 // Dialog listing every order of one design with the same review/edit actions
 // as the designs tab of the orders page; the dialog hugs the table width so
 // the listing never scrolls horizontally
-export default function DesignOrdersDialog({ product, open, onClose }) {
+export default function DesignOrdersDialog({ product, open, onClose, actor }) {
     const { toast } = useToast();
 
     const design = product?.design;
@@ -514,7 +514,7 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
         if (res.status === 'Submitted') {
             reviewRes = { ...res, status: 'InReview' };
 
-            markOrderInReviewAPI(process.env.NEXT_PUBLIC_API_PASS, res.id)
+            markOrderInReviewAPI(process.env.NEXT_PUBLIC_API_PASS, res.id, actor?.id)
                 .then(() => loadCounts())
                 .catch(() => {});
 
@@ -703,6 +703,11 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
             return;
         }
 
+        if (!actor?.id) {
+            toast({ description: "Your session is unavailable. Please sign in again." });
+            return;
+        }
+
         setActionLoading(true);
         try {
             var path = '';
@@ -721,7 +726,7 @@ export default function DesignOrdersDialog({ product, open, onClose }) {
                 process.env.NEXT_PUBLIC_API_PASS, path,
                 selectedRes.id,
                 approvalQty,
-                selectedRes.userId,
+                actor.id,
                 dayjs().format('YYYY-MM-DD HH:mm:ss'),
                 selectedReviewDesign.design,
                 path === 'U0.2' && selectedRes.stockType === 'prm' ? getBatchAllocationPayload() : [],

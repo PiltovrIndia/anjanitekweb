@@ -111,8 +111,8 @@ fetch("/api/v2/orders_test/"+pass+"/U0.5/"+encodeURIComponent(cartId)+"/"+adminI
 });
 
 // mark a submitted order item as in review
-const markOrderInReviewAPI = async (pass, orderId) =>
-fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId, {
+const markOrderInReviewAPI = async (pass, orderId, actorId) =>
+fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId+"?"+new URLSearchParams({ actorId: actorId || '' }).toString(), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -894,7 +894,7 @@ export default function Orders() {
         if (res.status === 'Submitted') {
             reviewRes = { ...res, status: 'InReview' };
 
-            markOrderInReviewAPI(process.env.NEXT_PUBLIC_API_PASS, res.id).catch(() => {});
+            markOrderInReviewAPI(process.env.NEXT_PUBLIC_API_PASS, res.id, user?.id).catch(() => {});
 
             // reflect the new status in the orders listing
             setOrders(prev => prev.map(group => {
@@ -1183,7 +1183,7 @@ export default function Orders() {
                 process.env.NEXT_PUBLIC_API_PASS, path,
                 selectedRes.id,
                 approvalQty,
-                selectedRes.userId,
+                user?.id,
                 dayjs().format('YYYY-MM-DD HH:mm:ss'),
                 selectedReviewDesign.design,
                 path === 'U0.2' && selectedRes.stockType === 'prm' ? getBatchAllocationPayload() : [],

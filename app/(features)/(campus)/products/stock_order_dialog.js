@@ -48,7 +48,7 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
     const designRef = useRef(null)
 
     // ── Cart ──────────────────────────────────────────────────────────────
-    const [cartItems, setCartItems] = useState([])  // { product, stockType, quantity, error }
+    const [cartItems, setCartItems] = useState([])  // { lineKey, product, stockType, quantity, error }
 
     // ── Ordering ──────────────────────────────────────────────────────────
     const [placing, setPlacing] = useState(false)
@@ -240,25 +240,37 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
         }, 400)
     }
 
-    const addToCart = (product) => {
-        if (cartItems.some(i => i.product.productId === product.productId)) {
-            setDesignQuery(''); setDesignResults([]); setShowDesignDrop(false); return
-        }
-        setCartItems(prev => [...prev, { product, stockType: 'prm', quantity: '', error: null }])
-        setDesignQuery(''); setDesignResults([]); setShowDesignDrop(false)
+    const getCartItemKey = (productId, stockType) => `${productId}:${stockType}`
+
+    const addToCart = (product, stockType) => {
+        const lineKey = getCartItemKey(product.productId, stockType)
+        setCartItems(prev => {
+            if (prev.some(item => item.lineKey === lineKey)) return prev
+            return [...prev, { lineKey, product, stockType, quantity: '', error: null }]
+        })
     }
 
     // ── Cart item update & validation ─────────────────────────────────────
-    const updateItem = (productId, field, value) => {
+    const updateItem = (lineKey, field, value) => {
         setCartItems(prev => prev.map(i => {
-            if (i.product.productId !== productId) return i
+            if (i.lineKey !== lineKey) return i
+            if (
+                field === 'stockType' &&
+                prev.some(other =>
+                    other.lineKey !== lineKey &&
+                    other.product.productId === i.product.productId &&
+                    other.stockType === value
+                )
+            ) {
+                return i
+            }
             const updated = { ...i, [field]: value }
             const qty = Number(field === 'quantity' ? value : updated.quantity)
             const type = field === 'stockType' ? value : updated.stockType
-            const availPrm = Number(updated.product.prm) || 0
             const availStd = Number(updated.product.std) || 0
+            updated.lineKey = getCartItemKey(updated.product.productId, type)
 
-            if (!value && field === 'quantity') {
+            if (!updated.quantity) {
                 updated.error = null // empty — will catch at submit
             } else if (qty < 1) {
                 updated.error = 'Quantity must be at least 1'
@@ -271,7 +283,7 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
         }))
     }
 
-    const removeFromCart = (productId) => setCartItems(prev => prev.filter(i => i.product.productId !== productId))
+    const removeFromCart = (lineKey) => setCartItems(prev => prev.filter(i => i.lineKey !== lineKey))
 
     // ── Build the designs array for the request body ──────────────────────
     // PRM rule: if qty > available, split into (available, isProduction=false) + (rest, isProduction=true)
@@ -340,6 +352,7 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
     }
 
     const totalBoxes = cartItems.reduce((s, i) => s + (Number(i.quantity) || 0), 0)
+    const totalDesigns = new Set(cartItems.map(item => item.product.productId)).size
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
@@ -518,11 +531,11 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
                                     {showDesignDrop && designResults.length > 0 && (
                                         <div className="absolute z-50 mt-1 w-full bg-white border rounded-md shadow-lg max-h-52 overflow-y-auto">
                                             {designResults.map(p => {
-                                                const alreadyAdded = cartItems.some(i => i.product.productId === p.productId)
+                                                const prmAdded = cartItems.some(i => i.lineKey === getCartItemKey(p.productId, 'prm'))
+                                                const stdAdded = cartItems.some(i => i.lineKey === getCartItemKey(p.productId, 'std'))
                                                 return (
                                                     <div key={p.productId}
-                                                        className={`px-3 py-2.5 flex items-center justify-between ${alreadyAdded ? 'opacity-40 cursor-not-allowed bg-gray-50' : 'hover:bg-gray-50 cursor-pointer'}`}
-                                                        onMouseDown={() => !alreadyAdded && addToCart(p)}>
+                                                        className="px-3 py-2.5 flex items-center justify-between gap-3 hover:bg-gray-50">
                                                         <div>
                                                             <span className="font-medium text-sm">{p.name}</span>
                                                             <span className="font-mono text-xs text-gray-400 ml-2">{p.design}</span>
@@ -530,7 +543,28 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
                                                         <div className="flex gap-3 text-xs">
                                                             <span className="text-violet-600 font-medium">PRM <span className="font-bold">{p.prm ?? 0}</span></span>
                                                             <span className="text-blue-600 font-medium">STD <span className="font-bold">{p.std ?? 0}</span></span>
-                                                            {alreadyAdded && <Badge variant="secondary" className="text-[10px] py-0 px-1.5">Added</Badge>}
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            <Button
+                                                                type="button"
+                                                                variant={prmAdded ? 'secondary' : 'outline'}
+                                                                size="sm"
+                                                                className="h-7 px-2 text-xs"
+                                                                disabled={prmAdded}
+                                                                onClick={() => addToCart(p, 'prm')}
+                                                            >
+                                                                {prmAdded ? 'PRM added' : 'Add PRM'}
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant={stdAdded ? 'secondary' : 'outline'}
+                                                                size="sm"
+                                                                className="h-7 px-2 text-xs"
+                                                                disabled={stdAdded}
+                                                                onClick={() => addToCart(p, 'std')}
+                                                            >
+                                                                {stdAdded ? 'STD added' : 'Add STD'}
+                                                            </Button>
                                                         </div>
                                                     </div>
                                                 )
@@ -556,9 +590,11 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
                                             const qty = Number(item.quantity) || 0
                                             const isPrmSplit = item.stockType === 'prm' && qty > availPrm
                                             const splitProduction = qty - availPrm
+                                            const hasPrmLine = cartItems.some(other => other.lineKey !== item.lineKey && other.lineKey === getCartItemKey(item.product.productId, 'prm'))
+                                            const hasStdLine = cartItems.some(other => other.lineKey !== item.lineKey && other.lineKey === getCartItemKey(item.product.productId, 'std'))
 
                                             return (
-                                                <Card key={item.product.productId} className={`p-3 ${item.error ? 'border-red-200 bg-red-50' : ''}`}>
+                                                <Card key={item.lineKey} className={`p-3 ${item.error ? 'border-red-200 bg-red-50' : ''}`}>
                                                     <div className="flex items-start gap-3">
                                                         <div className="flex-1 min-w-0">
                                                             <div className="font-semibold text-sm truncate">{item.product.name}</div>
@@ -571,13 +607,13 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
 
                                                         <div className="flex items-center gap-2 shrink-0">
                                                             <Select value={item.stockType}
-                                                                onValueChange={v => updateItem(item.product.productId, 'stockType', v)}>
+                                                                onValueChange={v => updateItem(item.lineKey, 'stockType', v)}>
                                                                 <SelectTrigger className="w-[72px] h-8 text-xs">
                                                                     <SelectValue />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    <SelectItem value="prm">PRM</SelectItem>
-                                                                    <SelectItem value="std">STD</SelectItem>
+                                                                    <SelectItem value="prm" disabled={hasPrmLine}>PRM</SelectItem>
+                                                                    <SelectItem value="std" disabled={hasStdLine}>STD</SelectItem>
                                                                 </SelectContent>
                                                             </Select>
 
@@ -587,13 +623,13 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
                                                                 max={item.stockType === 'std' ? availStd : undefined}
                                                                 placeholder="Qty"
                                                                 value={item.quantity}
-                                                                onChange={e => updateItem(item.product.productId, 'quantity', e.target.value)}
+                                                                onChange={e => updateItem(item.lineKey, 'quantity', e.target.value)}
                                                                 className="w-20 h-8 text-sm"
                                                             />
 
                                                             <Button size="icon" variant="ghost"
                                                                 className="h-8 w-8 text-gray-300 hover:text-red-500 hover:bg-red-50"
-                                                                onClick={() => removeFromCart(item.product.productId)}>
+                                                                onClick={() => removeFromCart(item.lineKey)}>
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </div>
@@ -639,7 +675,7 @@ export default function StockOrderDialog({ id, isOpen, onClose, pass, role, onSu
                 <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50/60">
                     <div className="text-sm text-gray-500">
                         {cartItems.length > 0
-                            ? <>{cartItems.length} design{cartItems.length !== 1 ? 's' : ''} · <b>{totalBoxes}</b> box{totalBoxes !== 1 ? 'es' : ''}</>
+                            ? <><b>{totalDesigns}</b> design{totalDesigns !== 1 ? 's' : ''} · {cartItems.length} stock request{cartItems.length !== 1 ? 's' : ''} · <b>{totalBoxes}</b> box{totalBoxes !== 1 ? 'es' : ''}</>
                             : <span className="text-gray-400">No items added yet</span>
                         }
                     </div>

@@ -1,6 +1,7 @@
 import pool from '../../../db'
 import { Keyverify } from '../../../secretverify';
 import { send_notification } from '../../../send_notification';
+import { recordOrderAction, resolveOrderActionActor } from '../order-action-audit';
 
 // API for updates to user data
 export async function GET(request,{params}) {
@@ -145,6 +146,10 @@ export async function GET(request,{params}) {
                         o.productionQty,
                         o.stockType,
                         o.status,
+                        o.lastActionById,
+                        o.lastActionByName,
+                        o.lastActionType,
+                        o.lastActionOn,
                         o.createdOn,
                         o.approvedOn,
                         o.modifiedOn,
@@ -790,7 +795,7 @@ export async function GET(request,{params}) {
 
                     // 3. Combined Query: Fetch both order and product in a single DB round-trip using FOR UPDATE
                     const [[order], [product]] = await Promise.all([
-                    connection.query(`SELECT id, status, stockType, requestedQty, approvedQty, productionQty, design, dealerId, modifiedOn, waitlistSequence FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]).then(([rows]) => rows),
+                    connection.query(`SELECT id, cartId, status, stockType, requestedQty, approvedQty, productionQty, design, dealerId, modifiedOn, waitlistSequence FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]).then(([rows]) => rows),
                     
                     connection.query(`SELECT productId, design, prm, std FROM products WHERE design = (SELECT design FROM orders WHERE id = ? AND isDeleted = 0) FOR UPDATE`, [orderId]).then(([rows]) => rows)]);
 
@@ -814,6 +819,12 @@ export async function GET(request,{params}) {
                     if (!product) {
                     await connection.rollback();
                     return Response.json({ status: 404, success: false, message: "Product not found" });
+                    }
+
+                    const actor = await resolveOrderActionActor(connection, adminId);
+                    if (!actor) {
+                        await connection.rollback();
+                        return Response.json({ status: 400, success: false, message: "A valid active user is required to take order actions" });
                     }
 
                     if (order.status === "Approved" && order.stockType === 'prm') {
@@ -856,6 +867,7 @@ export async function GET(request,{params}) {
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
+                        await recordOrderAction(connection, { orderId, cartId: order.cartId, actor, actionType: 'Modified', actionOn: actionDate, actionNotes: notes });
 
                         await connection.commit();
 
@@ -921,6 +933,7 @@ export async function GET(request,{params}) {
                         const stockAfterAllocation = newAvailableStock;
 
                         await connection.query(`UPDATE products SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
+                        await recordOrderAction(connection, { orderId, cartId: order.cartId, actor, actionType: 'Modified', actionOn: actionDate, actionNotes: notes });
 
                         await connection.commit();
 
@@ -990,6 +1003,7 @@ export async function GET(request,{params}) {
 
                         await persistPrmBatchDrain(connection, batches, adminId);
                         await connection.query(`UPDATE products SET prm = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
+                        await recordOrderAction(connection, { orderId, cartId: order.cartId, actor, actionType: 'Approved', actionOn: actionDate, actionNotes: notes });
 
                         await connection.commit();
 
@@ -1029,6 +1043,7 @@ export async function GET(request,{params}) {
 
                         await connection.query(`UPDATE products SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]
                         );
+                        await recordOrderAction(connection, { orderId, cartId: order.cartId, actor, actionType: 'Approved', actionOn: actionDate, actionNotes: notes });
 
                         await connection.commit();
 
@@ -1093,6 +1108,12 @@ export async function GET(request,{params}) {
                     const currentStatus = existingOrder.status;
                     let waitlistAllocations = [];
 
+                    const actor = await resolveOrderActionActor(rejectConnection, adminId);
+                    if (!actor) {
+                        await rejectConnection.rollback();
+                        return Response.json({ status: 400, success: false, message: "A valid active user is required to take order actions" });
+                    }
+
                     if (["Approved"].includes(currentStatus)) {
 
                         await rejectConnection.query(`UPDATE orders SET status = 'Rejected', productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
@@ -1119,6 +1140,7 @@ export async function GET(request,{params}) {
                         await rejectConnection.query(`UPDATE orders SET status = 'Rejected', productionQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
                     }
 
+                    await recordOrderAction(rejectConnection, { orderId, cartId: existingOrder.cartId, actor, actionType: 'Rejected', actionOn: actionDate, actionNotes: notes });
                     await rejectConnection.commit();
 
                     // send notification
@@ -1201,6 +1223,12 @@ export async function GET(request,{params}) {
                     const currentStatus = existingOrder.status;
                     let waitlistAllocations = [];
 
+                    const actor = await resolveOrderActionActor(oosConnection, adminId);
+                    if (!actor) {
+                        await oosConnection.rollback();
+                        return Response.json({ status: 400, success: false, message: "A valid active user is required to take order actions" });
+                    }
+
                     if (["Approved"].includes(currentStatus)) {
 
                         await oosConnection.query(`UPDATE orders SET status = 'OutOfStock', approvedQty = 0, productionQty = 0, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, orderId]);
@@ -1227,6 +1255,7 @@ export async function GET(request,{params}) {
                         await oosConnection.query(`UPDATE orders SET status = 'OutOfStock', productionQty = 0, approvedQty = 0, approvedOn = ?, modifiedOn = ? WHERE id = ? AND isDeleted = 0`, [actionDate, actionDate, orderId]);
                     }
 
+                    await recordOrderAction(oosConnection, { orderId, cartId: existingOrder.cartId, actor, actionType: 'OutOfStock', actionOn: actionDate, actionNotes: notes });
                     await oosConnection.commit();
 
                     return Response.json({
@@ -1258,6 +1287,7 @@ export async function GET(request,{params}) {
                 try {
                     var orderId = params.ids[2];
                     var actionDate = params.ids[3];
+                    const actorId = new URL(request.url).searchParams.get('actorId');
 
                     if (!orderId) {
                     return Response.json({
@@ -1267,27 +1297,32 @@ export async function GET(request,{params}) {
                     });
                     }
 
-                    const [result] = await pool.query(
-                    `
-                    UPDATE orders
-                    SET
-                        status = 'Deleted',
-                        isDeleted = 1,
-                        modifiedOn = ? 
-                    WHERE id = ?
-                        AND isDeleted = 0
-                        AND status NOT IN ('Approved', 'Deleted', 'Rejected', 'Cancelled')
-                    `,
-                    [actionDate, orderId]
+                    await connection.beginTransaction();
+                    const [orderRows] = await connection.query(`SELECT id, cartId FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]);
+                    const actor = await resolveOrderActionActor(connection, actorId);
+                    if (!actor) {
+                        await connection.rollback();
+                        return Response.json({ status: 400, success: false, message: "A valid active user is required to take order actions" });
+                    }
+
+                    const [result] = await connection.query(
+                        `UPDATE orders SET status = 'Deleted', isDeleted = 1, modifiedOn = ?
+                         WHERE id = ? AND isDeleted = 0
+                         AND status NOT IN ('Approved', 'Deleted', 'Rejected', 'Cancelled')`,
+                        [actionDate, orderId]
                     );
 
                     if (result.affectedRows === 0) {
+                    await connection.rollback();
                     return Response.json({
                         status: 409,
                         success: false,
                         message: "Order item could not be deleted or is already processed",
                     });
                     }
+
+                    await recordOrderAction(connection, { orderId, cartId: orderRows[0]?.cartId, actor, actionType: 'Deleted', actionOn: actionDate });
+                    await connection.commit();
 
                     return Response.json({
                     status: 200,
@@ -1296,6 +1331,7 @@ export async function GET(request,{params}) {
                     data: { orderId },
                     });
                 } catch (error) {
+                    await connection.rollback();
                     return Response.json({
                     status: 500,
                     success: false,
@@ -1324,7 +1360,7 @@ export async function GET(request,{params}) {
                     await saleOrderConnection.beginTransaction();
 
                     const [items] = await saleOrderConnection.query(
-                        `SELECT id, dealerId, status, productionQty FROM orders WHERE cartId = ? AND isDeleted = 0 FOR UPDATE`,
+                        `SELECT id, cartId, dealerId, status, productionQty FROM orders WHERE cartId = ? AND isDeleted = 0 FOR UPDATE`,
                         [cartId]
                     );
 
@@ -1357,6 +1393,12 @@ export async function GET(request,{params}) {
                         });
                     }
 
+                    const actor = await resolveOrderActionActor(saleOrderConnection, adminId);
+                    if (!actor) {
+                        await saleOrderConnection.rollback();
+                        return Response.json({ status: 400, success: false, message: "A valid active user is required to take order actions" });
+                    }
+
                     // flip every live item to SaleOrder and clear pending production;
                     // Cancelled/Rejected items keep their status but any leftover
                     // productionQty is still cleared
@@ -1369,6 +1411,10 @@ export async function GET(request,{params}) {
                         `UPDATE orders SET productionQty = 0, modifiedOn = ? WHERE cartId = ? AND isDeleted = 0 AND productionQty > 0`,
                         [actionDate, cartId]
                     );
+
+                    for (const item of items.filter((item) => !['Cancelled', 'Rejected'].includes(item.status))) {
+                        await recordOrderAction(saleOrderConnection, { orderId: item.id, cartId: item.cartId, actor, actionType: 'SaleOrder', actionOn: actionDate });
+                    }
 
                     await saleOrderConnection.commit();
 
@@ -1441,10 +1487,11 @@ export async function GET(request,{params}) {
                 }
             }
             // mark a Submitted order item as InReview when an admin opens it for review
-            // /U0.7/$orderId
+            // /U0.7/$orderId?actorId=$actorId
             else if (params.ids[1] === "U0.7") {
                 try {
                     var orderId = params.ids[2];
+                    const actorId = new URL(request.url).searchParams.get('actorId');
 
                     if (!orderId) {
                         return Response.json({
@@ -1454,11 +1501,26 @@ export async function GET(request,{params}) {
                         });
                     }
 
+                    await connection.beginTransaction();
+                    const [ordersForReview] = await connection.query(
+                        `SELECT id, cartId FROM orders WHERE id = ? AND isDeleted = 0 AND status = 'Submitted' FOR UPDATE`,
+                        [orderId]
+                    );
+                    const actor = await resolveOrderActionActor(connection, actorId);
+                    if (!actor) {
+                        await connection.rollback();
+                        return Response.json({ status: 400, success: false, message: "A valid active user is required to take order actions" });
+                    }
+
                     // only a Submitted item moves to InReview; anything else is left untouched
-                    const [result] = await pool.query(
+                    const [result] = await connection.query(
                         `UPDATE orders SET status = 'InReview' WHERE id = ? AND isDeleted = 0 AND status = 'Submitted'`,
                         [orderId]
                     );
+                    if (result.affectedRows > 0) {
+                        await recordOrderAction(connection, { orderId, cartId: ordersForReview[0]?.cartId, actor, actionType: 'InReview', actionOn: new Date() });
+                    }
+                    await connection.commit();
 
                     return Response.json({
                         status: 200,
@@ -1467,12 +1529,41 @@ export async function GET(request,{params}) {
                         data: { orderId, updated: result.affectedRows > 0 },
                     });
                 } catch (error) {
+                    await connection.rollback();
                     return Response.json({
                         status: 500,
                         success: false,
                         message: "Failed to mark order item as InReview",
                         error: error.message,
                     });
+                }
+            }
+            // get the recorded action history for one order item
+            // /U0.9/$orderId/$role/$userId
+            else if (params.ids[1] === "U0.9") {
+                try {
+                    const orderId = params.ids[2];
+                    const role = params.ids[3];
+                    const userId = params.ids[4];
+                    const isGlobal = ['GlobalAdmin', 'SuperAdmin'].includes(role);
+                    const accessSql = isGlobal || !userId
+                        ? ''
+                        : 'AND (u.relatedTo LIKE ? OR u.id = ? OR o.userId = ? OR o.dealerId = ?)';
+                    const values = isGlobal || !userId
+                        ? [orderId]
+                        : [orderId, `%${userId}%`, userId, userId, userId];
+                    const [rows] = await connection.query(
+                        `SELECT h.id, h.orderId, h.cartId, h.actionType, h.actorId, h.actorName, h.actionNotes, h.actionOn
+                         FROM order_action_history h
+                         JOIN orders o ON o.id = h.orderId
+                         LEFT JOIN user u ON u.id = o.userId
+                         WHERE h.orderId = ? ${accessSql}
+                         ORDER BY h.actionOn DESC, h.id DESC`,
+                        values
+                    );
+                    return Response.json({ status: 200, success: true, data: rows });
+                } catch (error) {
+                    return Response.json({ status: 500, success: false, message: 'Failed to load order action history', error: error.message });
                 }
             }
             // get listing for mobile by userId for dealer
@@ -2235,7 +2326,8 @@ function groupOrdersByCart(rows) {
     const availabilityPercent =
       requestedQty > 0 ? Math.round((approvedQty / requestedQty) * 100) : 0;
 
-    order.totalDesigns += 1;
+    if (!order.designCodes) order.designCodes = new Set();
+    order.designCodes.add(row.design);
     order.totalRequestedQty += requestedQty;
     order.totalApprovedQty += approvedQty;
     order.totalProductionQty += productionQty;
@@ -2249,6 +2341,10 @@ function groupOrdersByCart(rows) {
       approvedQty,
       productionQty,
       stockType: row.stockType,
+      lastActionById: row.lastActionById,
+      lastActionByName: row.lastActionByName,
+      lastActionType: row.lastActionType,
+      lastActionOn: row.lastActionOn,
       isProduction: row.isProduction === 1,
       status: row.status,
       availabilityPercent,
@@ -2275,6 +2371,8 @@ function groupOrdersByCart(rows) {
   }
 
   for (const order of orderMap.values()) {
+    order.totalDesigns = order.designCodes.size;
+    delete order.designCodes;
     order.orderStatus = getBasketStatus(order.items);
   }
 
@@ -2364,7 +2462,8 @@ function groupAdminOrders(rows) {
     const approvedQty = Number(row.approvedQty || 0);
     const productionQty = Number(row.productionQty || 0);
 
-    order.totalDesigns += 1;
+    if (!order.designCodes) order.designCodes = new Set();
+    order.designCodes.add(row.design);
     order.totalRequestedQty += requestedQty;
     order.totalApprovedQty += approvedQty;
     order.totalProductionQty += productionQty;
@@ -2405,6 +2504,10 @@ function groupAdminOrders(rows) {
       std: Number(row.std || 0),
 
       status: row.status,
+      lastActionById: row.lastActionById,
+      lastActionByName: row.lastActionByName,
+      lastActionType: row.lastActionType,
+      lastActionOn: row.lastActionOn,
       waitlistPosition: row.waitlistPosition,
       batchAllocations: row.batchAllocations || [],
 
@@ -2420,6 +2523,20 @@ function groupAdminOrders(rows) {
   }
 
   for (const order of map.values()) {
+    order.totalDesigns = order.designCodes.size;
+    delete order.designCodes;
+    const latestItem = order.items.reduce((latest, item) => {
+      if (!item.lastActionOn) return latest;
+      if (!latest?.lastActionOn || new Date(item.lastActionOn) > new Date(latest.lastActionOn)) return item;
+      return latest;
+    }, null);
+
+    if (latestItem) {
+      order.lastActionById = latestItem.lastActionById;
+      order.lastActionByName = latestItem.lastActionByName;
+      order.lastActionType = latestItem.lastActionType;
+      order.lastActionOn = latestItem.lastActionOn;
+    }
     order.orderStatus = getAdminBasketStatus(order);
   }
 
@@ -2427,7 +2544,7 @@ function groupAdminOrders(rows) {
 }
 
 function getAdminBasketStatus(order) {
-  const totalDesigns = Number(order.totalDesigns || 0);
+  const totalItems = Array.isArray(order.items) ? order.items.length : 0;
   const submittedItems = Number(order.submittedItems || 0);
   const rejectedItems = Number(order.rejectedItems || 0);
 
@@ -2435,7 +2552,7 @@ function getAdminBasketStatus(order) {
   const totalApprovedQty = Number(order.totalApprovedQty || 0);
   const totalProductionQty = Number(order.totalProductionQty || 0);
 
-  if (totalDesigns === 0) {
+  if (totalItems === 0) {
     return "No Items";
   }
 
@@ -2443,11 +2560,11 @@ function getAdminBasketStatus(order) {
     return "Sale Order";
   }
 
-  if (rejectedItems === totalDesigns) {
+  if (rejectedItems === totalItems) {
     return "Rejected";
   }
 
-  if (submittedItems === totalDesigns) {
+  if (submittedItems === totalItems) {
     return "Submitted";
   }
 

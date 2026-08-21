@@ -111,13 +111,20 @@ fetch("/api/v2/orders_test/"+pass+"/U0.5/"+encodeURIComponent(cartId)+"/"+adminI
 });
 
 // mark a submitted order item as in review
-const markOrderInReviewAPI = async (pass, orderId) =>
-fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId, {
+const markOrderInReviewAPI = async (pass, orderId, actorId) =>
+fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId+"?"+new URLSearchParams({ actorId: actorId || '' }).toString(), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
     },
+});
+
+const getOrderActionHistoryAPI = async (pass, orderId, role, userId, signal) =>
+fetch("/api/v2/orders_test/"+pass+"/U0.9/"+orderId+"/"+encodeURIComponent(role || '')+"/"+encodeURIComponent(userId || ''), {
+    method: "GET",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    signal,
 });
 
 function OrderNotesPreview({ entries = [] }) {
@@ -148,6 +155,33 @@ function OrderNotesPreview({ entries = [] }) {
                             <p className="whitespace-pre-wrap break-words text-sm leading-5 text-slate-600">{entry.note}</p>
                         </div>
                     ))}
+                </div>
+            </HoverCardContent>
+        </HoverCard>
+    );
+}
+
+function OrderActionPreview({ action }) {
+    if (!action?.lastActionByName) {
+        return <span className="text-xs text-slate-300">-</span>;
+    }
+
+    return (
+        <HoverCard openDelay={250} closeDelay={100}>
+            <HoverCardTrigger asChild>
+                <button
+                    type="button"
+                    className="block max-w-28 truncate text-left text-xs font-medium text-slate-600 transition-colors hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                    onClick={(event) => event.stopPropagation()}
+                    aria-label={`Latest action by ${action.lastActionByName}`}
+                >
+                    {action.lastActionByName}
+                </button>
+            </HoverCardTrigger>
+            <HoverCardContent align="start" className="w-64 p-3">
+                <div className="text-sm font-semibold text-slate-900">{action.lastActionByName}</div>
+                <div className="mt-1 text-xs text-slate-500">
+                    {action.lastActionType || 'Updated'}{action.lastActionOn ? ` • ${dayjs(action.lastActionOn).format('DD MMM YYYY, hh:mm A')}` : ''}
                 </div>
             </HoverCardContent>
         </HoverCard>
@@ -213,8 +247,12 @@ export default function OrdersV2() {
     const [designOrderHistory, setDesignOrderHistory] = useState([])
     const [loadingDesignOrderHistory, setLoadingDesignOrderHistory] = useState(false)
     const [designOrderHistoryError, setDesignOrderHistoryError] = useState('')
+    const [orderActionHistory, setOrderActionHistory] = useState([])
+    const [loadingOrderActionHistory, setLoadingOrderActionHistory] = useState(false)
+    const [orderActionHistoryError, setOrderActionHistoryError] = useState('')
     const [isEditingOrderItem, setIsEditingOrderItem] = useState(false)
     const [showDesignOrderHistory, setShowDesignOrderHistory] = useState(false)
+    const [showOrderActionHistory, setShowOrderActionHistory] = useState(false)
     const [designBatches, setDesignBatches] = useState([])
     const [loadingDesignBatches, setLoadingDesignBatches] = useState(false)
     const [batchSequence, setBatchSequence] = useState([]) // admin-chosen batch allocation order (stock batch ids)
@@ -299,8 +337,12 @@ export default function OrdersV2() {
             setDesignOrderHistory([])
             setLoadingDesignOrderHistory(false)
             setDesignOrderHistoryError('')
+            setOrderActionHistory([])
+            setLoadingOrderActionHistory(false)
+            setOrderActionHistoryError('')
             setIsEditingOrderItem(false)
             setShowDesignOrderHistory(false)
+            setShowOrderActionHistory(false)
         }
     }, [isActionDialogOpen])
 
@@ -351,6 +393,46 @@ export default function OrdersV2() {
 
         return () => controller.abort()
     }, [isActionDialogOpen, showDesignOrderHistory, selectedReviewDesign?.design, selectedRes?.id])
+
+    useEffect(() => {
+        if (!isActionDialogOpen || !showOrderActionHistory || !selectedRes?.id || !user?.id) {
+            setOrderActionHistory([])
+            setLoadingOrderActionHistory(false)
+            setOrderActionHistoryError('')
+            return
+        }
+
+        const controller = new AbortController()
+
+        async function fetchOrderActionHistory() {
+            setLoadingOrderActionHistory(true)
+            setOrderActionHistoryError('')
+
+            try {
+                const result = await getOrderActionHistoryAPI(
+                    process.env.NEXT_PUBLIC_API_PASS,
+                    selectedRes.id,
+                    user.role,
+                    user.id,
+                    controller.signal
+                )
+                const queryResult = await result.json()
+                if (!controller.signal.aborted) {
+                    setOrderActionHistory(queryResult.status === 200 && Array.isArray(queryResult.data) ? queryResult.data : [])
+                }
+            } catch (error) {
+                if (!controller.signal.aborted) {
+                    setOrderActionHistory([])
+                    setOrderActionHistoryError('Could not load action history')
+                }
+            } finally {
+                if (!controller.signal.aborted) setLoadingOrderActionHistory(false)
+            }
+        }
+
+        fetchOrderActionHistory()
+        return () => controller.abort()
+    }, [isActionDialogOpen, showOrderActionHistory, selectedRes?.id, user?.id, user?.role])
 
     // Clamp approvalQty to availableStd whenever the dialog opens or fresh stock arrives
     useEffect(() => {
@@ -524,7 +606,7 @@ export default function OrdersV2() {
                 ...group,
                 ...first,
                 first,
-                totalDesigns: rows.length,
+                totalDesigns: new Set(rows.map((item) => item.design).filter(Boolean)).size,
                 totalRequestedQty: rows.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0),
                 totalApprovedQty: rows.reduce((sum, item) => sum + Number(item.approvedQty || 0), 0),
                 totalProductionQty: rows.reduce((sum, item) => sum + Number(item.productionQty || 0), 0),
@@ -902,15 +984,30 @@ export default function OrdersV2() {
         if (res.status === 'Submitted') {
             reviewRes = { ...res, status: 'InReview' };
 
-            markOrderInReviewAPI(process.env.NEXT_PUBLIC_API_PASS, res.id).catch(() => {});
+            markOrderInReviewAPI(process.env.NEXT_PUBLIC_API_PASS, res.id, user?.id).catch(() => {});
 
             // reflect the new status in the orders listing
             setOrders(prev => prev.map(group => {
                 if (!group.rows?.some(row => String(row.id) === String(res.id))) return group;
-                const updatedRows = group.rows.map(row => String(row.id) === String(res.id) ? { ...row, status: 'InReview' } : row);
+                const updatedRows = group.rows.map(row => String(row.id) === String(res.id) ? {
+                    ...row,
+                    status: 'InReview',
+                    lastActionById: user?.id,
+                    lastActionByName: user?.name,
+                    lastActionType: 'InReview',
+                    lastActionOn: new Date().toISOString(),
+                } : row);
+                const latestActionRow = updatedRows.reduce((latest, row) => {
+                    if (!row.lastActionOn) return latest;
+                    return !latest?.lastActionOn || new Date(row.lastActionOn) > new Date(latest.lastActionOn) ? row : latest;
+                }, null);
                 return {
                     ...group,
                     rows: updatedRows,
+                    lastActionById: latestActionRow?.lastActionById,
+                    lastActionByName: latestActionRow?.lastActionByName,
+                    lastActionType: latestActionRow?.lastActionType,
+                    lastActionOn: latestActionRow?.lastActionOn,
                     first: updatedRows[0] || group.first,
                     status: group.rows.length === 1 ? 'InReview' : group.status,
                     statuses: getStatusCounts(updatedRows),
@@ -1181,6 +1278,11 @@ export default function OrdersV2() {
             return;
         }
 
+        if (!user?.id) {
+            toast({ description: "Your session is unavailable. Please sign in again." });
+            return;
+        }
+
         setResLoading(true);
         try {
             var path = '';
@@ -1200,7 +1302,7 @@ export default function OrdersV2() {
                 process.env.NEXT_PUBLIC_API_PASS, path,
                 selectedRes.id,
                 approvalQty,
-                selectedRes.userId,
+                user?.id,
                 dayjs().format('YYYY-MM-DD HH:mm:ss'),
                 selectedReviewDesign.design,
                 path === 'U0.2' && selectedRes.stockType === 'prm' ? getBatchAllocationPayload() : [],
@@ -1222,6 +1324,10 @@ export default function OrdersV2() {
                         requestedQty: data.newRequestedQty ?? data.requestedQty,
                         notes: orderNotes || null,
                         status: status === 'Rejected' ? 'Rejected' : status === 'OutOfStock' ? 'OutOfStock' : 'Approved',
+                        lastActionById: user?.id,
+                        lastActionByName: user?.name,
+                        lastActionType: status === 'Rejected' ? 'Rejected' : status === 'OutOfStock' ? 'OutOfStock' : getApprovalStatus() === 'Modified' ? 'Modified' : 'Approved',
+                        lastActionOn: new Date().toISOString(),
                     };
 
                     // Build id→patch map for the main order + every waitlist allocation
@@ -1246,6 +1352,10 @@ export default function OrdersV2() {
                         const totalApprovedQty   = updatedRows.reduce((s, r) => s + Number(r.approvedQty   || 0), 0);
                         const totalProductionQty = updatedRows.reduce((s, r) => s + Number(r.productionQty || 0), 0);
                         const waitlistItems      = updatedRows.filter(r => Number(r.productionQty || 0) > 0).length;
+                        const latestActionRow = updatedRows.reduce((latest, row) => {
+                            if (!row.lastActionOn) return latest;
+                            return !latest?.lastActionOn || new Date(row.lastActionOn) > new Date(latest.lastActionOn) ? row : latest;
+                        }, null);
 
                         return {
                             ...group,
@@ -1255,6 +1365,10 @@ export default function OrdersV2() {
                             approvedQty: totalApprovedQty,
                             productionQty: totalProductionQty,
                             waitlistItems,
+                            lastActionById: latestActionRow?.lastActionById,
+                            lastActionByName: latestActionRow?.lastActionByName,
+                            lastActionType: latestActionRow?.lastActionType,
+                            lastActionOn: latestActionRow?.lastActionOn,
                         };
                     }));
                 } else {
@@ -1565,6 +1679,7 @@ return (
                                 <TableHead className="text-right">Waitlist</TableHead>
                                 <TableHead>Stock</TableHead>
                                 <TableHead>Status</TableHead>
+                                <TableHead className="w-28">Action by</TableHead>
                                 <TableHead className="w-40">Notes</TableHead>
                                 <TableHead>Order Type</TableHead>
                                 <TableHead className="cursor-pointer select-none hover:bg-slate-50" onClick={() => handleOrdersSort('submittedOn')}>
@@ -1575,9 +1690,9 @@ return (
                         </TableHeader>
                         <TableBody>
                             {resLoading ? (
-                                <TableRow><TableCell colSpan={14} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={15} className="text-center py-10"><SpinnerGap className="animate-spin inline-block mr-2" /> Loading...</TableCell></TableRow>
                             ) : groupedOrders.length === 0 ? (
-                                <TableRow><TableCell colSpan={14} className="text-center py-10">No orders listed</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={15} className="text-center py-10">No orders listed</TableCell></TableRow>
                             ) : groupedOrders.map((group) => {
                                 const isExpanded = Boolean(expandedCartGroups[group.cartId])
                                 const hasMultipleRows = group.rows.length > 0
@@ -1692,6 +1807,9 @@ return (
                                                 </div>
                                             </TableCell>
                                             <TableCell>
+                                                <OrderActionPreview action={group} />
+                                            </TableCell>
+                                            <TableCell>
                                                 <OrderNotesPreview entries={groupNotes} />
                                             </TableCell>
                                             <TableCell>
@@ -1803,6 +1921,9 @@ return (
                                                     <span className={`px-2 py-1 rounded-full text-xs ${res.status === 'Approved' ? 'bg-green-100 text-green-700' : res.status === 'Rejected' ? 'bg-red-100 text-red-700' : res.status === 'SaleOrder' ? 'bg-emerald-100 text-emerald-700' : res.status === 'InReview' ? 'bg-sky-100 text-sky-700' : res.status === 'Modified' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
                                                         {res.status === 'SaleOrder' ? 'Sale Order' : res.status === 'InReview' ? 'In Review' : res.status} {(res.status === 'Approved' || res.status == 'Rejected') ? '- '+dayjs(res.approvedOn).format('DD/MM/YYYY') : (res.status === 'Modified' || res.status === 'SaleOrder') ? '- '+dayjs(res.modifiedOn).format('DD/MM/YYYY') : ''}
                                                     </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <OrderActionPreview action={res} />
                                                 </TableCell>
                                                 <TableCell>
                                                     <OrderNotesPreview
@@ -2282,6 +2403,43 @@ return (
                         ) : null}
                     </div>
                     ) : null}
+                    <div className="rounded-lg border border-slate-200 bg-white">
+                        <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                            <div>
+                                <div className="text-sm font-semibold text-slate-900">Action history</div>
+                                <div className="text-xs text-slate-500">Recorded updates for this order item</div>
+                            </div>
+                            <Button size="sm" variant="outline" onClick={() => setShowOrderActionHistory((prev) => !prev)}>
+                                {showOrderActionHistory ? 'Hide History' : 'View History'}
+                            </Button>
+                        </div>
+                        {showOrderActionHistory ? (
+                            <div className="h-56 overflow-y-auto border-t border-slate-200">
+                                {loadingOrderActionHistory ? (
+                                    <div className="flex h-full items-center justify-center text-sm text-slate-500"><SpinnerGap className="mr-2 h-4 w-4 animate-spin" />Loading history...</div>
+                                ) : orderActionHistoryError ? (
+                                    <div className="flex h-full items-center justify-center text-sm text-red-600">{orderActionHistoryError}</div>
+                                ) : orderActionHistory.length === 0 ? (
+                                    <div className="flex h-full items-center justify-center text-sm text-slate-500">No actions recorded yet</div>
+                                ) : (
+                                    <div className="divide-y divide-slate-100">
+                                        {orderActionHistory.map((entry) => (
+                                            <div key={entry.id} className="px-3 py-3">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div>
+                                                        <div className="text-sm font-medium text-slate-900">{entry.actorName || 'Unknown user'}</div>
+                                                        <div className="mt-0.5 text-xs text-slate-500">{entry.actionType || 'Updated'}</div>
+                                                    </div>
+                                                    <div className="shrink-0 text-right text-xs text-slate-500">{entry.actionOn ? dayjs(entry.actionOn).format('DD MMM YYYY, hh:mm A') : '-'}</div>
+                                                </div>
+                                                {entry.actionNotes ? <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-slate-600">{entry.actionNotes}</p> : null}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : null}
+                    </div>
                 </div>
                 <div className="flex justify-end gap-3">
                     {isEditingOrderItem ? (

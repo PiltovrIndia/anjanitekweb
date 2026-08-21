@@ -2127,6 +2127,7 @@ return (
             product={ordersSheetProduct}
             open={!!ordersSheetProduct}
             onClose={() => setOrdersSheetProduct(null)}
+            actor={user}
           />
 
           {/* PRM stock batches for a design, opened from the Active Batches count */}
