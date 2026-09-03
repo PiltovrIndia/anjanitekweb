@@ -27,7 +27,9 @@ export async function GET(request,{params}) {
                     const userId = params.ids[5];      // Test002
                     const sortBy = params.ids[6] || "createdOn";
 
-                    const search = (new URL(request.url).searchParams.get("search") || "").trim().slice(0, 100);
+                    const requestUrl = new URL(request.url);
+                    const search = (requestUrl.searchParams.get("search") || "").trim().slice(0, 100);
+                    const executiveId = (requestUrl.searchParams.get("executiveId") || "").trim().slice(0, 100);
                     // const page = 1;
                     const page = params.ids[3];
                     const limit = 20;
@@ -42,6 +44,32 @@ export async function GET(request,{params}) {
 
                     const where = ["o.isDeleted = 0"];
                     const queryParams = [];
+
+                    if (executiveId) {
+                        if (!["GlobalAdmin", "SuperAdmin"].includes(role)) {
+                            return Response.json({
+                                status: 403,
+                                success: false,
+                                message: "Executive order browsing is available to administrators only",
+                            }, { status: 403 });
+                        }
+
+                        const [executiveRows] = await connection.execute(
+                            "SELECT id FROM user WHERE id = ? AND role = 'SalesExecutive' LIMIT 1",
+                            [executiveId]
+                        );
+
+                        if (executiveRows.length === 0) {
+                            return Response.json({
+                                status: 400,
+                                success: false,
+                                message: "A valid Sales Executive is required",
+                            }, { status: 200 });
+                        }
+
+                        where.push("o.userId = ?");
+                        queryParams.push(executiveId);
+                    }
 
                     if (status && status !== "All") {
                         where.push("o.status = ?");
@@ -293,6 +321,99 @@ export async function GET(request,{params}) {
                     message: "Failed to fetch admin orders",
                     error: error.message,
                     });
+                } finally {
+                    connection.release();
+                }
+            }
+            // executive-level order summaries for the administrator Orders view
+            else if (params.ids[1] == "U0.10") {
+                try {
+                    const status = params.ids[2];
+                    const role = params.ids[3];
+                    const requestUrl = new URL(request.url);
+                    const search = (requestUrl.searchParams.get("search") || "").trim().slice(0, 100);
+                    const waitlistOnly = requestUrl.searchParams.get("waitlist") === "1";
+
+                    if (!["GlobalAdmin", "SuperAdmin"].includes(role)) {
+                        return Response.json({
+                            status: 403,
+                            success: false,
+                            message: "Executive order browsing is available to administrators only",
+                        }, { status: 403 });
+                    }
+
+                    const where = ["o.isDeleted = 0", "u.role = 'SalesExecutive'"];
+                    const values = [];
+
+                    if (status && status !== "All") {
+                        where.push("o.status = ?");
+                        values.push(status);
+                    }
+
+                    if (waitlistOnly) {
+                        where.push("o.productionQty > 0");
+                    }
+
+                    if (search) {
+                        where.push(`(
+                            o.cartId LIKE ?
+                            OR o.design LIKE ?
+                            OR o.userId LIKE ?
+                            OR o.dealerId LIKE ?
+                            OR u.name LIKE ?
+                            OR u_dealer.name LIKE ?
+                            OR p.name LIKE ?
+                            OR o.status LIKE ?
+                        )`);
+                        values.push(...Array(8).fill(`%${search}%`));
+                    }
+
+                    const [rows] = await connection.execute(
+                        `
+                        SELECT
+                            u.id AS executiveId,
+                            u.name AS executiveName,
+                            u.isActive AS executiveIsActive,
+                            COUNT(DISTINCT o.cartId) AS cartCount,
+                            COALESCE(SUM(o.requestedQty), 0) AS totalRequestedQty,
+                            COALESCE(SUM(o.approvedQty), 0) AS totalApprovedQty,
+                            COALESCE(SUM(o.productionQty), 0) AS totalProductionQty,
+                            COALESCE(SUM(CASE WHEN o.productionQty > 0 THEN 1 ELSE 0 END), 0) AS waitlistItems,
+                            MAX(o.createdOn) AS latestOrderOn
+                        FROM orders o
+                        INNER JOIN user u ON o.userId = u.id
+                        LEFT JOIN user u_dealer ON o.dealerId = u_dealer.id
+                        LEFT JOIN products p ON o.design = p.design
+                        WHERE ${where.join(" AND ")}
+                        GROUP BY u.id, u.name, u.isActive
+                        ORDER BY cartCount DESC, latestOrderOn DESC, executiveName ASC
+                        `,
+                        values
+                    );
+
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        data: rows.map((row) => ({
+                            ...row,
+                            cartCount: Number(row.cartCount || 0),
+                            totalRequestedQty: Number(row.totalRequestedQty || 0),
+                            totalApprovedQty: Number(row.totalApprovedQty || 0),
+                            totalProductionQty: Number(row.totalProductionQty || 0),
+                            waitlistItems: Number(row.waitlistItems || 0),
+                        })),
+                        message: "Executive order summaries fetched successfully",
+                    }, { status: 200 });
+                } catch (error) {
+                    console.error("Executive order summary fetch error:", error);
+                    return Response.json({
+                        status: 500,
+                        success: false,
+                        message: "Failed to fetch executive order summaries",
+                        error: error.message,
+                    }, { status: 200 });
+                } finally {
+                    connection.release();
                 }
             }
             // get listing for admin group by designs
@@ -2113,6 +2234,32 @@ export async function GET(request,{params}) {
 
                     var query = '';
                     var queryCount = '';
+                    const reportUrl = new URL(request.url);
+                    const executiveId = (reportUrl.searchParams.get('executiveId') || '').trim().slice(0, 100);
+                    const reportRole = (reportUrl.searchParams.get('role') || '').trim();
+
+                    if (executiveId) {
+                        if (!['GlobalAdmin', 'SuperAdmin'].includes(reportRole)) {
+                            return Response.json({
+                                status: 403,
+                                success: false,
+                                message: 'Executive order browsing is available to administrators only',
+                            }, { status: 403 });
+                        }
+
+                        const [executiveRows] = await connection.execute(
+                            "SELECT id FROM user WHERE id = ? AND role = 'SalesExecutive' LIMIT 1",
+                            [executiveId]
+                        );
+
+                        if (executiveRows.length === 0) {
+                            return Response.json({
+                                status: 400,
+                                success: false,
+                                message: 'A valid Sales Executive is required',
+                            }, { status: 200 });
+                        }
+                    }
                         // params.ids[3] will be date range, lets download the orders modified/created in that date range.
 
 
@@ -2227,8 +2374,15 @@ export async function GET(request,{params}) {
                                 }
                         }
 
-                    const [rows, fields] = await connection.execute(query, [params.ids[3].split(',')[0], params.ids[3].split(',')[1], params.ids[3].split(',')[0], params.ids[3].split(',')[1]]);
-                    const [countRows, countFields] = await connection.execute(queryCount, [params.ids[3].split(',')[0], params.ids[3].split(',')[1], params.ids[3].split(',')[0], params.ids[3].split(',')[1]]);
+                    const reportValues = [params.ids[3].split(',')[0], params.ids[3].split(',')[1], params.ids[3].split(',')[0], params.ids[3].split(',')[1]];
+                    if (executiveId) {
+                        query = query.replace(' ORDER BY r.createdOn DESC', ' AND r.userId = ? ORDER BY r.createdOn DESC');
+                        queryCount += ' AND r.userId = ?';
+                        reportValues.push(executiveId);
+                    }
+
+                    const [rows, fields] = await connection.execute(query, reportValues);
+                    const [countRows, countFields] = await connection.execute(queryCount, reportValues);
 
                     // attach the prm batch allocations for every order in the report:
                     // net quantity currently held per (order, batch) from the ledger

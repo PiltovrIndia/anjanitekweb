@@ -15,7 +15,8 @@ import { Button } from '@/app/components/ui/button'
 import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
-import { ArrowDown, CheckIcon, ChevronDown, ChevronRight, FileCheck, HeartIcon, Pencil, Search, Trash } from 'lucide-react'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/app/components/ui/command'
+import { ArrowDown, CheckIcon, ChevronDown, ChevronRight, FileCheck, HeartIcon, Pencil, Search, Trash, UserRound, UsersRound } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
@@ -29,6 +30,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/app/components/
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/app/components/ui/sheet'
 import { Label } from '@/app/components/ui/label'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs'
 import * as XLSX from 'xlsx';
 import StockOrderDialog from '../products/stock_order_dialog'
 
@@ -38,9 +40,10 @@ const xlsx = require('xlsx');
 const ORDER_PAGE_SIZE = 0;
 
 // get orders
-const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', signal) => {
+const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
+if (executiveId) searchParams.set('executiveId', executiveId)
 return fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -52,9 +55,10 @@ return fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+u
 };
 
 // get waitlisted order items, grouped by cart
-const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', signal) => {
+const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
+if (executiveId) searchParams.set('executiveId', executiveId)
 return fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -66,14 +70,31 @@ return fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+u
 };
 
 // get report specific listing
-const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction) =>
-fetch("/api/v2/orders_test/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction, {
+const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction, executiveId = '', role = '') => {
+const searchParams = new URLSearchParams()
+if (executiveId) {
+    searchParams.set('executiveId', executiveId)
+    searchParams.set('role', role)
+}
+return fetch("/api/v2/orders_test/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
     },
 });
+};
+
+const getExecutiveOrderSummariesAPI = async (pass, type, role, userId, isProduction, { search = '', waitlistOnly = false } = {}, signal) => {
+const searchParams = new URLSearchParams()
+if (search.trim()) searchParams.set('search', search.trim())
+if (waitlistOnly) searchParams.set('waitlist', '1')
+return fetch("/api/v2/orders_test/"+pass+"/U0.10/"+type+"/"+role+"/"+userId+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
+    method: "GET",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    signal,
+});
+};
 
 
 const getOrdersByDesignAPI = async (pass, design, signal) =>
@@ -218,11 +239,19 @@ export default function OrdersV2() {
     const [showWaitlist, setShowWaitlist] = useState(false);
     const [isProduction, setisProduction] = useState('All');
     const [downloadingOrders, setDownloadingOrders] = useState(false);
+    const [downloadingExecutiveId, setDownloadingExecutiveId] = useState(null);
     const [resOffset, setResOffset] = useState(0);
     const [resStatus, setResStatus] = useState('All');
     const [resSearch, setResSearch] = useState('');
     const [activeSearchQuery, setActiveSearchQuery] = useState('');
     const [isSearchingOrders, setIsSearchingOrders] = useState(false);
+    const [ordersView, setOrdersView] = useState('orders');
+    const [selectedExecutive, setSelectedExecutive] = useState(null);
+    const [executivePickerOpen, setExecutivePickerOpen] = useState(false);
+    const [executiveSummaries, setExecutiveSummaries] = useState([]);
+    const [executiveSummaryQuery, setExecutiveSummaryQuery] = useState('');
+    const [loadingExecutiveSummaries, setLoadingExecutiveSummaries] = useState(false);
+    const [executiveSummariesError, setExecutiveSummariesError] = useState('');
     const [downloadFromDate, setDownloadFromDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
     const [downloadToDate, setDownloadToDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [showDownloadPopover, setShowDownloadPopover] = useState(false);
@@ -297,6 +326,9 @@ export default function OrdersV2() {
     const [eventMedia, setEventMedia] = useState('-');
     const [uploadProgress, setUploadProgress] = useState(0);
     const [imageError, setImageError] = useState('');
+    const canBrowseExecutives = ['GlobalAdmin', 'SuperAdmin'].includes(user?.role);
+    const selectedExecutiveId = selectedExecutive?.executiveId || '';
+    const shouldShowOrdersListing = !canBrowseExecutives || ordersView === 'orders' || Boolean(selectedExecutiveId);
     
     // get the user and fire the data fetch
     useEffect(()=>{
@@ -315,6 +347,47 @@ export default function OrdersV2() {
                 router.push('/')
             }
     },[]);
+
+    useEffect(() => {
+        if (!canBrowseExecutives || !user?.role || !user?.id) {
+            setExecutiveSummaries([]);
+            setExecutiveSummariesError('');
+            setLoadingExecutiveSummaries(false);
+            return;
+        }
+
+        const controller = new AbortController();
+        setLoadingExecutiveSummaries(true);
+        setExecutiveSummariesError('');
+
+        getExecutiveOrderSummariesAPI(
+            process.env.NEXT_PUBLIC_API_PASS,
+            resStatus,
+            user.role,
+            user.id,
+            isProduction,
+            { search: activeSearchQuery, waitlistOnly: showWaitlist },
+            controller.signal
+        )
+            .then(async (response) => {
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 200) {
+                    throw new Error(payload.message || 'Unable to load executive summaries');
+                }
+                if (!controller.signal.aborted) setExecutiveSummaries(Array.isArray(payload.data) ? payload.data : []);
+            })
+            .catch((error) => {
+                if (!controller.signal.aborted) {
+                    setExecutiveSummaries([]);
+                    setExecutiveSummariesError(error.message || 'Unable to load executive summaries');
+                }
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoadingExecutiveSummaries(false);
+            });
+
+        return () => controller.abort();
+    }, [canBrowseExecutives, user?.role, user?.id, resStatus, isProduction, showWaitlist, activeSearchQuery]);
 
     useEffect(() => {
         const handler = (e) => {
@@ -529,6 +602,8 @@ export default function OrdersV2() {
     }, [isEditingOrderItem, selectedRes?.stockType, selectedRes?.status, loadingDesignBatches, loadingOrderAllocations, orderAllocations, designBatches])
 
     useEffect(() => {
+        if (!shouldShowOrdersListing) return;
+
         const sentinel = ordersEndRef.current;
         if (!sentinel) return;
         const observer = new IntersectionObserver((entries) => {
@@ -536,7 +611,7 @@ export default function OrdersV2() {
         }, { threshold: 0 });
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, []);
+    }, [shouldShowOrdersListing]);
 
     // useEffect(() => {
     //         if (user && user.id) {
@@ -665,7 +740,7 @@ export default function OrdersV2() {
         append = false,
         waitlistOnly = showWaitlist,
         searchQuery = activeSearchQuery,
-        { signal, keepRows = false } = {}
+        { signal, keepRows = false, executiveId = selectedExecutiveId } = {}
     ){
         const requestVersion = append ? ordersRequestVersionRef.current : ordersRequestVersionRef.current + 1;
         if (!append) {
@@ -695,8 +770,8 @@ export default function OrdersV2() {
 
         try {    
             const result = await (waitlistOnly
-                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, signal)
-                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, signal));
+                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, signal)
+                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, signal));
             const queryResult = await result.json() // get data
 
             if (!isCurrentRequest()) return false;
@@ -787,10 +862,13 @@ export default function OrdersV2() {
         xlsx.writeFile(workbook, filename);
     }
 
-    async function downloadOrdersNow() {
+    async function downloadOrdersNow({ executive = selectedExecutive, source = 'toolbar' } = {}) {
         const statusToDownload = resStatus || 'All';
+        const executiveId = executive?.executiveId || '';
+        const isExecutiveCardDownload = source === 'executive-card';
 
-        setDownloadingOrders(true);
+        if (isExecutiveCardDownload) setDownloadingExecutiveId(executiveId);
+        else setDownloadingOrders(true);
         setShowDownloadPopover(false);
 
         try {
@@ -801,7 +879,9 @@ export default function OrdersV2() {
                 statusToDownload,
                 downloadFromDate,
                 downloadToDate,
-                isProduction
+                isProduction,
+                executiveId,
+                user?.role || ''
             );
             const queryResult = await result.json();
 
@@ -831,13 +911,15 @@ export default function OrdersV2() {
             }
 
             const orderRows = buildOrderDownloadRows(allOrders);
-            writeOrdersWorkbook(orderRows, `orders${isProduction != 'All' ? (isProduction == 1 ? '_Production' : '_Current') : ''}_${statusToDownload.toLowerCase()}_${downloadFromDate}_to_${downloadToDate}.xlsx`);
+            const executiveSuffix = executiveId ? `_executive_${executiveId}` : '';
+            writeOrdersWorkbook(orderRows, `orders${isProduction != 'All' ? (isProduction == 1 ? '_Production' : '_Current') : ''}${executiveSuffix}_${statusToDownload.toLowerCase()}_${downloadFromDate}_to_${downloadToDate}.xlsx`);
 
-            toast({ description: `Downloaded ${allOrders.length} orders (${orderRows.length} rows)` });
+            toast({ description: `Downloaded ${allOrders.length} orders (${orderRows.length} rows)${executive?.executiveName ? ` for ${executive.executiveName}` : ''}` });
         } catch (e) {
             toast({ description: e.message || 'Failed to download orders' });
         } finally {
-            setDownloadingOrders(false);
+            if (isExecutiveCardDownload) setDownloadingExecutiveId(null);
+            else setDownloadingOrders(false);
         }
     }
 
@@ -1495,6 +1577,24 @@ export default function OrdersV2() {
         getOrders(val, 0, user, isProduction, false, showWaitlist, searchQuery, { keepRows: true });
     }
 
+    function handleExecutiveSelection(executive) {
+        const nextExecutive = executive || null;
+        const nextExecutiveId = nextExecutive?.executiveId || '';
+
+        cancelOrderSearch();
+        setSelectedExecutive(nextExecutive);
+        setExecutivePickerOpen(false);
+        setResOffset(0);
+        setExpandedCartGroups({});
+
+        if (user) {
+            getOrders(resStatus, 0, user, isProduction, false, showWaitlist, getEligibleOrderSearchQuery(), {
+                keepRows: true,
+                executiveId: nextExecutiveId,
+            });
+        }
+    }
+
     async function handleWaitlistToggle(checked) {
         if (resLoading || isLoadingMore || isSearchingOrders || !user) return;
 
@@ -1535,6 +1635,18 @@ export default function OrdersV2() {
         setResOffset(next);
         getOrders(resStatus, next, user, isProduction, true, showWaitlist, activeSearchQuery);
     };
+
+    const visibleExecutiveSummaries = useMemo(() => {
+        const query = executiveSummaryQuery.trim().toLowerCase();
+        if (!query) return executiveSummaries;
+        return executiveSummaries.filter((executive) => (
+            [executive.executiveName, executive.executiveId]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase()
+                .includes(query)
+        ));
+    }, [executiveSummaries, executiveSummaryQuery]);
 
 return (
 
@@ -1604,6 +1716,46 @@ return (
                                 <SelectItem value="SaleOrder">SaleOrder</SelectItem>
                             </SelectContent>
                         </Select>
+                        {canBrowseExecutives ? (
+                            <Popover open={executivePickerOpen} onOpenChange={setExecutivePickerOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-[210px] justify-between font-medium" aria-label="Filter orders by sales executive">
+                                        <span className="flex min-w-0 items-center gap-2">
+                                            <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <span className="truncate">{selectedExecutive?.executiveName || 'All Executives'}</span>
+                                        </span>
+                                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[290px] p-0" align="end">
+                                    <Command>
+                                        <CommandInput placeholder="Search executives..." />
+                                        <CommandList>
+                                            <CommandEmpty>No executives match these filters.</CommandEmpty>
+                                            <CommandGroup heading="Order creators">
+                                                <CommandItem value="all executives" onSelect={() => handleExecutiveSelection(null)}>
+                                                    <UsersRound className="mr-2 h-4 w-4" />
+                                                    <span>All Executives</span>
+                                                    {!selectedExecutiveId ? <CheckIcon className="ml-auto h-4 w-4" /> : null}
+                                                </CommandItem>
+                                                {executiveSummaries.map((executive) => (
+                                                    <CommandItem
+                                                        key={executive.executiveId}
+                                                        value={`${executive.executiveName || ''} ${executive.executiveId || ''}`}
+                                                        onSelect={() => handleExecutiveSelection(executive)}
+                                                    >
+                                                        <UserRound className="mr-2 h-4 w-4" />
+                                                        <span className="truncate">{executive.executiveName || executive.executiveId}</span>
+                                                        {Number(executive.executiveIsActive) !== 1 ? <span className="ml-2 text-xs text-muted-foreground">Inactive</span> : null}
+                                                        {selectedExecutiveId === executive.executiveId ? <CheckIcon className="ml-auto h-4 w-4" /> : null}
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        ) : null}
                         <Button size="xs" onClick={() => setStockOrderOpen(true)} className="bg-green-600 hover:bg-green-700 text-white font-mono uppercase text-sm tracking-wider px-3 py-2" >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Add Order
@@ -1636,7 +1788,7 @@ return (
                                     </div>
                                     <Button
                                         className="w-full mt-1 font-mono uppercase text-sm tracking-wide"
-                                        onClick={downloadOrdersNow}
+                                        onClick={() => downloadOrdersNow()}
                                         disabled={!downloadFromDate || !downloadToDate}
                                     >
                                         <ArrowDown className="mr-2 h-4 w-4" />
@@ -1651,8 +1803,120 @@ return (
               <Toaster />
           </div>
 
-          
-          
+          {canBrowseExecutives ? (
+              <Tabs value={ordersView} onValueChange={setOrdersView} className="w-full">
+                  <TabsList aria-label="Order browsing mode">
+                      <TabsTrigger value="orders">Orders</TabsTrigger>
+                      <TabsTrigger value="executives">By Executive</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="executives" className="mt-4">
+                      <div className="flex flex-col gap-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                  <h3 className="text-base font-semibold">Executive order activity</h3>
+                                  <p className="text-sm text-muted-foreground">Choose an executive to browse their carts using the current order filters.</p>
+                              </div>
+                              <div className="relative w-full sm:w-64">
+                                  <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                  <Input
+                                      value={executiveSummaryQuery}
+                                      onChange={(event) => setExecutiveSummaryQuery(event.target.value)}
+                                      placeholder="Search executives..."
+                                      className="pl-8"
+                                  />
+                              </div>
+                          </div>
+
+                          {loadingExecutiveSummaries ? (
+                              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                  {[0, 1, 2, 3, 4, 5].map((index) => <Skeleton key={index} className="h-40 rounded-md" />)}
+                              </div>
+                          ) : executiveSummariesError ? (
+                              <Card className="border-red-200 bg-red-50 shadow-none">
+                                  <CardContent className="p-4 text-sm text-red-700">{executiveSummariesError}</CardContent>
+                              </Card>
+                          ) : visibleExecutiveSummaries.length === 0 ? (
+                              <Card className="border-dashed shadow-none">
+                                  <CardContent className="p-8 text-center text-sm text-muted-foreground">No executives have matching orders.</CardContent>
+                              </Card>
+                          ) : (
+                              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                  {visibleExecutiveSummaries.map((executive) => {
+                                      const isSelected = selectedExecutiveId === executive.executiveId;
+                                      const isDownloadingExecutive = downloadingExecutiveId === executive.executiveId;
+                                      return (
+                                          <Card
+                                              key={executive.executiveId}
+                                              onClick={() => handleExecutiveSelection(executive)}
+                                              onKeyDown={(event) => {
+                                                  if (event.key === 'Enter' || event.key === ' ') {
+                                                      event.preventDefault();
+                                                      handleExecutiveSelection(executive);
+                                                  }
+                                              }}
+                                              role="button"
+                                              tabIndex={0}
+                                              className={`h-full cursor-pointer rounded-md text-left shadow-none transition-colors hover:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 ${isSelected ? 'border-slate-900 bg-slate-50' : ''}`}
+                                          >
+                                              <CardContent className="p-4">
+                                                  <div className="flex items-start justify-between gap-3">
+                                                      <div className="min-w-0">
+                                                          <div className="flex items-center gap-2">
+                                                              <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                              <p className="truncate font-semibold">{executive.executiveName || executive.executiveId}</p>
+                                                          </div>
+                                                          <p className="mt-1 truncate text-xs text-muted-foreground">{executive.executiveId}</p>
+                                                      </div>
+                                                      <div className="flex items-center gap-2">
+                                                          {Number(executive.executiveIsActive) === 1 ? null : <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-500">Inactive</span>}
+                                                          <Button
+                                                              type="button"
+                                                              variant="outline"
+                                                              size="icon"
+                                                              className="h-8 w-8"
+                                                              disabled={isDownloadingExecutive}
+                                                              onClick={(event) => {
+                                                                  event.stopPropagation();
+                                                                  downloadOrdersNow({ executive, source: 'executive-card' });
+                                                              }}
+                                                              onKeyDown={(event) => event.stopPropagation()}
+                                                              aria-label={`Download orders for ${executive.executiveName || executive.executiveId}`}
+                                                              title="Download executive orders"
+                                                          >
+                                                              {isDownloadingExecutive ? <SpinnerGap className="h-4 w-4 animate-spin" /> : <ArrowDown className="h-4 w-4" />}
+                                                          </Button>
+                                                      </div>
+                                                  </div>
+                                                  <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                                                      <div><p className="text-xs text-muted-foreground">Carts</p><p className="mt-1 font-semibold">{Number(executive.cartCount || 0).toLocaleString()}</p></div>
+                                                      <div><p className="text-xs text-muted-foreground">Waitlist</p><p className="mt-1 font-semibold text-orange-700">{Number(executive.waitlistItems || 0).toLocaleString()}</p></div>
+                                                      <div><p className="text-xs text-muted-foreground">Requested</p><p className="mt-1 font-mono">{Number(executive.totalRequestedQty || 0).toLocaleString()}</p></div>
+                                                      <div><p className="text-xs text-muted-foreground">Approved / Production</p><p className="mt-1 font-mono">{Number(executive.totalApprovedQty || 0).toLocaleString()} / {Number(executive.totalProductionQty || 0).toLocaleString()}</p></div>
+                                                  </div>
+                                              </CardContent>
+                                          </Card>
+                                      );
+                                  })}
+                              </div>
+                          )}
+                      </div>
+                  </TabsContent>
+              </Tabs>
+          ) : null}
+
+          {ordersView === 'executives' && selectedExecutive ? (
+              <div className="flex items-center justify-between gap-3 border-y py-3">
+                  <div className="min-w-0">
+                      <p className="text-sm text-muted-foreground">Browsing orders created by</p>
+                      <p className="truncate font-semibold">{selectedExecutive.executiveName || selectedExecutive.executiveId}</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => handleExecutiveSelection(null)}>
+                      <X className="mr-2 h-4 w-4" /> Clear executive
+                  </Button>
+              </div>
+          ) : null}
+
+          {shouldShowOrdersListing ? (
             <div className="w-full">
 
                 <Card>
@@ -1965,6 +2229,7 @@ return (
                     {!isLoadingMore && orders.length > 0 && orders.length >= totalOrders && <span>All {totalOrders} orders loaded</span>}
                 </div>
             </div>
+          ) : null}
           
           <StockOrderDialog
             id={userId}
