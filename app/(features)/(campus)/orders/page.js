@@ -16,7 +16,7 @@ import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/app/components/ui/command'
-import { ArrowDown, CheckIcon, ChevronDown, ChevronRight, FileCheck, HeartIcon, Pencil, Search, Trash, UserRound, UsersRound } from 'lucide-react'
+import { ArrowDown, CheckIcon, ChevronDown, ChevronRight, FileCheck, HeartIcon, MessageSquare, Pencil, Search, Trash, UserRound, UsersRound } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
@@ -31,6 +31,8 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHe
 import { Label } from '@/app/components/ui/label'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/app/components/ui/alert-dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs'
+import { ScrollArea } from '@/app/components/ui/scroll-area'
+import { Badge } from '@/app/components/ui/badge'
 import * as XLSX from 'xlsx';
 import StockOrderDialog from '../products/stock_order_dialog'
 
@@ -40,10 +42,11 @@ const xlsx = require('xlsx');
 const ORDER_PAGE_SIZE = 0;
 
 // get orders
-const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', signal) => {
+const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
 if (executiveId) searchParams.set('executiveId', executiveId)
+if (basketType !== 'All') searchParams.set('basketType', basketType)
 return fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -55,10 +58,11 @@ return fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+u
 };
 
 // get waitlisted order items, grouped by cart
-const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', signal) => {
+const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
 if (executiveId) searchParams.set('executiveId', executiveId)
+if (basketType !== 'All') searchParams.set('basketType', basketType)
 return fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -70,12 +74,13 @@ return fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+u
 };
 
 // get report specific listing
-const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction, executiveId = '', role = '') => {
+const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction, executiveId = '', role = '', basketType = 'All') => {
 const searchParams = new URLSearchParams()
 if (executiveId) {
     searchParams.set('executiveId', executiveId)
     searchParams.set('role', role)
 }
+if (basketType !== 'All') searchParams.set('basketType', basketType)
 return fetch("/api/v2/orders_test/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -85,10 +90,11 @@ return fetch("/api/v2/orders_test/"+pass+"/report/"+type+"/"+encodeURIComponent(
 });
 };
 
-const getExecutiveOrderSummariesAPI = async (pass, type, role, userId, isProduction, { search = '', waitlistOnly = false } = {}, signal) => {
+const getExecutiveOrderSummariesAPI = async (pass, type, role, userId, isProduction, { search = '', waitlistOnly = false, basketType = 'All' } = {}, signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
 if (waitlistOnly) searchParams.set('waitlist', '1')
+if (basketType !== 'All') searchParams.set('basketType', basketType)
 return fetch("/api/v2/orders_test/"+pass+"/U0.10/"+type+"/"+role+"/"+userId+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -118,6 +124,38 @@ return fetch("/api/v2/orders_test/"+pass+"/"+path+"/"+orderId+"/"+qty+"/"+userId
         "Content-Type": "application/json",
         Accept: "application/json",
     },
+});
+};
+
+const changePrmOrderToStdAPI = async (pass, orderId, userId, actionDate, notes = '') => {
+const searchParams = new URLSearchParams({ notes: notes || '' })
+return fetch(`/api/v2/orders_test/${pass}/U0.11/${orderId}/${userId}/${actionDate}?${searchParams.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+});
+};
+
+const changeStdOrderToPrmAPI = async (pass, orderId, userId, actionDate, notes = '') => {
+const searchParams = new URLSearchParams({ notes: notes || '' })
+return fetch(`/api/v2/orders_test/${pass}/U0.12/${orderId}/${userId}/${actionDate}?${searchParams.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+});
+};
+
+const changePendingOrderDesignAPI = async (pass, orderId, userId, design, actionDate, notes = '') => {
+const searchParams = new URLSearchParams({ notes: notes || '' })
+return fetch(`/api/v2/orders_test/${pass}/U0.13/${orderId}/${userId}/${encodeURIComponent(design)}/${actionDate}?${searchParams.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+});
+};
+
+const updateOrderNotesAPI = async (pass, orderId, userId, actionDate, notes = '') => {
+const searchParams = new URLSearchParams({ notes: notes || '' })
+return fetch(`/api/v2/orders_test/${pass}/U0.14/${orderId}/${userId}/${actionDate}?${searchParams.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
 });
 };
 
@@ -238,6 +276,7 @@ export default function OrdersV2() {
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [showWaitlist, setShowWaitlist] = useState(false);
     const [isProduction, setisProduction] = useState('All');
+    const [basketTypeFilter, setBasketTypeFilter] = useState('All');
     const [downloadingOrders, setDownloadingOrders] = useState(false);
     const [downloadingExecutiveId, setDownloadingExecutiveId] = useState(null);
     const [resOffset, setResOffset] = useState(0);
@@ -257,6 +296,9 @@ export default function OrdersV2() {
     const [showDownloadPopover, setShowDownloadPopover] = useState(false);
     const [downloadingCartId, setDownloadingCartId] = useState(null);
     const [stockOrderOpen, setStockOrderOpen] = useState(false);
+    const [addToCartGroup, setAddToCartGroup] = useState(null);
+    const [basketReviewGroup, setBasketReviewGroup] = useState(null);
+    const [basketReviewReturnCartId, setBasketReviewReturnCartId] = useState(null);
     const [expandedCartGroups, setExpandedCartGroups] = useState({});
 
     // Sort state
@@ -268,9 +310,13 @@ export default function OrdersV2() {
     const [selectedRes, setSelectedRes] = useState(null);
     const [approvalQty, setApprovalQty] = useState('');
     const [orderNotes, setOrderNotes] = useState('');
+    const [notesDialogOrder, setNotesDialogOrder] = useState(null)
+    const [notesDialogValue, setNotesDialogValue] = useState('')
+    const [savingOrderNotes, setSavingOrderNotes] = useState(false)
     const [reviewDesignQuery, setReviewDesignQuery] = useState('')
     const [reviewDesignResults, setReviewDesignResults] = useState([])
     const [searchingReviewDesigns, setSearchingReviewDesigns] = useState(false)
+    const [changingReviewDesign, setChangingReviewDesign] = useState(false)
     const [showReviewDesignDrop, setShowReviewDesignDrop] = useState(false)
     const [selectedReviewDesign, setSelectedReviewDesign] = useState(null)
     const [designOrderHistory, setDesignOrderHistory] = useState([])
@@ -366,7 +412,7 @@ export default function OrdersV2() {
             user.role,
             user.id,
             isProduction,
-            { search: activeSearchQuery, waitlistOnly: showWaitlist },
+            { search: activeSearchQuery, waitlistOnly: showWaitlist, basketType: basketTypeFilter },
             controller.signal
         )
             .then(async (response) => {
@@ -387,7 +433,7 @@ export default function OrdersV2() {
             });
 
         return () => controller.abort();
-    }, [canBrowseExecutives, user?.role, user?.id, resStatus, isProduction, showWaitlist, activeSearchQuery]);
+    }, [canBrowseExecutives, user?.role, user?.id, resStatus, isProduction, showWaitlist, activeSearchQuery, basketTypeFilter]);
 
     useEffect(() => {
         const handler = (e) => {
@@ -406,6 +452,7 @@ export default function OrdersV2() {
             setReviewDesignResults([])
             setShowReviewDesignDrop(false)
             setSearchingReviewDesigns(false)
+            setChangingReviewDesign(false)
             setSelectedReviewDesign(null)
             setDesignOrderHistory([])
             setLoadingDesignOrderHistory(false)
@@ -418,6 +465,22 @@ export default function OrdersV2() {
             setShowOrderActionHistory(false)
         }
     }, [isActionDialogOpen])
+
+    useEffect(() => {
+        if (isActionDialogOpen || !basketReviewReturnCartId) return;
+
+        const refreshedBasket = orders.find((group) => String(group.cartId) === String(basketReviewReturnCartId));
+        if (refreshedBasket) setBasketReviewGroup(refreshedBasket);
+        setBasketReviewReturnCartId(null);
+    }, [isActionDialogOpen, basketReviewReturnCartId, orders])
+
+    useEffect(() => {
+        const basketId = basketReviewGroup?.cartId;
+        if (!basketId) return;
+
+        const refreshedBasket = orders.find((group) => String(group.cartId) === String(basketId));
+        if (refreshedBasket && refreshedBasket !== basketReviewGroup) setBasketReviewGroup(refreshedBasket);
+    }, [orders, basketReviewGroup])
 
     useEffect(() => {
         if (!isActionDialogOpen || !showDesignOrderHistory || !selectedReviewDesign?.design) {
@@ -521,7 +584,8 @@ export default function OrdersV2() {
     // Load the PRM stock batches for the design under review
     useEffect(() => {
         const design = selectedReviewDesign?.design || selectedRes?.design;
-        if (!isActionDialogOpen || selectedRes?.stockType !== 'prm' || !design) {
+        const shouldLoadPrmBatches = selectedRes?.stockType === 'prm' || (isEditingOrderItem && selectedRes?.stockType === 'std');
+        if (!isActionDialogOpen || !shouldLoadPrmBatches || !design) {
             setDesignBatches([]);
             setLoadingDesignBatches(false);
             setBatchSequence([]);
@@ -549,7 +613,7 @@ export default function OrdersV2() {
         });
 
         return () => { cancelled = true; };
-    }, [isActionDialogOpen, selectedRes?.stockType, selectedReviewDesign?.design, selectedRes?.design])
+    }, [isActionDialogOpen, isEditingOrderItem, selectedRes?.stockType, selectedReviewDesign?.design, selectedRes?.design])
 
     // For an approved PRM order, load the batches its stock is allocated from
     useEffect(() => {
@@ -653,6 +717,7 @@ export default function OrdersV2() {
                     productionQty: Number(order.totalProductionQty || 0),
                     waitlistItems: Number(order.waitlistItems || 0),
                     stockTypes: [...new Set(rows.map((item) => item.stockType).filter(Boolean))],
+                    basketTypes: [...new Set(rows.map((item) => Number(item.designType) === 1 ? 'ATL' : Number(item.designType) === 2 ? 'VCL' : null).filter(Boolean))],
                     requestTypes: [...new Set(rows.map((item) => Number(item.productionQty || 0) > 0 ? 'Production' : 'Current'))],
                     statuses: order.orderStatus
                         ? [{ label: order.orderStatus, count: 1 }]
@@ -689,6 +754,7 @@ export default function OrdersV2() {
                 approvedQty: rows.reduce((sum, item) => sum + Number(item.approvedQty || 0), 0),
                 waitlistItems: rows.filter((item) => hasWaitlistPosition(item.waitlistPosition)).length,
                 stockTypes: [...new Set(rows.map((item) => item.stockType).filter(Boolean))],
+                basketTypes: [...new Set(rows.map((item) => Number(item.designType) === 1 ? 'ATL' : Number(item.designType) === 2 ? 'VCL' : null).filter(Boolean))],
                 requestTypes: [...new Set(rows.map((item) => item.isProduction == 1 || Number(item.productionQty || 0) > 0 ? 'Production' : 'Current'))],
                 statuses: getStatusCounts(rows),
             }
@@ -740,7 +806,7 @@ export default function OrdersV2() {
         append = false,
         waitlistOnly = showWaitlist,
         searchQuery = activeSearchQuery,
-        { signal, keepRows = false, executiveId = selectedExecutiveId } = {}
+        { signal, keepRows = false, executiveId = selectedExecutiveId, basketType = basketTypeFilter } = {}
     ){
         const requestVersion = append ? ordersRequestVersionRef.current : ordersRequestVersionRef.current + 1;
         if (!append) {
@@ -770,8 +836,8 @@ export default function OrdersV2() {
 
         try {    
             const result = await (waitlistOnly
-                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, signal)
-                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, signal));
+                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, signal)
+                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, signal));
             const queryResult = await result.json() // get data
 
             if (!isCurrentRequest()) return false;
@@ -881,7 +947,8 @@ export default function OrdersV2() {
                 downloadToDate,
                 isProduction,
                 executiveId,
-                user?.role || ''
+                user?.role || '',
+                basketTypeFilter
             );
             const queryResult = await result.json();
 
@@ -1154,14 +1221,165 @@ export default function OrdersV2() {
         }, 400)
     }
 
-    const selectReviewDesign = (product) => {
-        setSelectedReviewDesign(product)
+    const selectReviewDesign = async (product) => {
+        if (!selectedRes?.id || !['Submitted', 'InReview'].includes(selectedRes.status)) {
+            toast({ description: 'Design can only be changed while an order item is pending review.' })
+            return
+        }
+        if (!user?.id) {
+            toast({ description: 'Your session is unavailable. Please sign in again.' })
+            return
+        }
+        if (!product?.design || product.design === selectedRes.design) {
+            setSelectedReviewDesign(selectedRes)
+            setReviewDesignQuery('')
+            setReviewDesignResults([])
+            setShowReviewDesignDrop(false)
+            return
+        }
+
+        setChangingReviewDesign(true)
+        setShowReviewDesignDrop(false)
         setReviewDesignQuery('')
         setReviewDesignResults([])
-        setShowReviewDesignDrop(false)
-        setShowDesignOrderHistory(false)
-        setDesignOrderHistory([])
-        setDesignOrderHistoryError('')
+        try {
+            const result = await changePendingOrderDesignAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                selectedRes.id,
+                user.id,
+                product.design,
+                dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                orderNotes,
+            )
+            const queryResult = await result.json()
+            if (queryResult.status !== 200) {
+                throw new Error(queryResult.message || 'Unable to change the requested design')
+            }
+
+            const actionOn = queryResult.data?.lastActionOn || new Date().toISOString()
+            const designPatch = {
+                design: product.design,
+                name: product.name,
+                description: product.description,
+                size: product.size,
+                tags: product.tags,
+                media: product.media,
+                productId: product.productId,
+                prm: product.prm,
+                std: product.std,
+                designType: product.designType,
+                notes: queryResult.data?.notes ?? orderNotes ?? null,
+                lastActionById: queryResult.data?.lastActionById || user.id,
+                lastActionByName: queryResult.data?.lastActionByName || user.name,
+                lastActionType: queryResult.data?.lastActionType || 'DesignChanged',
+                lastActionOn: actionOn,
+            }
+
+            setSelectedRes((current) => current ? { ...current, ...designPatch } : current)
+            setSelectedReviewDesign(product)
+            setShowDesignOrderHistory(false)
+            setDesignOrderHistory([])
+            setDesignOrderHistoryError('')
+            setBatchSequence([])
+            setBatchQtyById({})
+            setOrderAllocations([])
+            setOrders((previousOrders) => previousOrders.map((group) => {
+                if (!group.rows?.some((row) => String(row.id) === String(selectedRes.id))) return group
+
+                const updatedRows = group.rows.map((row) => (
+                    String(row.id) === String(selectedRes.id) ? { ...row, ...designPatch } : row
+                ))
+                const latestActionRow = updatedRows.reduce((latest, row) => {
+                    if (!row.lastActionOn) return latest
+                    return !latest?.lastActionOn || new Date(row.lastActionOn) > new Date(latest.lastActionOn) ? row : latest
+                }, null)
+
+                return {
+                    ...group,
+                    rows: updatedRows,
+                    first: updatedRows[0] || group.first,
+                    totalDesigns: new Set(updatedRows.map((row) => row.design).filter(Boolean)).size,
+                    basketTypes: [...new Set(updatedRows.map((row) => Number(row.designType) === 1 ? 'ATL' : Number(row.designType) === 2 ? 'VCL' : null).filter(Boolean))],
+                    lastActionById: latestActionRow?.lastActionById,
+                    lastActionByName: latestActionRow?.lastActionByName,
+                    lastActionType: latestActionRow?.lastActionType,
+                    lastActionOn: latestActionRow?.lastActionOn,
+                }
+            }))
+            toast({ description: `Requested design changed to ${product.design}.` })
+        } catch (error) {
+            setSelectedReviewDesign(selectedRes)
+            toast({ description: error.message || 'Unable to change the requested design' })
+        } finally {
+            setChangingReviewDesign(false)
+        }
+    }
+
+    const openOrderNotesDialog = (order, event) => {
+        event?.stopPropagation?.()
+        setNotesDialogOrder(order)
+        setNotesDialogValue(typeof order?.notes === 'string' && order.notes !== '-' ? order.notes : '')
+    }
+
+    const saveOrderNotes = async () => {
+        if (!notesDialogOrder?.id || !user?.id) {
+            toast({ description: 'Your session is unavailable. Please sign in again.' })
+            return
+        }
+
+        setSavingOrderNotes(true)
+        try {
+            const response = await updateOrderNotesAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                notesDialogOrder.id,
+                user.id,
+                dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                notesDialogValue,
+            )
+            const result = await response.json()
+            if (result.status !== 200) {
+                throw new Error(result.message || 'Unable to update notes')
+            }
+
+            const notePatch = {
+                notes: result.data?.notes ?? null,
+                lastActionById: result.data?.lastActionById || user.id,
+                lastActionByName: result.data?.lastActionByName || user.name,
+                lastActionType: result.data?.lastActionType || 'NotesUpdated',
+                lastActionOn: result.data?.lastActionOn || new Date().toISOString(),
+            }
+            const orderId = notesDialogOrder.id
+
+            setOrders((previousOrders) => previousOrders.map((group) => {
+                if (!group.rows?.some((row) => String(row.id) === String(orderId))) return group
+
+                const updatedRows = group.rows.map((row) => (
+                    String(row.id) === String(orderId) ? { ...row, ...notePatch } : row
+                ))
+                const latestActionRow = updatedRows.reduce((latest, row) => {
+                    if (!row.lastActionOn) return latest
+                    return !latest?.lastActionOn || new Date(row.lastActionOn) > new Date(latest.lastActionOn) ? row : latest
+                }, null)
+
+                return {
+                    ...group,
+                    rows: updatedRows,
+                    first: updatedRows[0] || group.first,
+                    lastActionById: latestActionRow?.lastActionById,
+                    lastActionByName: latestActionRow?.lastActionByName,
+                    lastActionType: latestActionRow?.lastActionType,
+                    lastActionOn: latestActionRow?.lastActionOn,
+                }
+            }))
+            setSelectedRes((current) => String(current?.id) === String(orderId) ? { ...current, ...notePatch } : current)
+            if (String(selectedRes?.id) === String(orderId)) setOrderNotes(notePatch.notes || '')
+            setNotesDialogOrder(null)
+            toast({ description: 'Notes saved.' })
+        } catch (error) {
+            toast({ description: error.message || 'Unable to update notes' })
+        } finally {
+            setSavingOrderNotes(false)
+        }
     }
 
     // mark every order item of a cart as Sale Order (clears pending production)
@@ -1442,6 +1660,7 @@ export default function OrdersV2() {
                         return {
                             ...group,
                             rows: updatedRows,
+                            first: updatedRows[0] || group.first,
                             totalRequestedQty, totalApprovedQty, totalProductionQty,
                             requestedQty: totalRequestedQty,
                             approvedQty: totalApprovedQty,
@@ -1451,6 +1670,7 @@ export default function OrdersV2() {
                             lastActionByName: latestActionRow?.lastActionByName,
                             lastActionType: latestActionRow?.lastActionType,
                             lastActionOn: latestActionRow?.lastActionOn,
+                            statuses: getStatusCounts(updatedRows),
                         };
                     }));
                 } else {
@@ -1461,6 +1681,194 @@ export default function OrdersV2() {
             }
         } catch (e) {
             toast({ description: "Error submitting approval: " + e.message });
+        } finally {
+            setResLoading(false);
+        }
+    }
+
+    async function changePrmOrderToStd() {
+        const requestedQty = Number(selectedRes?.requestedQty || 0);
+        const availableStd = Number(selectedReviewDesign?.std || 0);
+
+        if (!selectedRes?.id || selectedRes.stockType !== 'prm') return;
+        if (!['Submitted', 'InReview', 'Approved'].includes(selectedRes.status)) {
+            toast({ description: 'Only pending or approved PRM items can be changed to STD' });
+            return;
+        }
+        if (!selectedReviewDesign?.design || selectedReviewDesign.design !== selectedRes.design) {
+            toast({ description: 'Restore the requested design before changing its stock type' });
+            return;
+        }
+        if (availableStd < requestedQty) {
+            toast({ description: `STD stock must be at least ${requestedQty} to change this order` });
+            return;
+        }
+        if (!user?.id) {
+            toast({ description: 'Your session is unavailable. Please sign in again.' });
+            return;
+        }
+
+        setResLoading(true);
+        try {
+            const result = await changePrmOrderToStdAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                selectedRes.id,
+                user.id,
+                dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                orderNotes,
+            );
+            const queryResult = await result.json();
+
+            if (queryResult.status !== 200) {
+                throw new Error(queryResult.message || 'Unable to change the order to STD');
+            }
+
+            const data = queryResult.data || {};
+            const convertedOn = new Date().toISOString();
+            const convertedPatch = {
+                stockType: 'std',
+                approvedQty: data.approvedQty ?? selectedRes.approvedQty,
+                productionQty: data.productionQty ?? selectedRes.productionQty,
+                status: data.status ?? selectedRes.status,
+                notes: orderNotes || null,
+                lastActionById: user.id,
+                lastActionByName: user.name,
+                lastActionType: 'StockTypeChanged',
+                lastActionOn: convertedOn,
+            };
+
+            setOrders((previousOrders) => previousOrders.map((group) => {
+                if (!group.rows?.some((row) => String(row.id) === String(selectedRes.id))) return group;
+
+                const updatedRows = group.rows.map((row) => (
+                    String(row.id) === String(selectedRes.id) ? { ...row, ...convertedPatch } : row
+                ));
+                const latestActionRow = updatedRows.reduce((latest, row) => {
+                    if (!row.lastActionOn) return latest;
+                    return !latest?.lastActionOn || new Date(row.lastActionOn) > new Date(latest.lastActionOn) ? row : latest;
+                }, null);
+
+                return {
+                    ...group,
+                    rows: updatedRows,
+                    first: updatedRows[0] || group.first,
+                    stockTypes: [...new Set(updatedRows.map((row) => row.stockType).filter(Boolean))],
+                    statuses: getStatusCounts(updatedRows),
+                    lastActionById: latestActionRow?.lastActionById,
+                    lastActionByName: latestActionRow?.lastActionByName,
+                    lastActionType: latestActionRow?.lastActionType,
+                    lastActionOn: latestActionRow?.lastActionOn,
+                };
+            }));
+
+            setSelectedRes((previous) => previous ? { ...previous, ...convertedPatch } : previous);
+            setSelectedReviewDesign((previous) => previous ? {
+                ...previous,
+                std: data.remainingStd ?? previous.std,
+            } : previous);
+            setBatchSequence([]);
+            setBatchQtyById({});
+            setOrderAllocations([]);
+            toast({ description: 'Order item changed from PRM to STD' });
+
+            if (data.wasApproved) setIsActionDialogOpen(false);
+        } catch (error) {
+            toast({ description: error.message || 'Unable to change the order to STD' });
+        } finally {
+            setResLoading(false);
+        }
+    }
+
+    async function changeStdOrderToPrm() {
+        const requestedQty = Number(selectedRes?.requestedQty || 0);
+        const availablePrm = designBatches.reduce((sum, batch) => (
+            sum + (batch.status === 'Active' ? Number(batch.availableQty || 0) : 0)
+        ), 0);
+
+        if (!selectedRes?.id || selectedRes.stockType !== 'std') return;
+        if (!['Submitted', 'InReview', 'Approved'].includes(selectedRes.status)) {
+            toast({ description: 'Only pending or approved STD items can be changed to PRM' });
+            return;
+        }
+        if (!selectedReviewDesign?.design || selectedReviewDesign.design !== selectedRes.design) {
+            toast({ description: 'Restore the requested design before changing its stock type' });
+            return;
+        }
+        if (loadingDesignBatches || availablePrm < requestedQty) {
+            toast({ description: `PRM batch stock must be at least ${requestedQty} to change this order` });
+            return;
+        }
+        if (!user?.id) {
+            toast({ description: 'Your session is unavailable. Please sign in again.' });
+            return;
+        }
+
+        setResLoading(true);
+        try {
+            const result = await changeStdOrderToPrmAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                selectedRes.id,
+                user.id,
+                dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                orderNotes,
+            );
+            const queryResult = await result.json();
+
+            if (queryResult.status !== 200) {
+                throw new Error(queryResult.message || 'Unable to change the order to PRM');
+            }
+
+            const data = queryResult.data || {};
+            const convertedOn = new Date().toISOString();
+            const convertedPatch = {
+                stockType: 'prm',
+                approvedQty: data.approvedQty ?? selectedRes.approvedQty,
+                productionQty: data.productionQty ?? selectedRes.productionQty,
+                status: data.status ?? selectedRes.status,
+                notes: orderNotes || null,
+                lastActionById: user.id,
+                lastActionByName: user.name,
+                lastActionType: 'StockTypeChanged',
+                lastActionOn: convertedOn,
+            };
+
+            setOrders((previousOrders) => previousOrders.map((group) => {
+                if (!group.rows?.some((row) => String(row.id) === String(selectedRes.id))) return group;
+
+                const updatedRows = group.rows.map((row) => (
+                    String(row.id) === String(selectedRes.id) ? { ...row, ...convertedPatch } : row
+                ));
+                const latestActionRow = updatedRows.reduce((latest, row) => {
+                    if (!row.lastActionOn) return latest;
+                    return !latest?.lastActionOn || new Date(row.lastActionOn) > new Date(latest.lastActionOn) ? row : latest;
+                }, null);
+
+                return {
+                    ...group,
+                    rows: updatedRows,
+                    first: updatedRows[0] || group.first,
+                    stockTypes: [...new Set(updatedRows.map((row) => row.stockType).filter(Boolean))],
+                    statuses: getStatusCounts(updatedRows),
+                    lastActionById: latestActionRow?.lastActionById,
+                    lastActionByName: latestActionRow?.lastActionByName,
+                    lastActionType: latestActionRow?.lastActionType,
+                    lastActionOn: latestActionRow?.lastActionOn,
+                };
+            }));
+
+            setSelectedRes((previous) => previous ? { ...previous, ...convertedPatch } : previous);
+            setSelectedReviewDesign((previous) => previous ? {
+                ...previous,
+                prm: data.remainingPrm ?? previous.prm,
+                std: data.remainingStd ?? previous.std,
+            } : previous);
+            setBatchSequence([]);
+            setBatchQtyById({});
+            toast({ description: 'Order item changed from STD to PRM' });
+
+            if (data.wasApproved) setIsActionDialogOpen(false);
+        } catch (error) {
+            toast({ description: error.message || 'Unable to change the order to PRM' });
         } finally {
             setResLoading(false);
         }
@@ -1575,6 +1983,20 @@ export default function OrdersV2() {
         setExpandedCartGroups({});
 
         getOrders(val, 0, user, isProduction, false, showWaitlist, searchQuery, { keepRows: true });
+    }
+
+    function handleBasketTypeChange(value) {
+        cancelOrderSearch();
+        const searchQuery = getEligibleOrderSearchQuery();
+        setBasketTypeFilter(value);
+        setActiveSearchQuery(searchQuery);
+        setResOffset(0);
+        setExpandedCartGroups({});
+
+        getOrders(resStatus, 0, user, isProduction, false, showWaitlist, searchQuery, {
+            keepRows: true,
+            basketType: value,
+        });
     }
 
     function handleExecutiveSelection(executive) {
@@ -1714,6 +2136,16 @@ return (
                                 <SelectItem value="Modified">Modified</SelectItem>
                                 <SelectItem value="OutOfStock">OutofStock</SelectItem>
                                 <SelectItem value="SaleOrder">SaleOrder</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={basketTypeFilter} onValueChange={handleBasketTypeChange}>
+                            <SelectTrigger className="w-[130px] font-mono uppercase text-sm tracking-wider" aria-label="Filter orders by basket type">
+                                <SelectValue placeholder="Basket type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All types</SelectItem>
+                                <SelectItem value="ATL">ATL</SelectItem>
+                                <SelectItem value="VCL">VCL</SelectItem>
                             </SelectContent>
                         </Select>
                         {canBrowseExecutives ? (
@@ -2001,10 +2433,19 @@ return (
                                                     <div className="mt-0.5 p-3 text-slate-500"></div>}
                                                     <div>
                                                         <span className='font-medium'>{group.first.orderedBy}</span><br/>
-                                                        <span className="rounded-full bg-white px-2 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                                                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                            <span className="rounded-full bg-white px-2 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
                                                                 #{group.first.cartId || group.cartId}
-
                                                             </span>
+                                                            {(group.basketTypes || []).map((basketType) => (
+                                                                <span
+                                                                    key={`${group.cartId}-${basketType}`}
+                                                                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${basketType === 'ATL' ? 'bg-orange-100 text-orange-800' : 'bg-indigo-100 text-indigo-800'}`}
+                                                                >
+                                                                    {basketType}
+                                                                </span>
+                                                            ))}
+                                                        </div>
                                                         {/* <span className='text-xs text-slate-500'>{group.first.userId}</span> */}
                                                         {/* <div className="mt-2 flex flex-wrap items-center gap-2">
                                                             <span className="rounded-full bg-white px-2 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
@@ -2089,6 +2530,8 @@ return (
                                             <TableCell className="text-right">
                                                 {(() => {
                                                     const groupRows = group.rows?.length ? group.rows : [group.first];
+                                                    const canAddOrderItem = Boolean(group.first?.cartId);
+                                                    const hasReviewableItems = groupRows.some((row) => ['Submitted', 'InReview'].includes(row?.status));
                                                     const saleOrderEligible = groupRows.some(r => r?.status === 'Approved') && !groupRows.some(r => ['Submitted', 'InReview'].includes(r?.status));
                                                     const isMarking = saleOrderCartId === group.cartId;
                                                     const isDownloadingCart = downloadingCartId === group.cartId;
@@ -2102,6 +2545,33 @@ return (
                                                             {isDownloadingCart ? <SpinnerGap className="h-4 w-4 animate-spin" /> : <ArrowDown className="h-4 w-4" />}
                                                         </Button>
                                                     );
+                                                    const addOrderItemButton = (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            title={`Add order item to basket ${group.cartId}`}
+                                                            aria-label={`Add order item to basket ${group.cartId}`}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setAddToCartGroup(group);
+                                                            }}
+                                                        >
+                                                            <Plus className="h-4 w-4" />
+                                                        </Button>
+                                                    );
+                                                    const reviewBasketButton = hasReviewableItems ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="secondary"
+                                                            className="bg-blue-600 text-white shadow-sm hover:bg-blue-700 hover:text-white"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setBasketReviewGroup(group);
+                                                            }}
+                                                        >
+                                                            <CheckIcon className="mr-2 h-4 w-4" />Review Basket
+                                                        </Button>
+                                                    ) : null;
                                                     const saleOrderButton = saleOrderEligible ? (
                                                         <Button
                                                             size="sm"
@@ -2117,7 +2587,9 @@ return (
 
                                                     return hasMultipleRows ? (
                                                         <div className="flex items-center justify-end gap-3">
+                                                            {canAddOrderItem ? addOrderItemButton : null}
                                                             {downloadButton}
+                                                            {reviewBasketButton}
                                                             {/* {saleOrderButton} */}
                                                             {/* <span className="text-xs font-medium text-slate-500">
                                                                 {isExpanded ? 'Hide items' : 'View items'}
@@ -2125,7 +2597,9 @@ return (
                                                         </div>
                                                     ) : (
                                                         <div className="flex justify-end gap-2">
+                                                            {canAddOrderItem ? addOrderItemButton : null}
                                                             {downloadButton}
+                                                            {reviewBasketButton}
                                                             {['Submitted', 'InReview'].includes(group.first.status) && (
                                                                 <div className='flex flex-row items-center gap-2'>
                                                                     <Button size="sm" variant="secondary" className="bg-blue-600 shadow-md text-white hover:bg-blue-700" onClick={() => handleUpdateStatus(group.first)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
@@ -2136,6 +2610,16 @@ return (
                                                                     <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(group.first)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
                                                                 </div>
                                                             )}
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                                                                title="Edit notes"
+                                                                aria-label={`Edit notes for ${group.first.design}`}
+                                                                onClick={(event) => openOrderNotesDialog(group.first, event)}
+                                                            >
+                                                                <MessageSquare className="h-4 w-4" />
+                                                            </Button>
                                                             {saleOrderButton}
                                                         </div>
                                                     );
@@ -2214,6 +2698,16 @@ return (
                                                                 <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(res)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
                                                             </div>
                                                         )}
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                                                            title="Edit notes"
+                                                            aria-label={`Edit notes for ${res.design}`}
+                                                            onClick={(event) => openOrderNotesDialog(res, event)}
+                                                        >
+                                                            <MessageSquare className="h-4 w-4" />
+                                                        </Button>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -2242,6 +2736,147 @@ return (
                   getOrders(resStatus, resOffset, user, isProduction, false, showWaitlist, activeSearchQuery, { keepRows: Boolean(activeSearchQuery) });
               }}
           />
+          <StockOrderDialog
+            id={userId}
+            isOpen={Boolean(addToCartGroup)}
+            onClose={() => setAddToCartGroup(null)}
+            pass={process.env.NEXT_PUBLIC_API_PASS}
+            role={user?.role}
+            existingCart={addToCartGroup}
+            onSuccess={(msg) => {
+                toast({ description: msg });
+                setResOffset(0);
+                setExpandedCartGroups({});
+                getOrders(resStatus, 0, user, isProduction, false, showWaitlist, activeSearchQuery, { keepRows: true });
+            }}
+          />
+
+          <Dialog open={Boolean(notesDialogOrder)} onOpenChange={(open) => {
+              if (!open && !savingOrderNotes) setNotesDialogOrder(null)
+          }}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Order Notes</DialogTitle>
+                    <DialogDescription>
+                        {notesDialogOrder?.design || 'Order item'}{notesDialogOrder?.name ? ` - ${notesDialogOrder.name}` : ''}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                    <Label htmlFor="inline-order-notes">Notes</Label>
+                    <Textarea
+                        id="inline-order-notes"
+                        value={notesDialogValue}
+                        onChange={(event) => setNotesDialogValue(event.target.value)}
+                        placeholder="Add context for this order item"
+                        maxLength={2000}
+                        disabled={savingOrderNotes}
+                        className="min-h-[136px] resize-y"
+                    />
+                    <p className="text-right text-xs text-slate-500">{notesDialogValue.length}/2000</p>
+                </div>
+                <div className="flex justify-end gap-2">
+                    <Button variant="outline" disabled={savingOrderNotes} onClick={() => setNotesDialogOrder(null)}>Cancel</Button>
+                    <Button disabled={savingOrderNotes} onClick={saveOrderNotes}>
+                        {savingOrderNotes ? <SpinnerGap className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Save notes
+                    </Button>
+                </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={Boolean(basketReviewGroup)} onOpenChange={(open) => {
+              if (!open) {
+                  setBasketReviewGroup(null);
+                  setBasketReviewReturnCartId(null);
+              }
+          }}>
+            <DialogContent className="max-h-[90vh] overflow-hidden p-0 sm:max-w-4xl">
+                <DialogHeader className="border-b px-6 py-5">
+                    <div className="flex flex-wrap items-start justify-between gap-4 pr-8">
+                        <div>
+                            <DialogTitle>Review Basket</DialogTitle>
+                            <DialogDescription className="mt-1">
+                                {basketReviewGroup?.first?.dealer || basketReviewGroup?.first?.dealerId || 'Recipient'} · Basket {basketReviewGroup?.first?.cartId || basketReviewGroup?.cartId || '-'}
+                            </DialogDescription>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {(basketReviewGroup?.basketTypes || []).map((basketType) => (
+                                <Badge key={basketType} variant="secondary" className={basketType === 'ATL' ? 'bg-orange-100 text-orange-800 hover:bg-orange-100' : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-100'}>{basketType}</Badge>
+                            ))}
+                            <OrderActionPreview action={basketReviewGroup} />
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                <div className="space-y-4 px-6 py-4">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                        <Card className="border-slate-200 shadow-none"><CardContent className="p-3"><div className="text-xs text-slate-500">Designs</div><div className="mt-1 font-mono text-lg font-semibold text-slate-900">{basketReviewGroup?.totalDesigns || 0}</div></CardContent></Card>
+                        <Card className="border-slate-200 shadow-none"><CardContent className="p-3"><div className="text-xs text-slate-500">Requested</div><div className="mt-1 font-mono text-lg font-semibold text-slate-900">{Number(basketReviewGroup?.requestedQty || 0)}</div></CardContent></Card>
+                        <Card className="border-slate-200 shadow-none"><CardContent className="p-3"><div className="text-xs text-slate-500">Approved</div><div className="mt-1 font-mono text-lg font-semibold text-green-700">{Number(basketReviewGroup?.approvedQty || 0)}</div></CardContent></Card>
+                        <Card className="border-slate-200 shadow-none"><CardContent className="p-3"><div className="text-xs text-slate-500">Production</div><div className="mt-1 font-mono text-lg font-semibold text-amber-700">{Number(basketReviewGroup?.productionQty || 0)}</div></CardContent></Card>
+                        <Card className="border-slate-200 shadow-none"><CardContent className="p-3"><div className="text-xs text-slate-500">Waitlist</div><div className="mt-1 font-mono text-lg font-semibold text-orange-700">{Number(basketReviewGroup?.waitlistItems || 0)}</div></CardContent></Card>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <div className="text-sm font-semibold text-slate-900">Order items</div>
+                            <div className="text-xs text-slate-500">Select a pending item to open the existing order review.</div>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                            {(basketReviewGroup?.statuses || []).map((status) => (
+                                <Badge key={status.label} variant="secondary" className={getOrderStatusClass(status.label)}>
+                                    {getOrderStatusLabel(status.label)} {status.count > 1 ? `(${status.count})` : ''}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+
+                    <ScrollArea className="h-[360px] rounded-md border border-slate-200">
+                        <div className="divide-y divide-slate-100">
+                            {(basketReviewGroup?.rows || []).map((row) => {
+                                const canReviewItem = ['Submitted', 'InReview'].includes(row.status);
+                                const hasNote = typeof row.notes === 'string' && row.notes.trim() && row.notes.trim() !== '-';
+
+                                return (
+                                    <div key={row.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-mono text-sm font-semibold text-slate-900">{row.design || '-'}</span>
+                                                <span className="truncate text-sm text-slate-600">{row.name || 'Order item'}</span>
+                                                <Badge variant="secondary" className={row.stockType === 'prm' ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : 'bg-blue-100 text-blue-700 hover:bg-blue-100'}>{row.stockType || '-'}</Badge>
+                                                <Badge variant="secondary" className={getOrderStatusClass(row.status)}>{getOrderStatusLabel(row.status)}</Badge>
+                                                {hasWaitlistPosition(row.waitlistPosition) ? <Badge variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-100">Waitlist #{row.waitlistPosition}</Badge> : null}
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                                                <span>Requested <b className="font-mono text-slate-800">{Number(row.requestedQty || 0)}</b></span>
+                                                <span>Approved <b className="font-mono text-slate-800">{Number(row.approvedQty || 0)}</b></span>
+                                                <span>Production <b className="font-mono text-slate-800">{Number(row.productionQty || 0)}</b></span>
+                                                {hasNote ? <OrderNotesPreview entries={[{ id: row.id, label: 'Item notes', note: row.notes.trim() }]} /> : <span className="text-slate-400">No notes</span>}
+                                            </div>
+                                        </div>
+                                        {canReviewItem ? (
+                                            <Button
+                                                size="sm"
+                                                className="shrink-0 bg-blue-600 text-white hover:bg-blue-700"
+                                                onClick={() => {
+                                                    setBasketReviewReturnCartId(basketReviewGroup.cartId);
+                                                    setBasketReviewGroup(null);
+                                                    handleUpdateStatus(row);
+                                                }}
+                                            >
+                                                <CheckIcon className="mr-2 h-4 w-4" />{row.status === 'InReview' ? 'Continue Review' : 'Review'}
+                                            </Button>
+                                        ) : (
+                                            <span className="shrink-0 text-xs font-medium text-slate-400">Read only</span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </ScrollArea>
+                </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Approval Confirmation Dialog */}
           <Dialog open={isActionDialogOpen} onOpenChange={setIsActionDialogOpen}>
@@ -2326,31 +2961,36 @@ return (
                                     </div>
                                 </div>
 
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-8 px-2 text-slate-500 hover:text-slate-800"
-                                    onClick={() => {
-                                        setSelectedReviewDesign(null)
-                                        setReviewDesignQuery(selectedRes?.design || '')
-                                        setShowDesignOrderHistory(false)
-                                        setDesignOrderHistory([])
-                                        setDesignOrderHistoryError('')
-                                    }}
-                                >
-                                    Change
-                                </Button>
+                                {['Submitted', 'InReview'].includes(selectedRes?.status) ? (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-8 px-2 text-slate-500 hover:text-slate-800"
+                                        disabled={changingReviewDesign}
+                                        onClick={() => {
+                                            setSelectedReviewDesign(null)
+                                            setReviewDesignQuery('')
+                                            setShowDesignOrderHistory(false)
+                                            setDesignOrderHistory([])
+                                            setDesignOrderHistoryError('')
+                                        }}
+                                    >
+                                        Change
+                                    </Button>
+                                ) : null}
                             </div>
                         ) : null}
+                        {['Submitted', 'InReview'].includes(selectedRes?.status) && !selectedReviewDesign?.design ? (
                         <div className="relative">
                             <Input
                                 placeholder="Search design by code or name..."
                                 value={reviewDesignQuery}
                                 onChange={(e) => handleReviewDesignSearch(e.target.value)}
                                 onFocus={() => reviewDesignResults.length > 0 && setShowReviewDesignDrop(true)}
+                                disabled={changingReviewDesign}
                                 className="pr-9"
                             />
-                            {searchingReviewDesigns ? (
+                            {searchingReviewDesigns || changingReviewDesign ? (
                                 <SpinnerGap className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-gray-400" />
                             ) : (
                                 <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -2358,10 +2998,12 @@ return (
                             {showReviewDesignDrop && reviewDesignResults.length > 0 && (
                                 <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border bg-white shadow-lg">
                                     {reviewDesignResults.map((product) => (
-                                        <div
+                                        <button
+                                            type="button"
                                             key={product.productId}
-                                            className="cursor-pointer px-3 py-2.5 hover:bg-gray-50"
-                                            onMouseDown={() => selectReviewDesign(product)}
+                                            className="block w-full cursor-pointer px-3 py-2.5 text-left hover:bg-gray-50 disabled:cursor-wait disabled:opacity-60"
+                                            disabled={changingReviewDesign}
+                                            onClick={() => selectReviewDesign(product)}
                                         >
                                             <div className="flex items-center justify-between gap-3">
                                                 <div>
@@ -2373,7 +3015,7 @@ return (
                                                     <span className="font-medium text-blue-600">STD <span className="font-bold">{product.std ?? 0}</span></span>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </button>
                                     ))}
                                 </div>
                             )}
@@ -2383,6 +3025,10 @@ return (
                                 </div>
                             )}
                         </div>
+                        ) : null}
+                        {changingReviewDesign ? (
+                            <p className="text-xs text-slate-500">Updating requested design...</p>
+                        ) : null}
                         {/* <p className="text-xs text-slate-500">
                             Current order: <span className="font-medium text-slate-700">{selectedRes?.design}</span>
                         </p> */}
@@ -2390,7 +3036,50 @@ return (
                     
                     
                     <div className="flex flex-col gap-4">
-                        <Label htmlFor="qty" className="text-left mt-4">Requested <span className={`font-bold ${selectedRes?.stockType == 'prm' ? 'text-violet-600' : 'text-blue-600'} uppercase`}>{selectedRes?.stockType}</span> Quantity</Label>
+                        <div className="mt-4 flex items-center justify-between gap-3">
+                            <Label htmlFor="qty" className="text-left">Requested <span className={`font-bold ${selectedRes?.stockType == 'prm' ? 'text-violet-600' : 'text-blue-600'} uppercase`}>{selectedRes?.stockType}</span> Quantity</Label>
+                            {selectedRes?.stockType === 'prm' && selectedReviewDesign?.design === selectedRes?.design && ['Submitted', 'InReview', 'Approved'].includes(selectedRes?.status) ? (() => {
+                                const requestedQty = Number(selectedRes?.requestedQty || 0);
+                                const availableStd = Number(selectedReviewDesign?.std || 0);
+                                const canChangeToStd = availableStd >= requestedQty;
+                                return (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 shrink-0 border-blue-200 text-xs text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                                        disabled={!canChangeToStd || resLoading}
+                                        onClick={changePrmOrderToStd}
+                                        title={`STD stock: ${availableStd} available / ${requestedQty} required`}
+                                        aria-label={`Change this PRM order to STD. ${availableStd} STD available and ${requestedQty} required`}
+                                    >
+                                        {resLoading ? <SpinnerGap className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                        Change to STD
+                                    </Button>
+                                );
+                            })() : selectedRes?.stockType === 'std' && selectedReviewDesign?.design === selectedRes?.design && ['Submitted', 'InReview', 'Approved'].includes(selectedRes?.status) ? (() => {
+                                const requestedQty = Number(selectedRes?.requestedQty || 0);
+                                const availablePrm = designBatches.reduce((sum, batch) => (
+                                    sum + (batch.status === 'Active' ? Number(batch.availableQty || 0) : 0)
+                                ), 0);
+                                const canChangeToPrm = !loadingDesignBatches && availablePrm >= requestedQty;
+                                return (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 shrink-0 border-violet-200 text-xs text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                                        disabled={!canChangeToPrm || resLoading}
+                                        onClick={changeStdOrderToPrm}
+                                        title={loadingDesignBatches ? 'Checking PRM batch stock' : `PRM batch stock: ${availablePrm} available / ${requestedQty} required`}
+                                        aria-label={loadingDesignBatches ? 'Checking PRM batch stock' : `Change this STD order to PRM. ${availablePrm} PRM available and ${requestedQty} required`}
+                                    >
+                                        {resLoading || loadingDesignBatches ? <SpinnerGap className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                        Change to PRM
+                                    </Button>
+                                );
+                            })() : null}
+                        </div>
                         {(() => {
                             const isStdType   = selectedRes?.stockType === 'std';
                             const availableStd = Number(selectedReviewDesign?.std || 0) - Number(selectedRes?.approvedQty || 0);

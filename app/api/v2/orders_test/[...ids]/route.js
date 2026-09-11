@@ -30,6 +30,8 @@ export async function GET(request,{params}) {
                     const requestUrl = new URL(request.url);
                     const search = (requestUrl.searchParams.get("search") || "").trim().slice(0, 100);
                     const executiveId = (requestUrl.searchParams.get("executiveId") || "").trim().slice(0, 100);
+                    const basketType = (requestUrl.searchParams.get("basketType") || "All").trim().toUpperCase();
+                    const designType = basketType === "ATL" ? 1 : basketType === "VCL" ? 2 : null;
                     // const page = 1;
                     const page = params.ids[3];
                     const limit = 20;
@@ -78,6 +80,11 @@ export async function GET(request,{params}) {
 
                     if (waitlistOnly) {
                         where.push("o.productionQty > 0");
+                    }
+
+                    if (designType !== null) {
+                        where.push("p.designType = ?");
+                        queryParams.push(designType);
                     }
 
                     /**
@@ -333,6 +340,8 @@ export async function GET(request,{params}) {
                     const requestUrl = new URL(request.url);
                     const search = (requestUrl.searchParams.get("search") || "").trim().slice(0, 100);
                     const waitlistOnly = requestUrl.searchParams.get("waitlist") === "1";
+                    const basketType = (requestUrl.searchParams.get("basketType") || "All").trim().toUpperCase();
+                    const designType = basketType === "ATL" ? 1 : basketType === "VCL" ? 2 : null;
 
                     if (!["GlobalAdmin", "SuperAdmin"].includes(role)) {
                         return Response.json({
@@ -352,6 +361,11 @@ export async function GET(request,{params}) {
 
                     if (waitlistOnly) {
                         where.push("o.productionQty > 0");
+                    }
+
+                    if (designType !== null) {
+                        where.push("p.designType = ?");
+                        values.push(designType);
                     }
 
                     if (search) {
@@ -1788,6 +1802,491 @@ export async function GET(request,{params}) {
                     return Response.json({ status: 500, success: false, message: 'Failed to load order action history', error: error.message });
                 }
             }
+            // replace the requested design for an item that is still pending review
+            // /U0.13/$orderId/$actorId/$design/$actionDate?notes=
+            else if (params.ids[1] === "U0.13") {
+                const orderId = params.ids[2];
+                const actorId = params.ids[3];
+                const nextDesign = decodeURIComponent(params.ids[4] || '').trim();
+                const actionDate = params.ids[5] || new Date();
+                const notes = getOrderNotes(request);
+
+                if (!orderId || !actorId || !nextDesign) {
+                    connection.release();
+                    return Response.json({ status: 400, success: false, message: 'An order item, active user, and design are required' });
+                }
+
+                try {
+                    await connection.beginTransaction();
+
+                    const [orderRows] = await connection.query(
+                        `SELECT o.id, o.cartId, o.design, o.stockType, o.status, o.notes, p.designType
+                         FROM orders o
+                         LEFT JOIN products p ON p.design = o.design
+                         WHERE o.id = ? AND o.isDeleted = 0
+                         FOR UPDATE`,
+                        [orderId]
+                    );
+                    const order = orderRows[0];
+
+                    if (!order) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Order item not found' });
+                    }
+                    if (!['Submitted', 'InReview'].includes(order.status)) {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: 'Requested design can only be changed while the item is pending review' });
+                    }
+                    if (order.design === nextDesign) {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: 'This design is already selected for the order item' });
+                    }
+
+                    const actor = await resolveOrderActionActor(connection, actorId);
+                    if (!actor) {
+                        await connection.rollback();
+                        return Response.json({ status: 400, success: false, message: 'A valid active user is required to take order actions' });
+                    }
+
+                    const [productRows] = await connection.query(
+                        `SELECT productId, design, name, description, size, tags, media, prm, std, designType
+                         FROM products
+                         WHERE design = ? AND isActive = 1
+                         LIMIT 1
+                         FOR UPDATE`,
+                        [nextDesign]
+                    );
+                    const product = productRows[0];
+                    if (!product) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Selected design is not available' });
+                    }
+                    if (order.designType && Number(order.designType) !== Number(product.designType)) {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: 'Select a design with the same ATL or VCL type as this basket' });
+                    }
+
+                    const [duplicates] = await connection.query(
+                        `SELECT id
+                         FROM orders
+                         WHERE cartId = ? AND design = ? AND stockType = ? AND id <> ? AND isDeleted = 0
+                         LIMIT 1
+                         FOR UPDATE`,
+                        [order.cartId, product.design, order.stockType, order.id]
+                    );
+                    if (duplicates.length) {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: `This basket already contains a ${order.stockType.toUpperCase()} request for ${product.design}` });
+                    }
+
+                    const notesToSave = notes === undefined ? order.notes : notes;
+                    await connection.query(
+                        `UPDATE orders
+                         SET design = ?, notes = ?, modifiedOn = ?
+                         WHERE id = ?`,
+                        [product.design, notesToSave, actionDate, order.id]
+                    );
+                    await recordOrderAction(connection, {
+                        orderId: order.id,
+                        cartId: order.cartId,
+                        actor,
+                        actionType: 'DesignChanged',
+                        actionOn: actionDate,
+                        actionNotes: notesToSave,
+                    });
+
+                    await connection.commit();
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        message: 'Requested design updated',
+                        data: {
+                            orderId: order.id,
+                            design: product.design,
+                            product,
+                            notes: notesToSave,
+                            lastActionById: actor.id,
+                            lastActionByName: actor.name,
+                            lastActionType: 'DesignChanged',
+                            lastActionOn: actionDate,
+                        },
+                    });
+                } catch (error) {
+                    await connection.rollback();
+                    return Response.json({ status: 500, success: false, message: 'Failed to update the requested design', error: error.message });
+                } finally {
+                    connection.release();
+                }
+            }
+            // update notes without changing the order status or stock allocation
+            // /U0.14/$orderId/$actorId/$actionDate?notes=
+            else if (params.ids[1] === "U0.14") {
+                const orderId = params.ids[2];
+                const actorId = params.ids[3];
+                const actionDate = params.ids[4] || new Date();
+                const notes = getOrderNotes(request);
+
+                if (!orderId || !actorId || notes === undefined) {
+                    connection.release();
+                    return Response.json({ status: 400, success: false, message: 'An order item, active user, and notes value are required' });
+                }
+
+                try {
+                    await connection.beginTransaction();
+                    const [orderRows] = await connection.query(
+                        `SELECT id, cartId
+                         FROM orders
+                         WHERE id = ? AND isDeleted = 0
+                         FOR UPDATE`,
+                        [orderId]
+                    );
+                    const order = orderRows[0];
+                    if (!order) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Order item not found' });
+                    }
+
+                    const actor = await resolveOrderActionActor(connection, actorId);
+                    if (!actor) {
+                        await connection.rollback();
+                        return Response.json({ status: 400, success: false, message: 'A valid active user is required to take order actions' });
+                    }
+
+                    await connection.query(
+                        'UPDATE orders SET notes = ?, modifiedOn = ? WHERE id = ?',
+                        [notes, actionDate, order.id]
+                    );
+                    await recordOrderAction(connection, {
+                        orderId: order.id,
+                        cartId: order.cartId,
+                        actor,
+                        actionType: 'NotesUpdated',
+                        actionOn: actionDate,
+                        actionNotes: notes,
+                    });
+
+                    await connection.commit();
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        message: 'Notes updated',
+                        data: {
+                            orderId: order.id,
+                            notes,
+                            lastActionById: actor.id,
+                            lastActionByName: actor.name,
+                            lastActionType: 'NotesUpdated',
+                            lastActionOn: actionDate,
+                        },
+                    });
+                } catch (error) {
+                    await connection.rollback();
+                    return Response.json({ status: 500, success: false, message: 'Failed to update notes', error: error.message });
+                } finally {
+                    connection.release();
+                }
+            }
+            // change a PRM order item to STD when its full requested quantity is available
+            // /U0.11/$orderId/$actorId/$actionDate?notes=
+            else if (params.ids[1] === "U0.11") {
+                const orderId = params.ids[2];
+                const actorId = params.ids[3];
+                const actionDate = params.ids[4] || new Date();
+                const notes = getOrderNotes(request);
+
+                if (!orderId || !actorId) {
+                    connection.release();
+                    return Response.json({ status: 400, success: false, message: 'An order item and active user are required' });
+                }
+
+                try {
+                    await connection.beginTransaction();
+
+                    const [orderRows] = await connection.query(
+                        `SELECT id, cartId, design, stockType, status, requestedQty, approvedQty, productionQty, notes
+                         FROM orders
+                         WHERE id = ? AND isDeleted = 0
+                         FOR UPDATE`,
+                        [orderId]
+                    );
+                    const order = orderRows[0];
+
+                    if (!order) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Order item not found' });
+                    }
+                    if (order.stockType !== 'prm') {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: 'Only PRM order items can be changed to STD' });
+                    }
+                    if (!['Submitted', 'InReview', 'Approved'].includes(order.status)) {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: `Cannot change a ${order.status} item to STD` });
+                    }
+
+                    const actor = await resolveOrderActionActor(connection, actorId);
+                    if (!actor) {
+                        await connection.rollback();
+                        return Response.json({ status: 400, success: false, message: 'A valid active user is required to take order actions' });
+                    }
+
+                    const [productRows] = await connection.query(
+                        'SELECT productId, design, prm, std FROM products WHERE design = ? FOR UPDATE',
+                        [order.design]
+                    );
+                    const product = productRows[0];
+                    if (!product) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Product not found' });
+                    }
+
+                    const requestedQty = Number(order.requestedQty || 0);
+                    const availableStd = Number(product.std || 0);
+                    if (availableStd < requestedQty) {
+                        await connection.rollback();
+                        return Response.json({
+                            status: 409,
+                            success: false,
+                            message: `STD stock must be at least ${requestedQty} to change this order`,
+                        });
+                    }
+
+                    const wasApproved = order.status === 'Approved';
+                    const notesToSave = notes === undefined ? order.notes : notes;
+                    let remainingPrm = Number(product.prm || 0);
+                    let remainingStd = availableStd;
+                    let releasedToBatches = [];
+
+                    if (wasApproved) {
+                        const releaseResult = await releasePrmToBatches(connection, {
+                            orderId,
+                            design: order.design,
+                            qty: Number(order.approvedQty || 0),
+                            adminId: actor.id,
+                        });
+                        releasedToBatches = releaseResult.released;
+
+                        const [batchTotals] = await connection.query(
+                            `SELECT COALESCE(SUM(availableQty), 0) AS availableQty
+                             FROM product_stock_batches
+                             WHERE design = ? AND stockType = 'prm'`,
+                            [order.design]
+                        );
+                        remainingPrm = Number(batchTotals[0]?.availableQty || 0);
+                        remainingStd = availableStd - requestedQty;
+
+                        await connection.query(
+                            `UPDATE orders
+                             SET stockType = 'std', approvedQty = ?, productionQty = 0, notes = ?, modifiedOn = ?
+                             WHERE id = ?`,
+                            [requestedQty, notesToSave, actionDate, orderId]
+                        );
+                        await connection.query(
+                            'UPDATE products SET prm = ?, std = ? WHERE design = ?',
+                            [remainingPrm, remainingStd, order.design]
+                        );
+                    } else {
+                        await connection.query(
+                            `UPDATE orders
+                             SET stockType = 'std', notes = ?, modifiedOn = ?
+                             WHERE id = ?`,
+                            [notesToSave, actionDate, orderId]
+                        );
+                    }
+
+                    await recordOrderAction(connection, {
+                        orderId,
+                        cartId: order.cartId,
+                        actor,
+                        actionType: 'StockTypeChanged',
+                        actionOn: actionDate,
+                        actionNotes: notesToSave,
+                    });
+
+                    await connection.commit();
+
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        message: 'Order item changed from PRM to STD',
+                        data: {
+                            orderId,
+                            design: order.design,
+                            stockType: 'std',
+                            status: order.status,
+                            requestedQty,
+                            approvedQty: wasApproved ? requestedQty : Number(order.approvedQty || 0),
+                            productionQty: wasApproved ? 0 : Number(order.productionQty || 0),
+                            wasApproved,
+                            remainingStd,
+                            remainingPrm,
+                            releasedToBatches,
+                        },
+                    });
+                } catch (error) {
+                    await connection.rollback();
+                    return Response.json({
+                        status: 500,
+                        success: false,
+                        message: 'Failed to change the order item to STD',
+                        error: error.message,
+                    });
+                } finally {
+                    connection.release();
+                }
+            }
+            // change an STD order item to PRM when its full requested quantity is available in active PRM batches
+            // /U0.12/$orderId/$actorId/$actionDate?notes=
+            else if (params.ids[1] === "U0.12") {
+                const orderId = params.ids[2];
+                const actorId = params.ids[3];
+                const actionDate = params.ids[4] || new Date();
+                const notes = getOrderNotes(request);
+
+                if (!orderId || !actorId) {
+                    connection.release();
+                    return Response.json({ status: 400, success: false, message: 'An order item and active user are required' });
+                }
+
+                try {
+                    await connection.beginTransaction();
+
+                    const [orderRows] = await connection.query(
+                        `SELECT id, cartId, design, stockType, status, requestedQty, approvedQty, productionQty, notes
+                         FROM orders
+                         WHERE id = ? AND isDeleted = 0
+                         FOR UPDATE`,
+                        [orderId]
+                    );
+                    const order = orderRows[0];
+
+                    if (!order) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Order item not found' });
+                    }
+                    if (order.stockType !== 'std') {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: 'Only STD order items can be changed to PRM' });
+                    }
+                    if (!['Submitted', 'InReview', 'Approved'].includes(order.status)) {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: `Cannot change a ${order.status} item to PRM` });
+                    }
+
+                    const actor = await resolveOrderActionActor(connection, actorId);
+                    if (!actor) {
+                        await connection.rollback();
+                        return Response.json({ status: 400, success: false, message: 'A valid active user is required to take order actions' });
+                    }
+
+                    const [productRows] = await connection.query(
+                        'SELECT productId, design, prm, std FROM products WHERE design = ? FOR UPDATE',
+                        [order.design]
+                    );
+                    const product = productRows[0];
+                    if (!product) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Product not found' });
+                    }
+
+                    const requestedQty = Number(order.requestedQty || 0);
+                    const batches = await lockPrmBatches(connection, order.design);
+                    const availablePrm = batches.reduce((sum, batch) => sum + Number(batch.availableQty || 0), 0);
+                    if (availablePrm < requestedQty) {
+                        await connection.rollback();
+                        return Response.json({
+                            status: 409,
+                            success: false,
+                            message: `PRM batch stock must be at least ${requestedQty} to change this order`,
+                        });
+                    }
+
+                    const wasApproved = order.status === 'Approved';
+                    const notesToSave = notes === undefined ? order.notes : notes;
+                    let remainingPrm = availablePrm;
+                    let remainingStd = Number(product.std || 0);
+                    let batchAllocations = [];
+
+                    if (wasApproved) {
+                        batchAllocations = drainPrmBatches(batches, requestedQty, []);
+                        await recordBatchLedger(connection, {
+                            orderId,
+                            design: order.design,
+                            entries: batchAllocations,
+                            allocationType: 'StockTypeChanged',
+                            adminId: actor.id,
+                        });
+                        await persistPrmBatchDrain(connection, batches, actor.id);
+
+                        const [batchTotals] = await connection.query(
+                            `SELECT COALESCE(SUM(availableQty), 0) AS availableQty
+                             FROM product_stock_batches
+                             WHERE design = ? AND stockType = 'prm'`,
+                            [order.design]
+                        );
+                        remainingPrm = Number(batchTotals[0]?.availableQty || 0);
+                        remainingStd += Number(order.approvedQty || 0);
+
+                        await connection.query(
+                            `UPDATE orders
+                             SET stockType = 'prm', approvedQty = ?, productionQty = 0, notes = ?, modifiedOn = ?
+                             WHERE id = ?`,
+                            [requestedQty, notesToSave, actionDate, orderId]
+                        );
+                        await connection.query(
+                            'UPDATE products SET prm = ?, std = ? WHERE design = ?',
+                            [remainingPrm, remainingStd, order.design]
+                        );
+                    } else {
+                        await connection.query(
+                            `UPDATE orders
+                             SET stockType = 'prm', notes = ?, modifiedOn = ?
+                             WHERE id = ?`,
+                            [notesToSave, actionDate, orderId]
+                        );
+                    }
+
+                    await recordOrderAction(connection, {
+                        orderId,
+                        cartId: order.cartId,
+                        actor,
+                        actionType: 'StockTypeChanged',
+                        actionOn: actionDate,
+                        actionNotes: notesToSave,
+                    });
+
+                    await connection.commit();
+
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        message: 'Order item changed from STD to PRM',
+                        data: {
+                            orderId,
+                            design: order.design,
+                            stockType: 'prm',
+                            status: order.status,
+                            requestedQty,
+                            approvedQty: wasApproved ? requestedQty : Number(order.approvedQty || 0),
+                            productionQty: wasApproved ? 0 : Number(order.productionQty || 0),
+                            wasApproved,
+                            remainingPrm,
+                            remainingStd,
+                            batchAllocations: batchAllocations.map((entry) => ({ batch: entry.batchId, qty: entry.qty })),
+                        },
+                    });
+                } catch (error) {
+                    await connection.rollback();
+                    return Response.json({
+                        status: 500,
+                        success: false,
+                        message: 'Failed to change the order item to PRM',
+                        error: error.message,
+                    });
+                } finally {
+                    connection.release();
+                }
+            }
             // get listing for mobile by userId for dealer
             // /U0.1/$selectedStatus/$offset/$role/$id/$sortBy - lets follow this for admins and dealers
             // /U0/$id/$sortBy - currently used for dealers 2-id = 5, 3-soryBy = 6
@@ -2237,6 +2736,8 @@ export async function GET(request,{params}) {
                     const reportUrl = new URL(request.url);
                     const executiveId = (reportUrl.searchParams.get('executiveId') || '').trim().slice(0, 100);
                     const reportRole = (reportUrl.searchParams.get('role') || '').trim();
+                    const basketType = (reportUrl.searchParams.get('basketType') || 'All').trim().toUpperCase();
+                    const designType = basketType === 'ATL' ? 1 : basketType === 'VCL' ? 2 : null;
 
                     if (executiveId) {
                         if (!['GlobalAdmin', 'SuperAdmin'].includes(reportRole)) {
@@ -2381,6 +2882,12 @@ export async function GET(request,{params}) {
                         reportValues.push(executiveId);
                     }
 
+                    if (designType !== null) {
+                        query = query.replace(' ORDER BY r.createdOn DESC', ' AND p.designType = ? ORDER BY r.createdOn DESC');
+                        queryCount += ' AND p.designType = ?';
+                        reportValues.push(designType);
+                    }
+
                     const [rows, fields] = await connection.execute(query, reportValues);
                     const [countRows, countFields] = await connection.execute(queryCount, reportValues);
 
@@ -2456,7 +2963,103 @@ export async function POST(request, {params}) {
       // authorize secret key
       if(await Keyverify(params.ids[0])){
 
-        if(params.ids[1] == 'U4'){
+        if (params.ids[1] == 'U4.1') {
+                let transactionStarted = false;
+
+                try {
+                    const body = await request.json();
+                    const { actorId, cartId, designs, createdOn } = body;
+
+                    if (!actorId || !cartId || !Array.isArray(designs) || designs.length === 0) {
+                        return Response.json({ status: 400, message: 'A cart and at least one order item are required.' }, { status: 200 });
+                    }
+
+                    const [actorRows] = await connection.execute(
+                        'SELECT id FROM user WHERE id = ? AND COALESCE(isActive, 1) = 1 LIMIT 1',
+                        [actorId]
+                    );
+                    if (actorRows.length === 0) {
+                        return Response.json({ status: 403, message: 'Your account is not allowed to add order items.' }, { status: 200 });
+                    }
+
+                    await connection.beginTransaction();
+                    transactionStarted = true;
+
+                    const [cartRows] = await connection.execute(
+                        `SELECT o.userId, o.dealerId, o.design, o.stockType, o.serialId, p.designType
+                         FROM orders o
+                         LEFT JOIN products p ON p.design = o.design
+                         WHERE o.cartId = ? AND COALESCE(o.isDeleted, 0) = 0
+                         FOR UPDATE`,
+                        [cartId]
+                    );
+
+                    if (cartRows.length === 0) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, message: 'This basket could not be found.' }, { status: 200 });
+                    }
+
+                    const cartOwner = cartRows[0];
+                    const cartDesignType = cartRows.find((row) => Number(row.designType) === 1 || Number(row.designType) === 2)?.designType;
+                    const existingLineKeys = new Set(
+                        cartRows.map((row) => `${row.design}:${String(row.stockType || '').toLowerCase()}`)
+                    );
+                    const incomingLineKeys = new Set();
+                    const itemsToCreate = [];
+
+                    for (const item of designs) {
+                        const design = String(item?.design || '').trim();
+                        const stockType = String(item?.stockType || '').trim().toLowerCase();
+                        const quantity = Number(item?.quantity);
+
+                        if (!design || !['prm', 'std'].includes(stockType) || !Number.isInteger(quantity) || quantity < 1) {
+                            throw new Error('Each order item needs a valid design, stock type, and quantity.');
+                        }
+
+                        const lineKey = `${design}:${stockType}`;
+                        if (existingLineKeys.has(lineKey) || incomingLineKeys.has(lineKey)) {
+                            throw new Error(`${design} already has a ${stockType.toUpperCase()} request in this basket.`);
+                        }
+
+                        const [productRows] = await connection.execute(
+                            'SELECT design, designType, std FROM products WHERE design = ? AND isActive = 1 LIMIT 1',
+                            [design]
+                        );
+                        const product = productRows[0];
+                        if (!product) {
+                            throw new Error(`${design} is not an active design.`);
+                        }
+                        if (cartDesignType && Number(product.designType) !== Number(cartDesignType)) {
+                            throw new Error(`${design} belongs to a different basket type.`);
+                        }
+                        if (stockType === 'std' && quantity > Number(product.std || 0)) {
+                            throw new Error(`${design} has only ${Number(product.std || 0)} STD stock available.`);
+                        }
+
+                        incomingLineKeys.add(lineKey);
+                        itemsToCreate.push({ design, stockType, quantity });
+                    }
+
+                    let nextSerialId = Math.max(...cartRows.map((row) => Number(row.serialId || 0)), 0) + 1;
+                    for (const item of itemsToCreate) {
+                        await connection.execute(
+                            `INSERT INTO orders
+                                (userId, dealerId, design, requestedQty, status, approvedQty, productionQty, stockType, createdOn, approvedOn, modifiedOn, serialId, cartId)
+                             VALUES (?, ?, ?, ?, 'Submitted', 0, 0, ?, ?, NULL, NULL, ?, ?)`,
+                            [cartOwner.userId, cartOwner.dealerId, item.design, item.quantity, item.stockType, createdOn || new Date(), nextSerialId++, cartId]
+                        );
+                    }
+
+                    await connection.commit();
+                    return Response.json({ status: 200, message: 'Order items added successfully.', data: itemsToCreate.length, cartId }, { status: 200 });
+                } catch (error) {
+                    if (transactionStarted) await connection.rollback();
+                    return Response.json({ status: 400, message: error.message || 'Unable to add order items.' }, { status: 200 });
+                } finally {
+                    connection.release();
+                }
+          }
+        else if(params.ids[1] == 'U4'){
 
                 try {
                     const body = await request.json();
