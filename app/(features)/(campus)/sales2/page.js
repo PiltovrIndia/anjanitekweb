@@ -6,14 +6,17 @@ import Biscuits from 'universal-cookie'
 import {
   AlertCircle,
   Building2,
+  Check,
   ChevronDown,
   ChevronRight,
+  ChevronsUpDown,
   Crown,
   Loader2,
   Mail,
   Network,
   Pencil,
   Phone,
+  Plus,
   RefreshCw,
   Search,
   Store,
@@ -38,9 +41,11 @@ import { Avatar, AvatarFallback } from '@/app/components/ui/avatar'
 import { Badge } from '@/app/components/ui/badge'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent } from '@/app/components/ui/card'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/app/components/ui/command'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog'
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
 import { ScrollArea } from '@/app/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { Separator } from '@/app/components/ui/separator'
@@ -52,6 +57,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/too
 const biscuits = new Biscuits()
 
 const hierarchyRoles = ['StateHead', 'SalesManager', 'SalesExecutive', 'Dealer']
+const creatableRoles = ['SalesManager', 'SalesExecutive']
+const createUserDefaults = { name: '', email: '', mobile: '', designation: 'Sales Manager', role: 'SalesManager', parentId: '' }
 
 const roleMeta = {
   StateHead: { label: 'State Head', icon: Crown, badgeClass: 'border-amber-200 bg-amber-50 text-amber-800' },
@@ -217,6 +224,7 @@ function Field({ label, children }) {
 
 export default function SalesHierarchyPage() {
   const router = useRouter()
+  const [currentUser, setCurrentUser] = useState(null)
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -229,6 +237,11 @@ export default function SalesHierarchyPage() {
   const [editError, setEditError] = useState('')
   const [savingUser, setSavingUser] = useState(false)
   const [actionFeedback, setActionFeedback] = useState(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createValues, setCreateValues] = useState(createUserDefaults)
+  const [createError, setCreateError] = useState('')
+  const [creatingUser, setCreatingUser] = useState(false)
+  const [parentPickerOpen, setParentPickerOpen] = useState(false)
 
   const loadHierarchy = useCallback(async (signal) => {
     const cookieValue = biscuits.get('sc_user_detail')
@@ -245,6 +258,8 @@ export default function SalesHierarchyPage() {
       router.replace('/')
       return
     }
+
+    setCurrentUser(currentUser)
 
     setLoading(true)
     setError('')
@@ -305,12 +320,26 @@ export default function SalesHierarchyPage() {
 
   const normalizedQuery = query.trim().toLowerCase()
   const searchIsActive = Boolean(normalizedQuery || roleFilter !== 'All')
+  const canCreateHierarchyUser = Boolean(
+    currentUser
+    && ['GlobalAdmin', 'SuperAdmin'].includes(currentUser.role)
+    && (currentUser.isActive === undefined || isPersonActive(currentUser))
+  )
   const roleCounts = useMemo(() => Object.fromEntries(hierarchyRoles.map((role) => [role, people.filter((person) => person.role === role).length])), [people])
   const mappedCount = useMemo(() => people.filter((person) => hasMapping(person, model.peopleById)).length, [people, model.peopleById])
   const visibleDirectory = useMemo(
     () => people.filter((person) => matchesPerson(person, normalizedQuery, roleFilter)).sort(personSort),
     [people, normalizedQuery, roleFilter]
   )
+  const availableParents = useMemo(() => {
+    const allowedRoles = createValues.role === 'SalesManager'
+      ? ['StateHead']
+      : ['StateHead', 'SalesManager']
+    return people
+      .filter((person) => isPersonActive(person) && allowedRoles.includes(person.role))
+      .sort(personSort)
+  }, [createValues.role, people])
+  const selectedCreateParent = availableParents.find((person) => person.id === createValues.parentId) || null
 
   const togglePerson = (id) => {
     setExpandedIds((current) => {
@@ -388,18 +417,73 @@ export default function SalesHierarchyPage() {
     }
   }
 
+  const openCreateDialog = () => {
+    setCreateValues(createUserDefaults)
+    setCreateError('')
+    setParentPickerOpen(false)
+    setCreateOpen(true)
+  }
+
+  const updateCreateRole = (role) => {
+    setCreateValues((current) => ({ ...current, role, designation: roleMeta[role].label, parentId: '' }))
+    setParentPickerOpen(false)
+  }
+
+  const createHierarchyUser = async (event) => {
+    event.preventDefault()
+    if(!currentUser?.id) {
+      setCreateError('Your session is unavailable. Sign in again and retry.')
+      return
+    }
+
+    setCreatingUser(true)
+    setCreateError('')
+    try {
+      const response = await fetch(`/api/v2/user/${process.env.NEXT_PUBLIC_API_PASS}/U18`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ actorId: currentUser.id, ...createValues }),
+      })
+      const payload = await response.json()
+      if(!response.ok || payload.status !== 200 || !payload.data) {
+        throw new Error(payload.message || 'Unable to create sales user.')
+      }
+
+      const createdPerson = payload.data
+      setPeople((current) => [...current, createdPerson].sort(personSort))
+      setExpandedIds((current) => new Set([...current, createdPerson.mapTo]))
+      setSelectedPerson(createdPerson)
+      setCreateOpen(false)
+      setActionFeedback({ type: 'success', message: `${createdPerson.name} was added to the hierarchy.` })
+    } catch (createError) {
+      setCreateError(createError.message || 'Unable to create sales user.')
+    } finally {
+      setCreatingUser(false)
+    }
+  }
+
   return (
     <div className='flex min-h-full w-full flex-col gap-5 pb-6'>
       <div className='flex min-h-[72px] flex-wrap items-center justify-between gap-3'>
-        <Network className='size-5 shrink-0 text-muted-foreground' aria-hidden='true' />
-        <h2 className='mr-auto text-xl font-semibold'>
-          Sales Hierarchy
-          <span className='mt-1 block text-sm font-normal text-muted-foreground'>State heads, sales teams, and assigned dealers</span>
-        </h2>
-        <Button variant='outline' size='sm' onClick={() => loadHierarchy()} disabled={loading}>
-          <RefreshCw className={`mr-2 size-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className='flex min-w-0 items-center gap-3'>
+          <Network className='size-5 shrink-0 text-muted-foreground' aria-hidden='true' />
+          <h2 className='text-xl font-semibold'>
+            Sales Hierarchy
+            <span className='mt-1 block text-sm font-normal text-muted-foreground'>State heads, sales teams, and assigned dealers</span>
+          </h2>
+        </div>
+        <div className='ml-auto flex items-center gap-2'>
+          {canCreateHierarchyUser ? (
+            <Button size='sm' onClick={openCreateDialog} disabled={loading}>
+              <Plus className='mr-2 size-4' />
+              Create user
+            </Button>
+          ) : null}
+          <Button variant='outline' size='sm' onClick={() => loadHierarchy()} disabled={loading}>
+            <RefreshCw className={`mr-2 size-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <section className='grid grid-cols-2 gap-3 lg:grid-cols-4' aria-label='Hierarchy summary'>
@@ -678,6 +762,85 @@ export default function SalesHierarchyPage() {
               <Button type='submit' disabled={savingUser}>
                 {savingUser ? <Loader2 className='mr-2 size-4 animate-spin' /> : null}
                 Save changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createOpen} onOpenChange={(open) => !creatingUser && setCreateOpen(open)}>
+        <DialogContent className='sm:max-w-xl'>
+          <DialogHeader>
+            <DialogTitle>Create sales user</DialogTitle>
+          </DialogHeader>
+          <form className='grid gap-4' onSubmit={createHierarchyUser}>
+            <div className='grid gap-2'>
+              <Label htmlFor='create-name'>Name</Label>
+              <Input id='create-name' value={createValues.name} onChange={(event) => setCreateValues((current) => ({ ...current, name: event.target.value }))} required autoFocus />
+            </div>
+            <div className='grid gap-4 sm:grid-cols-2'>
+              <div className='grid gap-2'>
+                <Label htmlFor='create-email'>Email <span className='font-normal text-muted-foreground'>(optional)</span></Label>
+                <Input id='create-email' type='email' value={createValues.email} onChange={(event) => setCreateValues((current) => ({ ...current, email: event.target.value }))} />
+              </div>
+              <div className='grid gap-2'>
+                <Label htmlFor='create-mobile'>Mobile</Label>
+                <Input id='create-mobile' value={createValues.mobile} onChange={(event) => setCreateValues((current) => ({ ...current, mobile: event.target.value }))} inputMode='tel' required />
+              </div>
+            </div>
+            <div className='grid gap-4 sm:grid-cols-2'>
+              <div className='grid gap-2'>
+                <Label htmlFor='create-role'>Role</Label>
+                <Select value={createValues.role} onValueChange={updateCreateRole}>
+                  <SelectTrigger id='create-role'><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {creatableRoles.map((role) => <SelectItem key={role} value={role}>{roleMeta[role].label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='grid gap-2'>
+                <Label htmlFor='create-designation'>Designation</Label>
+                <Input id='create-designation' value={createValues.designation} onChange={(event) => setCreateValues((current) => ({ ...current, designation: event.target.value }))} required />
+              </div>
+            </div>
+            <div className='grid gap-2'>
+              <Label>Reports to</Label>
+              <Popover open={parentPickerOpen} onOpenChange={setParentPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button type='button' variant='outline' role='combobox' aria-expanded={parentPickerOpen} className='w-full justify-between font-normal'>
+                    {selectedCreateParent ? <span className='min-w-0 truncate'>{selectedCreateParent.name} <span className='font-mono text-xs text-muted-foreground'>{selectedCreateParent.id}</span></span> : `Select an active ${createValues.role === 'SalesManager' ? 'State Head' : 'State Head or Sales Manager'}`}
+                    <ChevronsUpDown className='ml-2 size-4 shrink-0 opacity-50' />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align='start' className='w-[--radix-popover-trigger-width] p-0'>
+                  <Command>
+                    <CommandInput placeholder='Search people...' />
+                    <CommandList>
+                      <CommandEmpty>No eligible reporting manager found.</CommandEmpty>
+                      <CommandGroup>
+                        {availableParents.map((person) => (
+                          <CommandItem key={person.id} value={`${person.name} ${person.id} ${person.role}`} onSelect={() => {
+                            setCreateValues((current) => ({ ...current, parentId: person.id }))
+                            setParentPickerOpen(false)
+                          }}>
+                            <Check className={`mr-2 size-4 ${createValues.parentId === person.id ? 'opacity-100' : 'opacity-0'}`} />
+                            <span className='min-w-0 flex-1'><span className='block truncate'>{person.name}</span><span className='block font-mono text-xs text-muted-foreground'>{person.id}</span></span>
+                            <RoleBadge role={person.role} />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className='text-xs text-muted-foreground'>{createValues.role === 'SalesManager' ? 'Sales Managers report to a State Head.' : 'Sales Executives may report to a State Head or Sales Manager.'}</p>
+            </div>
+            {createError ? <Alert variant='destructive'><AlertDescription>{createError}</AlertDescription></Alert> : null}
+            <DialogFooter className='pt-2'>
+              <Button type='button' variant='outline' onClick={() => setCreateOpen(false)} disabled={creatingUser}>Cancel</Button>
+              <Button type='submit' disabled={creatingUser || !createValues.parentId}>
+                {creatingUser ? <Loader2 className='mr-2 size-4 animate-spin' /> : <Plus className='mr-2 size-4' />}
+                Create user
               </Button>
             </DialogFooter>
           </form>

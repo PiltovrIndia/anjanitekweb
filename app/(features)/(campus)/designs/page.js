@@ -1039,6 +1039,7 @@ export default function Products() {
         let totalSucceeded = 0;
         let totalFailed = 0;
         let totalQtyMoved = 0;   // units actually added/removed, so a no-op is visible
+        let totalImported = 0;
         const problems = [];     // per-design reasons a removal did not fully apply
         const totalRows = items1.length;
         let hasError = false;
@@ -1062,6 +1063,7 @@ export default function Products() {
                     const summary = queryResult.data || [];
                     totalSucceeded += summary.filter(r => r.success).length;
                     totalFailed += summary.filter(r => !r.success).length;
+                    totalImported += summary.filter(r => r.importedFromProducts1).length;
 
                     summary.forEach(entry => {
                         if (mode === 'remove') {
@@ -1102,6 +1104,7 @@ export default function Products() {
             } else {
                 const msg = `${totalQtyMoved} units ${verb} across ${totalSucceeded} of ${totalRows} designs`
                     + (totalFailed > 0 ? ` (${totalFailed} not applied)` : '')
+                    + (totalImported > 0 ? `; ${totalImported} design(s) added to the active catalogue` : '')
                     + '. Refresh to view updated data.';
                 toast({ description: msg });
 

@@ -115,8 +115,8 @@ const guides = [
     icon: Network,
     summary: 'Browse the reporting chain from State Head through Sales Manager and Executive to Dealer.',
     purpose: 'Use this page to understand ownership, identify unmapped people, and maintain accurate sales-team details.',
-    actions: ['Browse the expandable hierarchy or switch to Directory for a flat searchable list.', 'Search by name, ID, phone, or email and filter by role.', 'Select a person to inspect reporting context and direct reports.', 'Edit mobile, email, or designation; deactivate a user when needed.'],
-    rules: ['State Head → Sales Manager → Sales Executive → Dealer is the intended reporting chain.', 'Deactivation keeps historical mapping and records intact while making the user inactive.'],
+    actions: ['Browse the expandable hierarchy or switch to Directory for a flat searchable list.', 'Search by name, ID, phone, or email and filter by role.', 'Select a person to inspect reporting context and direct reports.', 'GlobalAdmin and SuperAdmin users can create Sales Managers and Sales Executives, then choose their active reporting manager. Email is optional and designation begins with the selected role.', 'Edit mobile, email, or designation; deactivate a user when needed.'],
+    rules: ['State Head → Sales Manager → Sales Executive → Dealer is the intended reporting chain. New Sales Executives may also report directly to a State Head.', 'New sales users receive the next available A-number ID and inherit the reporting manager\'s ownership chain.', 'Deactivation keeps historical mapping and records intact while making the user inactive.'],
     tags: ['hierarchy', 'sales team', 'dealer mapping'],
   },
   {
@@ -164,7 +164,7 @@ const guides = [
     summary: 'Maintain the design catalog, premium batches, standard stock, and design-level reservation activity.',
     purpose: 'Designs is the stock and catalog source for orders, batch allocation, and product browsing.',
     actions: ['Search and filter the catalog by size, then open a design for its details.', 'Add new designs from the template after choosing ATL or VCL; sizes are matched to existing size tags.', 'Add or remove stock through the supplied upload flows.', 'View active premium batches and design-related orders.', 'Update catalog details, set design of the day, or remove an obsolete design from active listings.', 'Download the catalog or download stock rows with available premium batches.'],
-    rules: ['Premium stock is held in batches; standard stock is tracked at the design level.', 'The stock-with-batches export has one std row per design and one prm row per available batch.', 'Removing a design from the active list preserves historical order context.'],
+    rules: ['Premium stock is held in batches; standard stock is tracked at the design level.', 'When stock is first uploaded for a legacy design that exists only in the prior catalogue, it is added to the active catalog before the stock is applied.', 'The stock-with-batches export has one std row per design and one prm row per available batch.', 'Removing a design from the active list preserves historical order context.'],
     tags: ['catalog', 'stock', 'batches', 'excel'],
   },
   {

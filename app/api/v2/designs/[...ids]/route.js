@@ -528,6 +528,58 @@ export async function GET(request,{params}) {
                         const productMap = new Map(
                         productRows.map((product) => [String(product.design), product])
                         );
+                        const importedLegacyDesigns = new Set();
+                        const missingDesigns = [...new Set(designs.map((design) => String(design)))]
+                            .filter((design) => !productMap.has(design));
+
+                        /**
+                         * `products` is the canonical catalogue used by Designs, Orders,
+                         * and product_stock_batches. Older inventory imports may still
+                         * exist only in `products1`; promote just the uploaded designs so
+                         * their initial stock can be received through the current workflow.
+                         */
+                        if (missingDesigns.length > 0) {
+                            const legacyPlaceholders = missingDesigns.map(() => '?').join(',');
+                            const [legacyRows] = await connection.query(
+                                `SELECT design, name, description, size, tags, media, createdOn, isActive, designType
+                                 FROM products1
+                                 WHERE design IN (${legacyPlaceholders})
+                                 FOR UPDATE`,
+                                missingDesigns
+                            );
+
+                            for (const legacyProduct of legacyRows) {
+                                if (importedLegacyDesigns.has(String(legacyProduct.design))) continue;
+                                await connection.query(
+                                    `INSERT INTO products
+                                        (design, name, description, size, tags, media, createdOn, prm, std, isActive, designType)
+                                     VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), 0, 0, COALESCE(?, 1), COALESCE(?, 2))`,
+                                    [
+                                        legacyProduct.design,
+                                        legacyProduct.name,
+                                        legacyProduct.description,
+                                        legacyProduct.size,
+                                        legacyProduct.tags,
+                                        legacyProduct.media,
+                                        legacyProduct.createdOn,
+                                        legacyProduct.isActive,
+                                        legacyProduct.designType,
+                                    ]
+                                );
+                                importedLegacyDesigns.add(String(legacyProduct.design));
+                            }
+
+                            if (legacyRows.length > 0) {
+                                const [promotedProducts] = await connection.query(
+                                    `SELECT productId, design, prm, std
+                                     FROM products
+                                     WHERE design IN (${legacyPlaceholders})
+                                     FOR UPDATE`,
+                                    missingDesigns
+                                );
+                                promotedProducts.forEach((product) => productMap.set(String(product.design), product));
+                            }
+                        }
 
                         for (const row of chunk) {
                         const design = row.design;
@@ -565,6 +617,7 @@ export async function GET(request,{params}) {
                             design,
                             prm: null,
                             std: null,
+                            importedFromProducts1: importedLegacyDesigns.has(String(design)),
                         };
 
                         /**

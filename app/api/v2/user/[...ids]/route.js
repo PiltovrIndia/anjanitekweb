@@ -17,6 +17,7 @@ const client = new OneSignal.Client(process.env.ONE_SIGNAL_APPID, process.env.ON
 // U9.2 – Search active customers
 // U7.1 – Get the complete sales hierarchy for the web hierarchy explorer
 // U17 – Update approved contact fields or active state for a user
+// U18 – Create a mapped Sales Manager or Sales Executive from the hierarchy explorer
 export async function GET(request,{params}) {
 
     // get the pool connection to db
@@ -1146,6 +1147,109 @@ export async function POST(request, {params}) {
                     return Response.json({status: 200, data: rows[0], message:'User updated successfully!'}, {status: 200})
                 } catch (error) {
                     return Response.json({status: 404, message:'Unable to update user!'}, {status: 200})
+                }
+            }
+            // Create a sales hierarchy user through the constrained web workflow.
+            else if(params.ids[1] == 'U18'){
+                let transactionStarted = false
+                try {
+                    const userCreate = await request.json()
+                    const actorId = String(userCreate?.actorId || '').trim()
+                    const name = String(userCreate?.name || '').trim()
+                    const email = String(userCreate?.email || '').trim()
+                    const mobile = String(userCreate?.mobile || '').trim()
+                    const designation = String(userCreate?.designation || '').trim()
+                    const role = String(userCreate?.role || '').trim()
+                    const parentId = String(userCreate?.parentId || '').trim()
+
+                    if(!actorId || !name || !mobile || !designation || !role || !parentId){
+                        return Response.json({status: 400, message:'Name, mobile, designation, role, and reporting manager are required.'}, {status: 200})
+                    }
+
+                    if(!['SalesManager', 'SalesExecutive'].includes(role)){
+                        return Response.json({status: 400, message:'Only Sales Managers and Sales Executives can be created here.'}, {status: 200})
+                    }
+
+                    if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+                        return Response.json({status: 400, message:'Enter a valid email address.'}, {status: 200})
+                    }
+
+                    const [actors] = await connection.execute(
+                        'SELECT id, role, isActive FROM user WHERE id = ? LIMIT 1',
+                        [actorId]
+                    )
+                    const actor = actors[0]
+                    if(!actor || Number(actor.isActive) !== 1 || !['GlobalAdmin', 'SuperAdmin'].includes(actor.role)){
+                        return Response.json({status: 403, message:'Only active GlobalAdmin and SuperAdmin users can create sales users.'}, {status: 200})
+                    }
+
+                    await connection.beginTransaction()
+                    transactionStarted = true
+
+                    const [parents] = await connection.execute(
+                        'SELECT id, role, relatedTo, isActive FROM user WHERE id = ? FOR UPDATE',
+                        [parentId]
+                    )
+                    const parent = parents[0]
+                    if(!parent || Number(parent.isActive) !== 1){
+                        await connection.rollback()
+                        transactionStarted = false
+                        return Response.json({status: 400, message:'Choose an active reporting manager.'}, {status: 200})
+                    }
+
+                    const allowedParentRoles = role === 'SalesManager'
+                        ? ['StateHead']
+                        : ['StateHead', 'SalesManager']
+                    if(!allowedParentRoles.includes(parent.role)){
+                        await connection.rollback()
+                        transactionStarted = false
+                        return Response.json({status: 400, message:`A ${role === 'SalesManager' ? 'Sales Manager' : 'Sales Executive'} cannot report to the selected user.`}, {status: 200})
+                    }
+
+                    const [duplicates] = await connection.execute(
+                        'SELECT id FROM user WHERE TRIM(mobile) = ? OR (? <> \'\' AND LOWER(TRIM(email)) = LOWER(?)) LIMIT 1 FOR UPDATE',
+                        [mobile, email, email]
+                    )
+                    if(duplicates.length > 0){
+                        await connection.rollback()
+                        transactionStarted = false
+                        return Response.json({status: 400, message:'A user with this email address or mobile number already exists.'}, {status: 200})
+                    }
+
+                    const [existingIds] = await connection.execute(
+                        "SELECT id FROM user WHERE id REGEXP '^A[0-9]+$' ORDER BY CAST(SUBSTRING(id, 2) AS UNSIGNED) DESC LIMIT 1 FOR UPDATE"
+                    )
+                    const previousId = existingIds[0]?.id || 'A000'
+                    const previousNumber = Number.parseInt(String(previousId).slice(1), 10) || 0
+                    const id = `A${String(previousNumber + 1).padStart(3, '0')}`
+
+                    const ancestorIds = String(parent.relatedTo || '')
+                        .split(',')
+                        .map((value) => value.trim())
+                        .filter((value) => value && value !== '-')
+                    const relatedTo = [...new Set([parent.id, ...ancestorIds])].join(',')
+
+                    await connection.execute(
+                        'INSERT INTO user (id, name, email, mobile, role, designation, mapTo, relatedTo, userImage, gcm_regId, isActive) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [id, name, email || '-', mobile, role, designation, parent.id, relatedTo, '-', '-', 1]
+                    )
+
+                    const [createdUsers] = await connection.execute(
+                        'SELECT id, name, email, mobile, designation, role, mapTo, isActive FROM user WHERE id = ? LIMIT 1',
+                        [id]
+                    )
+
+                    await connection.commit()
+                    transactionStarted = false
+                    return Response.json({status: 200, data: createdUsers[0], message:'Sales user created successfully!'}, {status: 200})
+                } catch (error) {
+                    if(transactionStarted){
+                        await connection.rollback()
+                    }
+                    if(error?.code === 'ER_DUP_ENTRY'){
+                        return Response.json({status: 400, message:'The generated user ID is already in use. Please try again.'}, {status: 200})
+                    }
+                    return Response.json({status: 404, message:'Unable to create sales user!'}, {status: 200})
                 }
             }
             else {
