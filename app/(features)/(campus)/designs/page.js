@@ -69,6 +69,15 @@ fetch("/api/v2/designs/"+pass+"/U13", {
     },
 });
 
+const getProductsForSod = async (pass) =>
+fetch("/api/v2/designs/"+pass+"/U14", {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
 // update product
 const upateProduct = async (pass, productId, tags, size) => 
 fetch("/api/v2/designs/"+pass+"/U5/"+productId+"/"+tags+"/"+size, {
@@ -207,6 +216,7 @@ export default function Products() {
     const [newDesignUploadError, setNewDesignUploadError] = useState('');
     const [downloadingDesigns, setDownloadingDesigns] = useState(false);
     const [downloadingDesignsWithBatches, setDownloadingDesignsWithBatches] = useState(false);
+    const [downloadingSod, setDownloadingSod] = useState(false);
     const [offerCreationLoading, setOfferCreationLoading] = useState(false);
     const [tagUpdateKey, setTagUpdateKey] = useState(0);
 
@@ -531,6 +541,65 @@ export default function Products() {
             toast({ description: error.message || 'Failed to download designs with batches.' });
         } finally {
             setDownloadingDesignsWithBatches(false);
+        }
+    }
+
+    async function downloadSod() {
+        setDownloadingSod(true);
+
+        try {
+            const result = await getProductsForSod(process.env.NEXT_PUBLIC_API_PASS);
+            const queryResult = await result.json();
+
+            if (queryResult.status !== 200) {
+                throw new Error(queryResult.message || 'Failed to fetch stock for the SOD download.');
+            }
+
+            const rows = Array.isArray(queryResult.data) ? queryResult.data : [];
+            if (rows.length === 0) {
+                toast({ description: 'No design stock is available for the SOD download.' });
+                return;
+            }
+
+            const headers = ['', 'Sl No.', 'Product Code', 'Product Name', 'Batch No', 'Serial No.', 'HSN', 'UOM', 'Qty'];
+            const exportRows = rows.map((product, index) => {
+                const design = String(product.design ?? '').trim();
+                const isAtl = Number(product.designType) === 1 || String(product.designType || '').toUpperCase() === 'ATL';
+                const stockType = String(product.stockType || '').toLowerCase();
+                const productCode = `${isAtl ? `T31ATL${design}J` : design}${stockType === 'prm' ? 'A' : 'B'}`;
+
+                return [
+                    '',
+                    index + 1,
+                    productCode,
+                    product.name || '',
+                    stockType === 'prm' ? (product.batchId || '') : '',
+                    '',
+                    '',
+                    'BOX',
+                    Number(product.stockQty || 0),
+                ];
+            });
+
+            const worksheet = xlsx.utils.aoa_to_sheet([headers, ...exportRows]);
+            worksheet['!cols'] = [
+                { wch: 3 }, { wch: 8 }, { wch: 18 }, { wch: 42 }, { wch: 14 },
+                { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
+            ];
+            exportRows.forEach((_, index) => {
+                worksheet[`I${index + 2}`].z = '0.00';
+            });
+
+            const workbook = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(workbook, worksheet, 'SOD');
+            xlsx.writeFile(workbook, `sod_stock_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`);
+
+            toast({ description: `${exportRows.length} SOD stock rows downloaded successfully.` });
+        } catch (error) {
+            console.error('Error downloading SOD stock:', error);
+            toast({ description: error.message || 'Failed to download SOD stock.' });
+        } finally {
+            setDownloadingSod(false);
         }
     }
 
@@ -1439,13 +1508,17 @@ return (
                         </Select>
                     }
                     
-                    <Button variant="outline" onClick={downloadAllDesigns} disabled={downloadingDesigns || downloadingDesignsWithBatches}>
+                    <Button variant="outline" onClick={downloadAllDesigns} disabled={downloadingDesigns || downloadingDesignsWithBatches || downloadingSod}>
                         {downloadingDesigns ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDown className="mr-2 h-4 w-4" />}
                         {downloadingDesigns ? 'Preparing export' : 'Download'}
                     </Button>
-                    <Button variant="outline" onClick={downloadDesignsWithBatches} disabled={downloadingDesigns || downloadingDesignsWithBatches}>
+                    <Button variant="outline" onClick={downloadDesignsWithBatches} disabled={downloadingDesigns || downloadingDesignsWithBatches || downloadingSod}>
                         {downloadingDesignsWithBatches ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDown className="mr-2 h-4 w-4" />}
                         {downloadingDesignsWithBatches ? 'Preparing export' : 'Download with batches'}
+                    </Button>
+                    <Button variant="outline" onClick={downloadSod} disabled={downloadingDesigns || downloadingDesignsWithBatches || downloadingSod}>
+                        {downloadingSod ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDown className="mr-2 h-4 w-4" />}
+                        {downloadingSod ? 'Preparing export' : 'Download SOD'}
                     </Button>
                 </div>
                 {/* <Button variant="outline" onClick={()=>downloadNow()}> <ArrowDown className="mr-2 h-4 w-4"/> InOuting Students</Button> */}
@@ -1454,11 +1527,11 @@ return (
             : ''    
             }
 
-        {downloadingDesigns || downloadingDesignsWithBatches ? (
+        {downloadingDesigns || downloadingDesignsWithBatches || downloadingSod ? (
             <div className="my-2 flex justify-end">
                 <OperationProgress
-                    title={downloadingDesignsWithBatches ? 'Preparing design and batch export' : 'Preparing designs export'}
-                    description={downloadingDesignsWithBatches ? 'Collecting every design, its standard stock, and available premium batches.' : 'Collecting every design for your download.'}
+                    title={downloadingSod ? 'Preparing SOD stock export' : downloadingDesignsWithBatches ? 'Preparing design and batch export' : 'Preparing designs export'}
+                    description={downloadingSod ? 'Formatting standard stock and available premium batches for SOD.' : downloadingDesignsWithBatches ? 'Collecting every design, its standard stock, and available premium batches.' : 'Collecting every design for your download.'}
                 />
             </div>
         ) : null}

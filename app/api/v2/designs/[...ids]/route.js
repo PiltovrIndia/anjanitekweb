@@ -386,6 +386,49 @@ export async function GET(request,{params}) {
                 }
             }
 
+            // SOD export: a standard row for every design and one row per available PRM batch.
+            else if(params.ids[1] == 'U14'){
+                try {
+                    const [rows] = await connection.execute(
+                        `SELECT
+                            p.design,
+                            p.name,
+                            p.designType,
+                            'std' AS stockType,
+                            p.std AS stockQty,
+                            NULL AS batchId,
+                            NULL AS receivedOn,
+                            NULL AS stockBatchId
+                         FROM products p
+                         WHERE p.isActive = 1
+                         UNION ALL
+                         SELECT
+                            p.design,
+                            p.name,
+                            p.designType,
+                            'prm' AS stockType,
+                            batches.availableQty AS stockQty,
+                            batches.batchId,
+                            batches.receivedOn,
+                            batches.id AS stockBatchId
+                         FROM products p
+                         INNER JOIN product_stock_batches batches
+                            ON batches.design = p.design
+                            AND batches.stockType = 'prm'
+                            AND batches.status != 'Cancelled'
+                            AND batches.availableQty > 0
+                         WHERE p.isActive = 1
+                         ORDER BY design ASC, FIELD(stockType, 'std', 'prm') ASC, receivedOn ASC, stockBatchId ASC`
+                    )
+                    connection.release()
+
+                    return Response.json({status: 200, data: rows, message: rows.length ? 'Data found!' : 'No stock found!'}, {status: 200})
+                } catch (error) {
+                    connection.release()
+                    return Response.json({status: 404, message:'Unable to prepare SOD export!'+error}, {status: 200})
+                }
+            }
+
             else {
                 return Response.json({status: 404, message:'No product found!'}, {status: 200})
             }
