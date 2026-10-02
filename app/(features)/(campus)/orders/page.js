@@ -16,7 +16,7 @@ import Image from 'next/image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/app/components/ui/command'
-import { ArrowDown, CheckIcon, ChevronDown, ChevronRight, FileCheck, HeartIcon, MessageSquare, Pencil, Search, Trash, UserRound, UsersRound } from 'lucide-react'
+import { ArrowDown, CheckIcon, ChevronDown, ChevronRight, HeartIcon, MessageSquare, Pencil, Search, Trash, UserRound, UsersRound } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table'
 import { Skeleton } from '@/app/components/ui/skeleton'
@@ -1382,12 +1382,13 @@ export default function OrdersV2() {
         }
     }
 
-    // mark every order item of a cart as Sale Order (clears pending production)
+    // Sale Order is a cart-wide transition. It clears production quantities
+    // without creating additional production tracking lines.
     async function handleMarkSaleOrder(group, e) {
         e?.stopPropagation?.();
         if (saleOrderCartId) return;
 
-        const confirmed = window.confirm(`Mark all items of cart #${group.first?.cartId || group.cartId} as Sale Order? Pending production quantities will be separated if any.`);
+        const confirmed = window.confirm(`Mark all items of cart #${group.first?.cartId || group.cartId} as Sale Order? Any production quantities in this basket will be set to 0.`);
         if (!confirmed) return;
 
         setSaleOrderCartId(group.cartId);
@@ -1401,12 +1402,7 @@ export default function OrdersV2() {
             const queryResult = await result.json();
 
             if (queryResult.status === 200) {
-                toast({ description: `Cart marked as Sale Order (${queryResult.data?.updatedItems ?? 0} items updated${(queryResult.data?.splitItems?.length ?? 0) > 0 ? `, ${queryResult.data.splitItems.length} production item${queryResult.data.splitItems.length > 1 ? 's' : ''} created` : ''})` });
-
-                // patch the group in place: live items become SaleOrder with production
-                // cleared, and every pending productionQty comes back as a fresh
-                // Approved tracking item appended to the same cart (mirrors the server split)
-                const splitItems = queryResult.data?.splitItems ?? [];
+                toast({ description: `Cart marked as Sale Order (${queryResult.data?.updatedItems ?? 0} items updated)` });
 
                 setOrders(prev => prev.map(g => {
                     if (String(g.cartId) !== String(group.cartId)) return g;
@@ -1414,21 +1410,6 @@ export default function OrdersV2() {
                     const updatedRows = g.rows.map(row => ['Cancelled', 'Rejected', 'Deleted'].includes(row.status)
                         ? { ...row, productionQty: 0 }
                         : { ...row, status: 'SaleOrder', productionQty: 0 });
-
-                    for (const split of splitItems) {
-                        const source = g.rows.find(r => String(r.id) === String(split.sourceOrderId));
-                        if (!source) continue;
-                        updatedRows.push({
-                            ...source,
-                            id: split.newOrderId,
-                            serialId: split.serialId,
-                            requestedQty: split.productionQty,
-                            approvedQty: 0,
-                            productionQty: split.productionQty,
-                            status: 'Approved',
-                            isProduction: 1,
-                        });
-                    }
 
                     const totalRequestedQty  = updatedRows.reduce((s, r) => s + Number(r.requestedQty  || 0), 0);
                     const totalApprovedQty   = updatedRows.reduce((s, r) => s + Number(r.approvedQty   || 0), 0);
@@ -2576,12 +2557,11 @@ return (
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            className="text-emerald-700 border-emerald-600 hover:bg-emerald-50 hover:text-emerald-800"
+                                                            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                                                             disabled={isMarking}
                                                             onClick={(e) => handleMarkSaleOrder(group, e)}
                                                         >
-                                                            {isMarking ? <SpinnerGap className="mr-2 h-4 w-4 animate-spin" /> : <FileCheck className="mr-2 h-4 w-4" />}
-                                                            Sale Order
+                                                            {isMarking ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'SO'}
                                                         </Button>
                                                     ) : null;
 
@@ -2590,7 +2570,7 @@ return (
                                                             {canAddOrderItem ? addOrderItemButton : null}
                                                             {downloadButton}
                                                             {reviewBasketButton}
-                                                            {/* {saleOrderButton} */}
+                                                            {saleOrderButton}
                                                             {/* <span className="text-xs font-medium text-slate-500">
                                                                 {isExpanded ? 'Hide items' : 'View items'}
                                                             </span> */}
@@ -2708,6 +2688,18 @@ return (
                                                         >
                                                             <MessageSquare className="h-4 w-4" />
                                                         </Button>
+                                                        {group.rows.some((row) => row?.status === 'Approved') && !group.rows.some((row) => ['Submitted', 'InReview'].includes(row?.status)) ? (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                                                                disabled={saleOrderCartId === group.cartId}
+                                                                title={`Mark basket ${group.cartId} as Sale Order`}
+                                                                onClick={(event) => handleMarkSaleOrder(group, event)}
+                                                            >
+                                                                {saleOrderCartId === group.cartId ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'SO'}
+                                                            </Button>
+                                                        ) : null}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
