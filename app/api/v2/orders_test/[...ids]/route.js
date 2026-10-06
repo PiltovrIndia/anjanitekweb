@@ -31,6 +31,7 @@ export async function GET(request,{params}) {
                     const search = (requestUrl.searchParams.get("search") || "").trim().slice(0, 100);
                     const executiveId = (requestUrl.searchParams.get("executiveId") || "").trim().slice(0, 100);
                     const basketType = (requestUrl.searchParams.get("basketType") || "All").trim().toUpperCase();
+                    const dealerState = (requestUrl.searchParams.get("dealerState") || "All").trim().slice(0, 100);
                     const designType = basketType === "ATL" ? 1 : basketType === "VCL" ? 2 : null;
                     // const page = 1;
                     const page = params.ids[3];
@@ -85,6 +86,11 @@ export async function GET(request,{params}) {
                     if (designType !== null) {
                         where.push("p.designType = ?");
                         queryParams.push(designType);
+                    }
+
+                    if (dealerState && dealerState !== "All") {
+                        where.push("d.state = ?");
+                        queryParams.push(dealerState);
                     }
 
                     /**
@@ -144,6 +150,7 @@ export async function GET(request,{params}) {
                     LEFT JOIN products p ON o.design = p.design
                     LEFT JOIN user u ON o.userId = u.id
                     LEFT JOIN user u_dealer ON o.dealerId = u_dealer.id
+                    LEFT JOIN dealer d ON d.dealerId = o.dealerId
                     ${whereSql}
                     GROUP BY o.cartId
                     ORDER BY ${orderBySql}
@@ -214,6 +221,7 @@ export async function GET(request,{params}) {
                         u.mapTo,
 
                         u_dealer.name AS dealer,
+                        d.state AS dealerState,
 
                         CASE
                             WHEN o.productionQty > 0 THEN (
@@ -242,6 +250,8 @@ export async function GET(request,{params}) {
                         ON o.userId = u.id
                     LEFT JOIN user u_dealer 
                         ON o.dealerId = u_dealer.id
+                    LEFT JOIN dealer d
+                        ON d.dealerId = o.dealerId
 
                     WHERE o.cartId IN (${placeholders})
                         AND o.isDeleted = 0
@@ -299,6 +309,7 @@ export async function GET(request,{params}) {
                         LEFT JOIN products p ON o.design = p.design
                         LEFT JOIN user u ON o.userId = u.id
                         LEFT JOIN user u_dealer ON o.dealerId = u_dealer.id
+                        LEFT JOIN dealer d ON d.dealerId = o.dealerId
                         ${whereSql}
                         GROUP BY o.cartId
                     ) t
@@ -341,6 +352,7 @@ export async function GET(request,{params}) {
                     const search = (requestUrl.searchParams.get("search") || "").trim().slice(0, 100);
                     const waitlistOnly = requestUrl.searchParams.get("waitlist") === "1";
                     const basketType = (requestUrl.searchParams.get("basketType") || "All").trim().toUpperCase();
+                    const dealerState = (requestUrl.searchParams.get("dealerState") || "All").trim().slice(0, 100);
                     const designType = basketType === "ATL" ? 1 : basketType === "VCL" ? 2 : null;
 
                     if (!["GlobalAdmin", "SuperAdmin"].includes(role)) {
@@ -366,6 +378,11 @@ export async function GET(request,{params}) {
                     if (designType !== null) {
                         where.push("p.designType = ?");
                         values.push(designType);
+                    }
+
+                    if (dealerState && dealerState !== "All") {
+                        where.push("d.state = ?");
+                        values.push(dealerState);
                     }
 
                     if (search) {
@@ -398,6 +415,7 @@ export async function GET(request,{params}) {
                         INNER JOIN user u ON o.userId = u.id
                         LEFT JOIN user u_dealer ON o.dealerId = u_dealer.id
                         LEFT JOIN products p ON o.design = p.design
+                        LEFT JOIN dealer d ON d.dealerId = o.dealerId
                         WHERE ${where.join(" AND ")}
                         GROUP BY u.id, u.name, u.isActive
                         ORDER BY cartCount DESC, latestOrderOn DESC, executiveName ASC
@@ -424,6 +442,48 @@ export async function GET(request,{params}) {
                         status: 500,
                         success: false,
                         message: "Failed to fetch executive order summaries",
+                        error: error.message,
+                    }, { status: 200 });
+                } finally {
+                    connection.release();
+                }
+            }
+            // available dealer states for the current caller's eligible order scope
+            // /U0.16/$role/$userId
+            else if (params.ids[1] == "U0.16") {
+                try {
+                    const role = params.ids[2] || "";
+                    const userId = params.ids[3] || "";
+                    const where = ["o.isDeleted = 0", "d.state IS NOT NULL", "TRIM(d.state) <> ''"];
+                    const values = [];
+
+                    if (!["GlobalAdmin", "SuperAdmin"].includes(role) && userId) {
+                        where.push("(u.relatedTo LIKE ? OR u.id = ? OR o.userId = ? OR o.dealerId = ?)");
+                        values.push(`%${userId}%`, userId, userId, userId);
+                    }
+
+                    const [rows] = await connection.execute(
+                        `SELECT DISTINCT d.state
+                         FROM orders o
+                         INNER JOIN dealer d ON d.dealerId = o.dealerId
+                         LEFT JOIN user u ON o.userId = u.id
+                         WHERE ${where.join(" AND ")}
+                         ORDER BY d.state ASC`,
+                        values
+                    );
+
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        data: rows.map((row) => row.state),
+                        message: "Order states fetched successfully",
+                    });
+                } catch (error) {
+                    console.error("Order state fetch error:", error);
+                    return Response.json({
+                        status: 500,
+                        success: false,
+                        message: "Failed to fetch order states",
                         error: error.message,
                     }, { status: 200 });
                 } finally {
@@ -1986,6 +2046,83 @@ export async function GET(request,{params}) {
                     connection.release();
                 }
             }
+            // mark one approved order item as Sale Order without changing its cart peers
+            // /U0.15/$orderId/$actorId/$actionDate
+            else if (params.ids[1] === "U0.15") {
+                const orderId = params.ids[2];
+                const actorId = params.ids[3];
+                const actionDate = params.ids[4] || new Date();
+
+                if (!orderId || !actorId) {
+                    connection.release();
+                    return Response.json({ status: 400, success: false, message: 'An order item and active user are required' });
+                }
+
+                try {
+                    await connection.beginTransaction();
+
+                    const [orderRows] = await connection.query(
+                        `SELECT id, cartId, design, status
+                         FROM orders
+                         WHERE id = ? AND isDeleted = 0
+                         FOR UPDATE`,
+                        [orderId]
+                    );
+                    const order = orderRows[0];
+
+                    if (!order) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Order item not found' });
+                    }
+                    if (order.status !== 'Approved') {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: 'Only approved order items can be marked as Sale Order' });
+                    }
+
+                    const actor = await resolveOrderActionActor(connection, actorId);
+                    if (!actor) {
+                        await connection.rollback();
+                        return Response.json({ status: 400, success: false, message: 'A valid active user is required to take order actions' });
+                    }
+
+                    await connection.query(
+                        `UPDATE orders
+                         SET status = 'SaleOrder', productionQty = 0, modifiedOn = ?
+                         WHERE id = ? AND isDeleted = 0`,
+                        [actionDate, order.id]
+                    );
+                    await recordOrderAction(connection, {
+                        orderId: order.id,
+                        cartId: order.cartId,
+                        actor,
+                        actionType: 'SaleOrder',
+                        actionOn: actionDate,
+                    });
+
+                    await connection.commit();
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        message: 'Order item marked as Sale Order',
+                        data: {
+                            orderId: order.id,
+                            cartId: order.cartId,
+                            status: 'SaleOrder',
+                            productionQty: 0,
+                            modifiedOn: actionDate,
+                            lastActionById: actor.id,
+                            lastActionByName: actor.name,
+                            lastActionType: 'SaleOrder',
+                            lastActionOn: actionDate,
+                        },
+                    });
+                } catch (error) {
+                    await connection.rollback();
+                    return Response.json({ status: 500, success: false, message: 'Failed to mark order item as Sale Order', error: error.message });
+                } finally {
+                    connection.release();
+                }
+            }
             // change a PRM order item to STD when its full requested quantity is available
             // /U0.11/$orderId/$actorId/$actionDate?notes=
             else if (params.ids[1] === "U0.11") {
@@ -2737,6 +2874,7 @@ export async function GET(request,{params}) {
                     const executiveId = (reportUrl.searchParams.get('executiveId') || '').trim().slice(0, 100);
                     const reportRole = (reportUrl.searchParams.get('role') || '').trim();
                     const basketType = (reportUrl.searchParams.get('basketType') || 'All').trim().toUpperCase();
+                    const dealerState = (reportUrl.searchParams.get('dealerState') || 'All').trim().slice(0, 100);
                     const designType = basketType === 'ATL' ? 1 : basketType === 'VCL' ? 2 : null;
 
                     if (executiveId) {
@@ -2886,6 +3024,13 @@ export async function GET(request,{params}) {
                         query = query.replace(' ORDER BY r.createdOn DESC', ' AND p.designType = ? ORDER BY r.createdOn DESC');
                         queryCount += ' AND p.designType = ?';
                         reportValues.push(designType);
+                    }
+
+                    if (dealerState && dealerState !== 'All') {
+                        const statePredicate = 'EXISTS (SELECT 1 FROM dealer d_state WHERE d_state.dealerId = r.dealerId AND d_state.state = ?)';
+                        query = query.replace(' ORDER BY r.createdOn DESC', ` AND ${statePredicate} ORDER BY r.createdOn DESC`);
+                        queryCount += ` AND ${statePredicate}`;
+                        reportValues.push(dealerState);
                     }
 
                     const [rows, fields] = await connection.execute(query, reportValues);
@@ -3289,6 +3434,7 @@ function groupAdminOrders(rows) {
 
         orderedBy: row.orderedBy,
         dealer: row.dealer,
+        dealerState: row.dealerState,
         mobile: row.mobile,
         mapTo: row.mapTo,
 

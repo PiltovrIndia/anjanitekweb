@@ -42,11 +42,12 @@ const xlsx = require('xlsx');
 const ORDER_PAGE_SIZE = 0;
 
 // get orders
-const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', signal) => {
+const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', dealerState = 'All', signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
 if (executiveId) searchParams.set('executiveId', executiveId)
 if (basketType !== 'All') searchParams.set('basketType', basketType)
+if (dealerState !== 'All') searchParams.set('dealerState', dealerState)
 return fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -58,11 +59,12 @@ return fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+u
 };
 
 // get waitlisted order items, grouped by cart
-const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', signal) => {
+const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', dealerState = 'All', signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
 if (executiveId) searchParams.set('executiveId', executiveId)
 if (basketType !== 'All') searchParams.set('basketType', basketType)
+if (dealerState !== 'All') searchParams.set('dealerState', dealerState)
 return fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -74,13 +76,14 @@ return fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+u
 };
 
 // get report specific listing
-const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction, executiveId = '', role = '', basketType = 'All') => {
+const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction, executiveId = '', role = '', basketType = 'All', dealerState = 'All') => {
 const searchParams = new URLSearchParams()
 if (executiveId) {
     searchParams.set('executiveId', executiveId)
     searchParams.set('role', role)
 }
 if (basketType !== 'All') searchParams.set('basketType', basketType)
+if (dealerState !== 'All') searchParams.set('dealerState', dealerState)
 return fetch("/api/v2/orders_test/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -90,17 +93,25 @@ return fetch("/api/v2/orders_test/"+pass+"/report/"+type+"/"+encodeURIComponent(
 });
 };
 
-const getExecutiveOrderSummariesAPI = async (pass, type, role, userId, isProduction, { search = '', waitlistOnly = false, basketType = 'All' } = {}, signal) => {
+const getExecutiveOrderSummariesAPI = async (pass, type, role, userId, isProduction, { search = '', waitlistOnly = false, basketType = 'All', dealerState = 'All' } = {}, signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
 if (waitlistOnly) searchParams.set('waitlist', '1')
 if (basketType !== 'All') searchParams.set('basketType', basketType)
+if (dealerState !== 'All') searchParams.set('dealerState', dealerState)
 return fetch("/api/v2/orders_test/"+pass+"/U0.10/"+type+"/"+role+"/"+userId+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     signal,
 });
 };
+
+const getOrderStatesAPI = async (pass, role, userId, signal) =>
+fetch(`/api/v2/orders_test/${pass}/U0.16/${role}/${userId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    signal,
+});
 
 
 const getOrdersByDesignAPI = async (pass, design, signal) =>
@@ -162,6 +173,16 @@ return fetch(`/api/v2/orders_test/${pass}/U0.14/${orderId}/${userId}/${actionDat
 // mark all order items of a cart as sale order
 const markCartAsSaleOrderAPI = async (pass, cartId, adminId, actionDate) =>
 fetch("/api/v2/orders_test/"+pass+"/U0.5/"+encodeURIComponent(cartId)+"/"+adminId+"/"+actionDate, {
+    method: "GET",
+    headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+    },
+});
+
+// mark one approved order item as a sale order without changing its basket peers
+const markOrderAsSaleOrderAPI = async (pass, orderId, actorId, actionDate) =>
+fetch(`/api/v2/orders_test/${pass}/U0.15/${orderId}/${actorId}/${actionDate}`, {
     method: "GET",
     headers: {
         "Content-Type": "application/json",
@@ -277,6 +298,9 @@ export default function OrdersV2() {
     const [showWaitlist, setShowWaitlist] = useState(false);
     const [isProduction, setisProduction] = useState('All');
     const [basketTypeFilter, setBasketTypeFilter] = useState('All');
+    const [dealerStateFilter, setDealerStateFilter] = useState('All');
+    const [orderStates, setOrderStates] = useState([]);
+    const [loadingOrderStates, setLoadingOrderStates] = useState(false);
     const [downloadingOrders, setDownloadingOrders] = useState(false);
     const [downloadingExecutiveId, setDownloadingExecutiveId] = useState(null);
     const [resOffset, setResOffset] = useState(0);
@@ -295,6 +319,7 @@ export default function OrdersV2() {
     const [downloadToDate, setDownloadToDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [showDownloadPopover, setShowDownloadPopover] = useState(false);
     const [downloadingCartId, setDownloadingCartId] = useState(null);
+    const [downloadingSodCartId, setDownloadingSodCartId] = useState(null);
     const [stockOrderOpen, setStockOrderOpen] = useState(false);
     const [addToCartGroup, setAddToCartGroup] = useState(null);
     const [basketReviewGroup, setBasketReviewGroup] = useState(null);
@@ -336,6 +361,7 @@ export default function OrdersV2() {
     const [loadingOrderAllocations, setLoadingOrderAllocations] = useState(false)
     const [showAutoApproveChoice, setShowAutoApproveChoice] = useState(false)
     const [saleOrderCartId, setSaleOrderCartId] = useState(null) // cartId currently being marked as Sale Order
+    const [saleOrderOrderId, setSaleOrderOrderId] = useState(null) // order item currently being marked as Sale Order
     const reviewDesignTimer = useRef(null)
     const reviewDesignRef = useRef(null)
     const ordersEndRef = useRef(null)
@@ -412,7 +438,7 @@ export default function OrdersV2() {
             user.role,
             user.id,
             isProduction,
-            { search: activeSearchQuery, waitlistOnly: showWaitlist, basketType: basketTypeFilter },
+            { search: activeSearchQuery, waitlistOnly: showWaitlist, basketType: basketTypeFilter, dealerState: dealerStateFilter },
             controller.signal
         )
             .then(async (response) => {
@@ -433,7 +459,33 @@ export default function OrdersV2() {
             });
 
         return () => controller.abort();
-    }, [canBrowseExecutives, user?.role, user?.id, resStatus, isProduction, showWaitlist, activeSearchQuery, basketTypeFilter]);
+    }, [canBrowseExecutives, user?.role, user?.id, resStatus, isProduction, showWaitlist, activeSearchQuery, basketTypeFilter, dealerStateFilter]);
+
+    useEffect(() => {
+        if (!user?.role || !user?.id) return;
+
+        const controller = new AbortController();
+        setLoadingOrderStates(true);
+
+        getOrderStatesAPI(process.env.NEXT_PUBLIC_API_PASS, user.role, user.id, controller.signal)
+            .then(async (response) => {
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 200) {
+                    throw new Error(payload.message || 'Unable to load order states');
+                }
+                if (!controller.signal.aborted) {
+                    setOrderStates(Array.isArray(payload.data) ? payload.data.filter(Boolean) : []);
+                }
+            })
+            .catch(() => {
+                if (!controller.signal.aborted) setOrderStates([]);
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoadingOrderStates(false);
+            });
+
+        return () => controller.abort();
+    }, [user?.role, user?.id]);
 
     useEffect(() => {
         const handler = (e) => {
@@ -702,6 +754,7 @@ export default function OrdersV2() {
                         dealerId: order.dealerId,
                         orderedBy: order.orderedBy,
                         dealer: order.dealer,
+                        dealerState: order.dealerState,
                         mobile: order.mobile,
                         mapTo: order.mapTo,
                         isProduction: Number(item.productionQty || 0) > 0 ? 1 : 0,
@@ -806,7 +859,7 @@ export default function OrdersV2() {
         append = false,
         waitlistOnly = showWaitlist,
         searchQuery = activeSearchQuery,
-        { signal, keepRows = false, executiveId = selectedExecutiveId, basketType = basketTypeFilter } = {}
+        { signal, keepRows = false, executiveId = selectedExecutiveId, basketType = basketTypeFilter, dealerState = dealerStateFilter } = {}
     ){
         const requestVersion = append ? ordersRequestVersionRef.current : ordersRequestVersionRef.current + 1;
         if (!append) {
@@ -836,8 +889,8 @@ export default function OrdersV2() {
 
         try {    
             const result = await (waitlistOnly
-                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, signal)
-                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, signal));
+                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, dealerState, signal)
+                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, dealerState, signal));
             const queryResult = await result.json() // get data
 
             if (!isCurrentRequest()) return false;
@@ -948,7 +1001,8 @@ export default function OrdersV2() {
                 isProduction,
                 executiveId,
                 user?.role || '',
-                basketTypeFilter
+                basketTypeFilter,
+                dealerStateFilter
             );
             const queryResult = await result.json();
 
@@ -966,6 +1020,7 @@ export default function OrdersV2() {
                         dealerId: order.dealerId,
                         orderedBy: order.orderedBy,
                         dealer: order.dealer,
+                        dealerState: order.dealerState,
                         mobile: order.mobile,
                         mapTo: order.mapTo,
                     }))
@@ -1011,6 +1066,85 @@ export default function OrdersV2() {
             toast({ description: e.message || 'Failed to download cart orders' });
         } finally {
             setDownloadingCartId(null);
+        }
+    }
+
+    function buildCartSodRows(cartRows = []) {
+        return cartRows.flatMap((order) => {
+            const requestedQty = Number(order.requestedQty || 0);
+            if (requestedQty <= 0) return [];
+
+            const design = String(order.design || '').trim();
+            const isAtl = Number(order.designType) === 1 || String(order.designType || '').toUpperCase() === 'ATL';
+            const stockType = String(order.stockType || '').toLowerCase();
+            const productCode = `${isAtl ? `T31ATL${design}J` : design}${stockType === 'prm' ? 'A' : 'B'}`;
+            const buildRow = (batchId, qty) => ({
+                productCode,
+                productName: order.name || '',
+                batchId: stockType === 'prm' ? (batchId || '') : '',
+                qty: Number(qty || 0),
+            });
+
+            if (stockType !== 'prm') return [buildRow('', requestedQty)];
+
+            const allocations = Array.isArray(order.batchAllocations) ? order.batchAllocations : [];
+            let remainingQty = requestedQty;
+            const allocationRows = allocations.reduce((rows, allocation) => {
+                const allocatedQty = Math.min(Number(allocation.qty || 0), remainingQty);
+                if (allocatedQty > 0) {
+                    rows.push(buildRow(allocation.batchId, allocatedQty));
+                    remainingQty -= allocatedQty;
+                }
+                return rows;
+            }, []);
+
+            return remainingQty > 0 ? [...allocationRows, buildRow('', remainingQty)] : allocationRows;
+        }).filter((row) => row.qty > 0);
+    }
+
+    function downloadCartSod(group, event) {
+        event?.stopPropagation();
+
+        const cartId = group.first?.cartId || group.cartId;
+        const cartRows = group.rows?.length ? group.rows : [group.first].filter(Boolean);
+        const exportRows = buildCartSodRows(cartRows);
+
+        if (exportRows.length === 0) {
+            toast({ description: 'No requested quantities are available for this basket SOD download.' });
+            return;
+        }
+
+        setDownloadingSodCartId(group.cartId);
+        try {
+            const headers = ['', 'Sl No.', 'Product Code', 'Product Name', 'Batch No', 'Serial No.', 'HSN', 'UOM', 'Qty'];
+            const worksheetRows = exportRows.map((row, index) => ([
+                '',
+                index + 1,
+                row.productCode,
+                row.productName,
+                row.batchId,
+                '',
+                '',
+                'BOX',
+                row.qty,
+            ]));
+            const worksheet = xlsx.utils.aoa_to_sheet([headers, ...worksheetRows]);
+            worksheet['!cols'] = [
+                { wch: 3 }, { wch: 8 }, { wch: 18 }, { wch: 42 }, { wch: 14 },
+                { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
+            ];
+            worksheetRows.forEach((_, index) => {
+                worksheet[`I${index + 2}`].z = '0.00';
+            });
+
+            const workbook = xlsx.utils.book_new();
+            xlsx.utils.book_append_sheet(workbook, worksheet, 'SOD');
+            xlsx.writeFile(workbook, `sod_basket_${cartId || 'unknown'}_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`);
+            toast({ description: `${worksheetRows.length} SOD row${worksheetRows.length === 1 ? '' : 's'} downloaded for basket ${cartId || ''}.` });
+        } catch (error) {
+            toast({ description: error.message || 'Failed to download basket SOD.' });
+        } finally {
+            setDownloadingSodCartId(null);
         }
     }
 
@@ -1437,6 +1571,82 @@ export default function OrdersV2() {
             toast({ description: 'Error marking cart as Sale Order' });
         } finally {
             setSaleOrderCartId(null);
+        }
+    }
+
+    // Unlike the basket action above, this transition applies only to the
+    // selected approved line item and leaves the rest of the basket unchanged.
+    async function handleMarkOrderAsSaleOrder(order, e) {
+        e?.stopPropagation?.();
+        if (!order?.id || saleOrderCartId || saleOrderOrderId) return;
+
+        const confirmed = window.confirm(`Mark ${order.design || 'this order item'} as Sale Order? Its production quantity will be set to 0.`);
+        if (!confirmed) return;
+
+        const actionDate = dayjs().format('YYYY-MM-DD HH:mm:ss');
+        setSaleOrderOrderId(order.id);
+        try {
+            const result = await markOrderAsSaleOrderAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                order.id,
+                user?.id,
+                actionDate,
+            );
+            const queryResult = await result.json();
+
+            if (queryResult.status !== 200) {
+                throw new Error(queryResult.message || 'Failed to mark order item as Sale Order');
+            }
+
+            const data = queryResult.data || {};
+            const itemPatch = {
+                status: 'SaleOrder',
+                productionQty: 0,
+                modifiedOn: data.modifiedOn || actionDate,
+                lastActionById: data.lastActionById || user?.id,
+                lastActionByName: data.lastActionByName || user?.name,
+                lastActionType: data.lastActionType || 'SaleOrder',
+                lastActionOn: data.lastActionOn || actionDate,
+            };
+
+            setOrders((previousOrders) => previousOrders.map((group) => {
+                if (!group.rows?.some((row) => String(row.id) === String(order.id))) return group;
+
+                const updatedRows = group.rows.map((row) => (
+                    String(row.id) === String(order.id) ? { ...row, ...itemPatch } : row
+                ));
+                const latestActionRow = updatedRows.reduce((latest, row) => {
+                    if (!row.lastActionOn) return latest;
+                    return !latest?.lastActionOn || new Date(row.lastActionOn) > new Date(latest.lastActionOn) ? row : latest;
+                }, null);
+                const totalRequestedQty = updatedRows.reduce((sum, row) => sum + Number(row.requestedQty || 0), 0);
+                const totalApprovedQty = updatedRows.reduce((sum, row) => sum + Number(row.approvedQty || 0), 0);
+                const totalProductionQty = updatedRows.reduce((sum, row) => sum + Number(row.productionQty || 0), 0);
+
+                return {
+                    ...group,
+                    rows: updatedRows,
+                    first: updatedRows[0] || group.first,
+                    totalRequestedQty,
+                    totalApprovedQty,
+                    totalProductionQty,
+                    requestedQty: totalRequestedQty,
+                    approvedQty: totalApprovedQty,
+                    productionQty: totalProductionQty,
+                    waitlistItems: updatedRows.filter((row) => Number(row.productionQty || 0) > 0).length,
+                    requestTypes: [...new Set(updatedRows.map((row) => Number(row.productionQty || 0) > 0 ? 'Production' : 'Current'))],
+                    statuses: getStatusCounts(updatedRows),
+                    lastActionById: latestActionRow?.lastActionById,
+                    lastActionByName: latestActionRow?.lastActionByName,
+                    lastActionType: latestActionRow?.lastActionType,
+                    lastActionOn: latestActionRow?.lastActionOn,
+                };
+            }));
+            toast({ description: 'Order item marked as Sale Order.' });
+        } catch (error) {
+            toast({ description: error.message || 'Failed to mark order item as Sale Order' });
+        } finally {
+            setSaleOrderOrderId(null);
         }
     }
 
@@ -1980,6 +2190,20 @@ export default function OrdersV2() {
         });
     }
 
+    function handleDealerStateChange(value) {
+        cancelOrderSearch();
+        const searchQuery = getEligibleOrderSearchQuery();
+        setDealerStateFilter(value);
+        setActiveSearchQuery(searchQuery);
+        setResOffset(0);
+        setExpandedCartGroups({});
+
+        getOrders(resStatus, 0, user, isProduction, false, showWaitlist, searchQuery, {
+            keepRows: true,
+            dealerState: value,
+        });
+    }
+
     function handleExecutiveSelection(executive) {
         const nextExecutive = executive || null;
         const nextExecutiveId = nextExecutive?.executiveId || '';
@@ -2075,10 +2299,10 @@ return (
                       />
                   </div>
               </div>
-              <div className="flex flex-row gap-2 justify-between items-center">
+              <div className="flex flex-row flex-wrap gap-2 justify-between items-center">
                     
                     <span className='text-sm text-slate-500'>{totalOrders}</span>
-                    <div className="flex flex-row items-center gap-3">
+                    <div className="flex flex-row flex-wrap items-center gap-3">
                         <div className="relative">
                             {isSearchingOrders ? (
                                 <SpinnerGap className="absolute left-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
@@ -2127,6 +2351,17 @@ return (
                                 <SelectItem value="All">All types</SelectItem>
                                 <SelectItem value="ATL">ATL</SelectItem>
                                 <SelectItem value="VCL">VCL</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={dealerStateFilter} onValueChange={handleDealerStateChange} disabled={loadingOrderStates || !user}>
+                            <SelectTrigger className="w-[190px] font-mono text-sm tracking-wider" aria-label="Filter orders by dealer state">
+                                <SelectValue placeholder="Dealer state" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All states</SelectItem>
+                                {orderStates.map((state) => (
+                                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                         {canBrowseExecutives ? (
@@ -2442,7 +2677,7 @@ return (
                                                 </div>
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                <span className='font-medium'>{group.first.dealer}</span><br/>
+                                                <span className='font-medium'>{group.first.dealer}<br/>{group.first.dealerState ? ` (${group.first.dealerState})` : ''}</span><br/>
                                                 {/* <span className='text-xs text-slate-500'>{group.first.dealerId}</span> */}
                                             </TableCell>
                                             <TableCell>
@@ -2515,7 +2750,10 @@ return (
                                                     const hasReviewableItems = groupRows.some((row) => ['Submitted', 'InReview'].includes(row?.status));
                                                     const saleOrderEligible = groupRows.some(r => r?.status === 'Approved') && !groupRows.some(r => ['Submitted', 'InReview'].includes(r?.status));
                                                     const isMarking = saleOrderCartId === group.cartId;
+                                                    const isAnySaleOrderActionPending = Boolean(saleOrderCartId || saleOrderOrderId);
                                                     const isDownloadingCart = downloadingCartId === group.cartId;
+                                                    const isDownloadingSod = downloadingSodCartId === group.cartId;
+                                                    const hasSodRows = groupRows.some((row) => Number(row?.requestedQty || 0) > 0);
                                                     const downloadButton = (
                                                         <Button
                                                             size="sm"
@@ -2558,12 +2796,24 @@ return (
                                                             size="sm"
                                                             variant="outline"
                                                             className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                                                            disabled={isMarking}
+                                                            disabled={isAnySaleOrderActionPending}
                                                             onClick={(e) => handleMarkSaleOrder(group, e)}
                                                         >
                                                             {isMarking ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'SO'}
                                                         </Button>
                                                     ) : null;
+                                                    const sodButton = (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                                                            disabled={!hasSodRows || isDownloadingSod}
+                                                            title={hasSodRows ? `Download SOD for basket ${group.cartId}` : 'No order quantities are available for this basket'}
+                                                            onClick={(e) => downloadCartSod(group, e)}
+                                                        >
+                                                            {isDownloadingSod ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'SOD'}
+                                                        </Button>
+                                                    );
 
                                                     return hasMultipleRows ? (
                                                         <div className="flex items-center justify-end gap-3">
@@ -2571,6 +2821,7 @@ return (
                                                             {downloadButton}
                                                             {reviewBasketButton}
                                                             {saleOrderButton}
+                                                            {sodButton}
                                                             {/* <span className="text-xs font-medium text-slate-500">
                                                                 {isExpanded ? 'Hide items' : 'View items'}
                                                             </span> */}
@@ -2601,6 +2852,7 @@ return (
                                                                 <MessageSquare className="h-4 w-4" />
                                                             </Button>
                                                             {saleOrderButton}
+                                                            {sodButton}
                                                         </div>
                                                     );
                                                 })()}
@@ -2614,7 +2866,7 @@ return (
                                                     <span className='text-xs text-slate-500'>{res.userId}</span>
                                                 </TableCell>
                                                 <TableCell className="py-4">
-                                                    <span className='font-medium'>{res.dealer}</span><br/>
+                                                    <span className='font-medium'>{res.dealer}{res.dealerState ? ` (${res.dealerState})` : ''}</span><br/>
                                                     <span className='text-xs text-slate-500'>{res.dealerId}</span>
                                                 </TableCell>
                                                 <TableCell>
@@ -2688,16 +2940,16 @@ return (
                                                         >
                                                             <MessageSquare className="h-4 w-4" />
                                                         </Button>
-                                                        {group.rows.some((row) => row?.status === 'Approved') && !group.rows.some((row) => ['Submitted', 'InReview'].includes(row?.status)) ? (
+                                                        {res.status === 'Approved' ? (
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
                                                                 className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                                                                disabled={saleOrderCartId === group.cartId}
-                                                                title={`Mark basket ${group.cartId} as Sale Order`}
-                                                                onClick={(event) => handleMarkSaleOrder(group, event)}
+                                                                disabled={Boolean(saleOrderCartId || saleOrderOrderId)}
+                                                                title={`Mark ${res.design} as Sale Order`}
+                                                                onClick={(event) => handleMarkOrderAsSaleOrder(res, event)}
                                                             >
-                                                                {saleOrderCartId === group.cartId ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'SO'}
+                                                                {saleOrderOrderId === res.id ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'SO'}
                                                             </Button>
                                                         ) : null}
                                                     </div>
