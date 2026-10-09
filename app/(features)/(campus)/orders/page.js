@@ -669,7 +669,7 @@ export default function OrdersV2() {
 
     // For a reserved PRM order, load the batches its stock is allocated from.
     useEffect(() => {
-        if (!isActionDialogOpen || selectedRes?.stockType !== 'prm' || !['Approved', 'SaleOrder'].includes(selectedRes?.status) || !selectedRes?.id) {
+        if (!isActionDialogOpen || selectedRes?.stockType !== 'prm' || !['Approved', 'Modified', 'SaleOrder'].includes(selectedRes?.status) || !selectedRes?.id) {
             setOrderAllocations([]);
             setLoadingOrderAllocations(false);
             return;
@@ -699,7 +699,7 @@ export default function OrdersV2() {
     // allocations when editing an already-reserved PRM order, so the admin
     // edits from what's currently reserved instead of starting blank
     useEffect(() => {
-        if (!isEditingOrderItem || selectedRes?.stockType !== 'prm' || !['Approved', 'SaleOrder'].includes(selectedRes?.status)) return;
+        if (!isEditingOrderItem || selectedRes?.stockType !== 'prm' || !['Approved', 'Modified', 'SaleOrder'].includes(selectedRes?.status)) return;
         if (loadingDesignBatches || loadingOrderAllocations) return;
         if (batchSequence.length > 0 || orderAllocations.length === 0 || designBatches.length === 0) return;
         const preselected = orderAllocations
@@ -1356,8 +1356,8 @@ export default function OrdersV2() {
     }
 
     const selectReviewDesign = async (product) => {
-        if (!selectedRes?.id || !['Submitted', 'InReview'].includes(selectedRes.status)) {
-            toast({ description: 'Design can only be changed while an order item is pending review.' })
+        if (!selectedRes?.id) {
+            toast({ description: 'Select an order item before changing its design.' })
             return
         }
         if (!user?.id) {
@@ -1399,8 +1399,8 @@ export default function OrdersV2() {
                 tags: product.tags,
                 media: product.media,
                 productId: product.productId,
-                prm: product.prm,
-                std: product.std,
+                prm: queryResult.data?.remainingPrm ?? product.prm,
+                std: queryResult.data?.remainingStd ?? product.std,
                 designType: product.designType,
                 notes: queryResult.data?.notes ?? orderNotes ?? null,
                 lastActionById: queryResult.data?.lastActionById || user.id,
@@ -1410,13 +1410,20 @@ export default function OrdersV2() {
             }
 
             setSelectedRes((current) => current ? { ...current, ...designPatch } : current)
-            setSelectedReviewDesign(product)
+            setSelectedReviewDesign({
+                ...product,
+                prm: queryResult.data?.remainingPrm ?? product.prm,
+                std: queryResult.data?.remainingStd ?? product.std,
+            })
             setShowDesignOrderHistory(false)
             setDesignOrderHistory([])
             setDesignOrderHistoryError('')
             setBatchSequence([])
             setBatchQtyById({})
-            setOrderAllocations([])
+            setOrderAllocations((queryResult.data?.batchAllocations || []).map((allocation) => ({
+                batchId: allocation.batch,
+                allocatedQty: allocation.qty,
+            })))
             setOrders((previousOrders) => previousOrders.map((group) => {
                 if (!group.rows?.some((row) => String(row.id) === String(selectedRes.id))) return group
 
@@ -1654,7 +1661,7 @@ export default function OrdersV2() {
     // capacity is its current availableQty plus whatever this order already
     // has reserved on it — that reservation gets released back to the batch
     // before the new selection is drained on submit
-    const isEditingApprovedPrm = isEditingOrderItem && selectedRes?.stockType === 'prm' && ['Approved', 'SaleOrder'].includes(selectedRes?.status);
+    const isEditingApprovedPrm = isEditingOrderItem && selectedRes?.stockType === 'prm' && ['Approved', 'Modified', 'SaleOrder'].includes(selectedRes?.status);
     const reservedQtyByBatch = useMemo(() => {
         const map = {};
         orderAllocations.forEach((alloc) => { map[alloc.batchId] = Number(alloc.allocatedQty || 0); });
@@ -1883,10 +1890,6 @@ export default function OrdersV2() {
         const availableStd = Number(selectedReviewDesign?.std || 0);
 
         if (!selectedRes?.id || selectedRes.stockType !== 'prm') return;
-        if (!['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(selectedRes.status)) {
-            toast({ description: 'Only pending, approved, or Sale Order PRM items can be changed to STD' });
-            return;
-        }
         if (!selectedReviewDesign?.design || selectedReviewDesign.design !== selectedRes.design) {
             toast({ description: 'Restore the requested design before changing its stock type' });
             return;
@@ -1978,10 +1981,6 @@ export default function OrdersV2() {
         ), 0);
 
         if (!selectedRes?.id || selectedRes.stockType !== 'std') return;
-        if (!['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(selectedRes.status)) {
-            toast({ description: 'Only pending, approved, or Sale Order STD items can be changed to PRM' });
-            return;
-        }
         if (!selectedReviewDesign?.design || selectedReviewDesign.design !== selectedRes.design) {
             toast({ description: 'Restore the requested design before changing its stock type' });
             return;
@@ -2836,7 +2835,7 @@ return (
                                                                     <Button size="sm" variant="secondary" className="bg-blue-600 shadow-md text-white hover:bg-blue-700" onClick={() => handleUpdateStatus(group.first)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
                                                                 </div>
                                                             )}
-                                                            {(group.first.status === 'Approved' || group.first.status === 'Modified' || group.first.status === 'Rejected' || group.first.status === 'SaleOrder') && (
+                                                            {!['Submitted', 'InReview'].includes(group.first.status) && (
                                                                 <div className='flex flex-row items-center gap-2'>
                                                                     <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(group.first)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
                                                                 </div>
@@ -2925,7 +2924,7 @@ return (
                                                                 <Button size="sm" variant="outline" className="bg-blue-600 shadow-md text-white hover:bg-blue-700 hover:text-white" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
                                                             </div>
                                                         )}
-                                                        {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected' || res.status === 'SaleOrder') && (
+                                                        {!['Submitted', 'InReview'].includes(res.status) && (
                                                             <div className='flex flex-row items-center gap-2'>
                                                                 <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(res)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
                                                             </div>
@@ -3185,7 +3184,7 @@ return (
                     </div>
                     ) : null}
 
-                    {!isEditingOrderItem && selectedRes?.stockType === 'prm' && ['Approved', 'SaleOrder'].includes(selectedRes?.status) ? renderAllocatedBatchesPanel() : null}
+                    {!isEditingOrderItem && selectedRes?.stockType === 'prm' && ['Approved', 'Modified', 'SaleOrder'].includes(selectedRes?.status) ? renderAllocatedBatchesPanel() : null}
 
                     {isEditingOrderItem ? (
                     <>
@@ -3205,26 +3204,24 @@ return (
                                     </div>
                                 </div>
 
-                                {['Submitted', 'InReview'].includes(selectedRes?.status) ? (
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-8 px-2 text-slate-500 hover:text-slate-800"
-                                        disabled={changingReviewDesign}
-                                        onClick={() => {
-                                            setSelectedReviewDesign(null)
-                                            setReviewDesignQuery('')
-                                            setShowDesignOrderHistory(false)
-                                            setDesignOrderHistory([])
-                                            setDesignOrderHistoryError('')
-                                        }}
-                                    >
-                                        Change
-                                    </Button>
-                                ) : null}
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 px-2 text-slate-500 hover:text-slate-800"
+                                    disabled={changingReviewDesign}
+                                    onClick={() => {
+                                        setSelectedReviewDesign(null)
+                                        setReviewDesignQuery('')
+                                        setShowDesignOrderHistory(false)
+                                        setDesignOrderHistory([])
+                                        setDesignOrderHistoryError('')
+                                    }}
+                                >
+                                    Change
+                                </Button>
                             </div>
                         ) : null}
-                        {['Submitted', 'InReview'].includes(selectedRes?.status) && !selectedReviewDesign?.design ? (
+                        {!selectedReviewDesign?.design ? (
                         <div className="relative">
                             <Input
                                 placeholder="Search design by code or name..."
@@ -3282,7 +3279,7 @@ return (
                     <div className="flex flex-col gap-4">
                         <div className="mt-4 flex items-center justify-between gap-3">
                             <Label htmlFor="qty" className="text-left">Requested <span className={`font-bold ${selectedRes?.stockType == 'prm' ? 'text-violet-600' : 'text-blue-600'} uppercase`}>{selectedRes?.stockType}</span> Quantity</Label>
-                            {selectedRes?.stockType === 'prm' && selectedReviewDesign?.design === selectedRes?.design && ['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(selectedRes?.status) ? (() => {
+                            {selectedRes?.stockType === 'prm' && selectedReviewDesign?.design === selectedRes?.design ? (() => {
                                 const requestedQty = Number(selectedRes?.requestedQty || 0);
                                 const availableStd = Number(selectedReviewDesign?.std || 0);
                                 const canChangeToStd = availableStd >= requestedQty;
@@ -3301,7 +3298,7 @@ return (
                                         Change to STD
                                     </Button>
                                 );
-                            })() : selectedRes?.stockType === 'std' && selectedReviewDesign?.design === selectedRes?.design && ['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(selectedRes?.status) ? (() => {
+                            })() : selectedRes?.stockType === 'std' && selectedReviewDesign?.design === selectedRes?.design ? (() => {
                                 const requestedQty = Number(selectedRes?.requestedQty || 0);
                                 const availablePrm = designBatches.reduce((sum, batch) => (
                                     sum + (batch.status === 'Active' ? Number(batch.availableQty || 0) : 0)
@@ -3326,7 +3323,7 @@ return (
                         </div>
                         {(() => {
                             const isStdType   = selectedRes?.stockType === 'std';
-                            const hasExistingStockReservation = ['Approved', 'SaleOrder'].includes(selectedRes?.status);
+                            const hasExistingStockReservation = ['Approved', 'Modified', 'SaleOrder'].includes(selectedRes?.status);
                             const availableStd = Number(selectedReviewDesign?.std || 0) + (hasExistingStockReservation ? Number(selectedRes?.approvedQty || 0) : 0);
                             const maxQty      = isStdType ? availableStd : undefined;
                             return (
