@@ -113,16 +113,22 @@ export async function GET(request,{params}) {
                         });
                         await Promise.all(promises2);
                         
-                        // get the list of dealers mapped to each executive
+                        // If this State Head has no executives, dealers may be
+                        // mapped directly to the State Head instead.
                         var dealers = [];
-                        const promises = executives.map(async (row) => {
-                            const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row+'"');
-                            rows1.map((row1) => {
-                                dealers.push(row1.id);
-                                
-                            })
-                        });
-                        await Promise.all(promises);
+                        if(executives.length === 0){
+                            query = 'SELECT * from user WHERE role="dealer" AND mapTo="'+params.ids[5]+'" AND name LIKE "%'+params.ids[2]+'%" LIMIT 20 OFFSET '+params.ids[3];
+                        }
+                        else {
+                            // get the list of dealers mapped to each executive
+                            const promises = executives.map(async (row) => {
+                                const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row+'"');
+                                rows1.map((row1) => {
+                                    dealers.push(row1.id);
+                                })
+                            });
+                            await Promise.all(promises);
+                        }
 
                         if(dealers.length > 0){
                             const dealersList = dealers.map(dealer => `'${dealer}'`).join(","); // Each dealer ID is wrapped in single quotes
