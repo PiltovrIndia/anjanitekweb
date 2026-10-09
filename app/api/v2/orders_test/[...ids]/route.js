@@ -1004,7 +1004,7 @@ export async function GET(request,{params}) {
 
                     // 3. Combined Query: Fetch both order and product in a single DB round-trip using FOR UPDATE
                     const [[order], [product]] = await Promise.all([
-                    connection.query(`SELECT id, cartId, status, stockType, requestedQty, approvedQty, productionQty, design, dealerId, modifiedOn, waitlistSequence FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]).then(([rows]) => rows),
+                    connection.query(`SELECT id, cartId, status, stockType, requestedQty, approvedQty, productionQty, design, dealerId, notes, modifiedOn, waitlistSequence FROM orders WHERE id = ? AND isDeleted = 0 FOR UPDATE`, [orderId]).then(([rows]) => rows),
                     
                     connection.query(`SELECT productId, design, prm, std FROM products WHERE design = (SELECT design FROM orders WHERE id = ? AND isDeleted = 0) FOR UPDATE`, [orderId]).then(([rows]) => rows)]);
 
@@ -1034,6 +1034,113 @@ export async function GET(request,{params}) {
                     if (!actor) {
                         await connection.rollback();
                         return Response.json({ status: 400, success: false, message: "A valid active user is required to take order actions" });
+                    }
+
+                    // Sale Orders remain fulfilled, zero-production items even when their
+                    // quantity or allocation is corrected. They must be fully covered by
+                    // current stock; unlike a normal approval, no shortfall can move to production.
+                    if (order.status === 'SaleOrder') {
+                        const newRequestedQty = Number(toBeApprovedQty || 0);
+                        if (!Number.isFinite(newRequestedQty) || newRequestedQty <= 0) {
+                            await connection.rollback();
+                            return Response.json({ status: 409, success: false, message: 'Sale Order quantity must be greater than zero' });
+                        }
+                        if (sendAllToProduction) {
+                            await connection.rollback();
+                            return Response.json({ status: 409, success: false, message: 'Sale Orders cannot be routed to production' });
+                        }
+
+                        const notesToSave = notes === undefined ? order.notes : notes;
+                        const oldApprovedQty = Number(order.approvedQty || 0);
+                        let batchAllocations = [];
+                        let stockAfterAllocation = 0;
+
+                        if (order.stockType === 'prm') {
+                            await releasePrmToBatches(connection, {
+                                orderId,
+                                design: order.design,
+                                qty: oldApprovedQty,
+                                adminId,
+                            });
+
+                            const batches = await lockPrmBatches(connection, order.design);
+                            const availableStock = batchSequence.length > 0
+                                ? getManualBatchAvailableStock(batches, batchSequence)
+                                : batches.reduce((sum, batch) => sum + Number(batch.availableQty || 0), 0);
+
+                            if (availableStock < newRequestedQty) {
+                                await connection.rollback();
+                                return Response.json({ status: 409, success: false, message: `Sale Order requires ${newRequestedQty} PRM stock, but only ${availableStock} is available` });
+                            }
+
+                            batchAllocations = drainPrmBatches(batches, newRequestedQty, batchSequence);
+                            const allocatedQty = batchAllocations.reduce((sum, entry) => sum + Number(entry.qty || 0), 0);
+                            if (allocatedQty !== newRequestedQty) {
+                                await connection.rollback();
+                                return Response.json({ status: 409, success: false, message: 'Selected PRM batches do not fully cover this Sale Order quantity' });
+                            }
+
+                            await recordBatchLedger(connection, {
+                                orderId,
+                                design: order.design,
+                                entries: batchAllocations,
+                                allocationType: 'SaleOrderModified',
+                                adminId,
+                            });
+                            await persistPrmBatchDrain(connection, batches, adminId);
+                            stockAfterAllocation = batches.reduce((sum, batch) => sum + Number(batch.availableQty || 0), 0);
+                            await connection.query('UPDATE products SET prm = ? WHERE design = ?', [stockAfterAllocation, order.design]);
+                        } else {
+                            const stockColumn = getStockColumn(order.stockType);
+                            const availableStock = Number(product[stockColumn] || 0) + oldApprovedQty;
+                            if (availableStock < newRequestedQty) {
+                                await connection.rollback();
+                                return Response.json({ status: 409, success: false, message: `Sale Order requires ${newRequestedQty} ${order.stockType.toUpperCase()} stock, but only ${availableStock} is available` });
+                            }
+
+                            stockAfterAllocation = availableStock - newRequestedQty;
+                            await connection.query(`UPDATE products SET ${stockColumn} = ? WHERE design = ?`, [stockAfterAllocation, order.design]);
+                        }
+
+                        await connection.query(
+                            `UPDATE orders
+                             SET requestedQty = ?, approvedQty = ?, productionQty = 0, status = 'SaleOrder', notes = ?, modifiedOn = ?
+                             WHERE id = ?`,
+                            [newRequestedQty, newRequestedQty, notesToSave, actionDate, orderId]
+                        );
+                        await recordOrderAction(connection, {
+                            orderId,
+                            cartId: order.cartId,
+                            actor,
+                            actionType: 'SaleOrderModified',
+                            actionOn: actionDate,
+                            actionNotes: notesToSave,
+                        });
+
+                        await connection.commit();
+                        return Response.json({
+                            status: 200,
+                            success: true,
+                            message: 'Sale Order updated successfully',
+                            data: {
+                                orderId,
+                                design: order.design,
+                                stockType: order.stockType,
+                                newRequestedQty,
+                                newApprovedQty: newRequestedQty,
+                                newProductionQty: 0,
+                                status: 'SaleOrder',
+                                notes: notesToSave,
+                                batchAllocations: batchAllocations.map((entry) => ({ batch: entry.batchId, qty: entry.qty })),
+                                waitlistAllocations: [],
+                                totalAllocatedQty: 0,
+                                stockAfterAllocation,
+                                lastActionById: actor.id,
+                                lastActionByName: actor.name,
+                                lastActionType: 'SaleOrderModified',
+                                lastActionOn: actionDate,
+                            },
+                        });
                     }
 
                     if (notes !== undefined) {
@@ -2156,7 +2263,7 @@ export async function GET(request,{params}) {
                         await connection.rollback();
                         return Response.json({ status: 409, success: false, message: 'Only PRM order items can be changed to STD' });
                     }
-                    if (!['Submitted', 'InReview', 'Approved'].includes(order.status)) {
+                    if (!['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(order.status)) {
                         await connection.rollback();
                         return Response.json({ status: 409, success: false, message: `Cannot change a ${order.status} item to STD` });
                     }
@@ -2188,7 +2295,7 @@ export async function GET(request,{params}) {
                         });
                     }
 
-                    const wasApproved = order.status === 'Approved';
+                    const wasApproved = ['Approved', 'SaleOrder'].includes(order.status);
                     const notesToSave = notes === undefined ? order.notes : notes;
                     let remainingPrm = Number(product.prm || 0);
                     let remainingStd = availableStd;
@@ -2305,7 +2412,7 @@ export async function GET(request,{params}) {
                         await connection.rollback();
                         return Response.json({ status: 409, success: false, message: 'Only STD order items can be changed to PRM' });
                     }
-                    if (!['Submitted', 'InReview', 'Approved'].includes(order.status)) {
+                    if (!['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(order.status)) {
                         await connection.rollback();
                         return Response.json({ status: 409, success: false, message: `Cannot change a ${order.status} item to PRM` });
                     }
@@ -2338,7 +2445,7 @@ export async function GET(request,{params}) {
                         });
                     }
 
-                    const wasApproved = order.status === 'Approved';
+                    const wasApproved = ['Approved', 'SaleOrder'].includes(order.status);
                     const notesToSave = notes === undefined ? order.notes : notes;
                     let remainingPrm = availablePrm;
                     let remainingStd = Number(product.std || 0);

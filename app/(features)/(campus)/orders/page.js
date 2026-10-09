@@ -667,9 +667,9 @@ export default function OrdersV2() {
         return () => { cancelled = true; };
     }, [isActionDialogOpen, isEditingOrderItem, selectedRes?.stockType, selectedReviewDesign?.design, selectedRes?.design])
 
-    // For an approved PRM order, load the batches its stock is allocated from
+    // For a reserved PRM order, load the batches its stock is allocated from.
     useEffect(() => {
-        if (!isActionDialogOpen || selectedRes?.stockType !== 'prm' || selectedRes?.status !== 'Approved' || !selectedRes?.id) {
+        if (!isActionDialogOpen || selectedRes?.stockType !== 'prm' || !['Approved', 'SaleOrder'].includes(selectedRes?.status) || !selectedRes?.id) {
             setOrderAllocations([]);
             setLoadingOrderAllocations(false);
             return;
@@ -696,10 +696,10 @@ export default function OrdersV2() {
     }, [isActionDialogOpen, selectedRes?.stockType, selectedRes?.status, selectedRes?.id])
 
     // Pre-fill the manual allocation order with this order's existing batch
-    // allocations when editing an already-approved prm order, so the admin
+    // allocations when editing an already-reserved PRM order, so the admin
     // edits from what's currently reserved instead of starting blank
     useEffect(() => {
-        if (!isEditingOrderItem || selectedRes?.stockType !== 'prm' || selectedRes?.status !== 'Approved') return;
+        if (!isEditingOrderItem || selectedRes?.stockType !== 'prm' || !['Approved', 'SaleOrder'].includes(selectedRes?.status)) return;
         if (loadingDesignBatches || loadingOrderAllocations) return;
         if (batchSequence.length > 0 || orderAllocations.length === 0 || designBatches.length === 0) return;
         const preselected = orderAllocations
@@ -1071,8 +1071,8 @@ export default function OrdersV2() {
 
     function buildCartSodRows(cartRows = []) {
         return cartRows.flatMap((order) => {
-            const requestedQty = Number(order.requestedQty || 0);
-            if (requestedQty <= 0) return [];
+            const approvedQty = Number(order.approvedQty || 0);
+            if (approvedQty <= 0) return [];
 
             const design = String(order.design || '').trim();
             const isAtl = Number(order.designType) === 1 || String(order.designType || '').toUpperCase() === 'ATL';
@@ -1085,10 +1085,10 @@ export default function OrdersV2() {
                 qty: Number(qty || 0),
             });
 
-            if (stockType !== 'prm') return [buildRow('', requestedQty)];
+            if (stockType !== 'prm') return [buildRow('', approvedQty)];
 
             const allocations = Array.isArray(order.batchAllocations) ? order.batchAllocations : [];
-            let remainingQty = requestedQty;
+            let remainingQty = approvedQty;
             const allocationRows = allocations.reduce((rows, allocation) => {
                 const allocatedQty = Math.min(Number(allocation.qty || 0), remainingQty);
                 if (allocatedQty > 0) {
@@ -1110,7 +1110,7 @@ export default function OrdersV2() {
         const exportRows = buildCartSodRows(cartRows);
 
         if (exportRows.length === 0) {
-            toast({ description: 'No requested quantities are available for this basket SOD download.' });
+            toast({ description: 'No approved quantities are available for this basket SOD download.' });
             return;
         }
 
@@ -1654,7 +1654,7 @@ export default function OrdersV2() {
     // capacity is its current availableQty plus whatever this order already
     // has reserved on it — that reservation gets released back to the batch
     // before the new selection is drained on submit
-    const isEditingApprovedPrm = isEditingOrderItem && selectedRes?.stockType === 'prm' && selectedRes?.status === 'Approved';
+    const isEditingApprovedPrm = isEditingOrderItem && selectedRes?.stockType === 'prm' && ['Approved', 'SaleOrder'].includes(selectedRes?.status);
     const reservedQtyByBatch = useMemo(() => {
         const map = {};
         orderAllocations.forEach((alloc) => { map[alloc.batchId] = Number(alloc.allocatedQty || 0); });
@@ -1662,7 +1662,7 @@ export default function OrdersV2() {
     }, [orderAllocations]);
     const getEffectiveAvailableQty = (batch) => Number(batch.availableQty || 0) + (isEditingApprovedPrm ? Number(reservedQtyByBatch[batch.batchId] || 0) : 0);
 
-    // panel showing which batches an approved order's stock was allocated from
+    // panel showing which batches a reserved order's stock was allocated from
     const renderAllocatedBatchesPanel = () => (
         <div className="rounded-lg border border-slate-200 bg-white">
             <div className="flex items-center justify-between gap-3 px-3 py-2.5">
@@ -1755,6 +1755,7 @@ export default function OrdersV2() {
     }
 
     function getApprovalStatus() {
+        if (selectedRes?.status === 'SaleOrder') return 'SaleOrder';
         return ['Approved', 'Modified', 'Rejected'].includes(selectedRes?.status) ? 'Modified' : 'Approved';
     }
 
@@ -1778,7 +1779,7 @@ export default function OrdersV2() {
         try {
             var path = '';
             // check if the status is already approved, modified or rejected, if yes then update the record with modified status with modifiedOn value
-            if(status.toLowerCase() == 'submitted' || status.toLowerCase() == 'approved' || status.toLowerCase() == 'modified'){
+            if(status.toLowerCase() == 'submitted' || status.toLowerCase() == 'approved' || status.toLowerCase() == 'modified' || status.toLowerCase() == 'saleorder'){
                 path = 'U0.2';
             }
             else if(status.toLowerCase() == 'rejected'){
@@ -1803,7 +1804,7 @@ export default function OrdersV2() {
             const queryResult = await result.json();
 
             if (queryResult.status === 200) {
-                toast({ description: `Order marked as ${status.toLowerCase()}!` });
+                toast({ description: status === 'SaleOrder' ? 'Sale Order updated.' : `Order marked as ${status.toLowerCase()}!` });
                 setIsActionDialogOpen(false);
 
                 const data = queryResult.data;
@@ -1814,11 +1815,11 @@ export default function OrdersV2() {
                         productionQty: data.newProductionQty ?? data.productionQty,
                         requestedQty: data.newRequestedQty ?? data.requestedQty,
                         notes: orderNotes || null,
-                        status: status === 'Rejected' ? 'Rejected' : status === 'OutOfStock' ? 'OutOfStock' : 'Approved',
-                        lastActionById: user?.id,
-                        lastActionByName: user?.name,
-                        lastActionType: status === 'Rejected' ? 'Rejected' : status === 'OutOfStock' ? 'OutOfStock' : getApprovalStatus() === 'Modified' ? 'Modified' : 'Approved',
-                        lastActionOn: new Date().toISOString(),
+                        status: status === 'Rejected' ? 'Rejected' : status === 'OutOfStock' ? 'OutOfStock' : status === 'SaleOrder' ? 'SaleOrder' : 'Approved',
+                        lastActionById: data.lastActionById || user?.id,
+                        lastActionByName: data.lastActionByName || user?.name,
+                        lastActionType: data.lastActionType || (status === 'Rejected' ? 'Rejected' : status === 'OutOfStock' ? 'OutOfStock' : status === 'SaleOrder' ? 'SaleOrderModified' : getApprovalStatus() === 'Modified' ? 'Modified' : 'Approved'),
+                        lastActionOn: data.lastActionOn || new Date().toISOString(),
                     };
 
                     // Build id→patch map for the main order + every waitlist allocation
@@ -1882,8 +1883,8 @@ export default function OrdersV2() {
         const availableStd = Number(selectedReviewDesign?.std || 0);
 
         if (!selectedRes?.id || selectedRes.stockType !== 'prm') return;
-        if (!['Submitted', 'InReview', 'Approved'].includes(selectedRes.status)) {
-            toast({ description: 'Only pending or approved PRM items can be changed to STD' });
+        if (!['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(selectedRes.status)) {
+            toast({ description: 'Only pending, approved, or Sale Order PRM items can be changed to STD' });
             return;
         }
         if (!selectedReviewDesign?.design || selectedReviewDesign.design !== selectedRes.design) {
@@ -1977,8 +1978,8 @@ export default function OrdersV2() {
         ), 0);
 
         if (!selectedRes?.id || selectedRes.stockType !== 'std') return;
-        if (!['Submitted', 'InReview', 'Approved'].includes(selectedRes.status)) {
-            toast({ description: 'Only pending or approved STD items can be changed to PRM' });
+        if (!['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(selectedRes.status)) {
+            toast({ description: 'Only pending, approved, or Sale Order STD items can be changed to PRM' });
             return;
         }
         if (!selectedReviewDesign?.design || selectedReviewDesign.design !== selectedRes.design) {
@@ -2753,7 +2754,6 @@ return (
                                                     const isAnySaleOrderActionPending = Boolean(saleOrderCartId || saleOrderOrderId);
                                                     const isDownloadingCart = downloadingCartId === group.cartId;
                                                     const isDownloadingSod = downloadingSodCartId === group.cartId;
-                                                    const hasSodRows = groupRows.some((row) => Number(row?.requestedQty || 0) > 0);
                                                     const downloadButton = (
                                                         <Button
                                                             size="sm"
@@ -2807,8 +2807,8 @@ return (
                                                             size="sm"
                                                             variant="outline"
                                                             className="border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                                                            disabled={!hasSodRows || isDownloadingSod}
-                                                            title={hasSodRows ? `Download SOD for basket ${group.cartId}` : 'No order quantities are available for this basket'}
+                                                            disabled={isDownloadingSod}
+                                                            title={`Download SOD for basket ${group.cartId}`}
                                                             onClick={(e) => downloadCartSod(group, e)}
                                                         >
                                                             {isDownloadingSod ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'SOD'}
@@ -2836,7 +2836,7 @@ return (
                                                                     <Button size="sm" variant="secondary" className="bg-blue-600 shadow-md text-white hover:bg-blue-700" onClick={() => handleUpdateStatus(group.first)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
                                                                 </div>
                                                             )}
-                                                            {(group.first.status === 'Approved' || group.first.status === 'Modified' || group.first.status === 'Rejected') && (
+                                                            {(group.first.status === 'Approved' || group.first.status === 'Modified' || group.first.status === 'Rejected' || group.first.status === 'SaleOrder') && (
                                                                 <div className='flex flex-row items-center gap-2'>
                                                                     <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(group.first)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
                                                                 </div>
@@ -2925,7 +2925,7 @@ return (
                                                                 <Button size="sm" variant="outline" className="bg-blue-600 shadow-md text-white hover:bg-blue-700 hover:text-white" onClick={() => handleUpdateStatus(res)}><CheckIcon className="mr-2 h-4 w-4" />Review</Button>
                                                             </div>
                                                         )}
-                                                        {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected') && (
+                                                        {(res.status === 'Approved' || res.status === 'Modified' || res.status === 'Rejected' || res.status === 'SaleOrder') && (
                                                             <div className='flex flex-row items-center gap-2'>
                                                                 <Button size="sm" variant="outline" className="text-gray-600 border-gray-600" onClick={() => handleUpdateStatus(res)}><Pencil className="mr-2 h-4 w-4" />Edit</Button>
                                                             </div>
@@ -3185,7 +3185,7 @@ return (
                     </div>
                     ) : null}
 
-                    {!isEditingOrderItem && selectedRes?.stockType === 'prm' && selectedRes?.status === 'Approved' ? renderAllocatedBatchesPanel() : null}
+                    {!isEditingOrderItem && selectedRes?.stockType === 'prm' && ['Approved', 'SaleOrder'].includes(selectedRes?.status) ? renderAllocatedBatchesPanel() : null}
 
                     {isEditingOrderItem ? (
                     <>
@@ -3282,7 +3282,7 @@ return (
                     <div className="flex flex-col gap-4">
                         <div className="mt-4 flex items-center justify-between gap-3">
                             <Label htmlFor="qty" className="text-left">Requested <span className={`font-bold ${selectedRes?.stockType == 'prm' ? 'text-violet-600' : 'text-blue-600'} uppercase`}>{selectedRes?.stockType}</span> Quantity</Label>
-                            {selectedRes?.stockType === 'prm' && selectedReviewDesign?.design === selectedRes?.design && ['Submitted', 'InReview', 'Approved'].includes(selectedRes?.status) ? (() => {
+                            {selectedRes?.stockType === 'prm' && selectedReviewDesign?.design === selectedRes?.design && ['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(selectedRes?.status) ? (() => {
                                 const requestedQty = Number(selectedRes?.requestedQty || 0);
                                 const availableStd = Number(selectedReviewDesign?.std || 0);
                                 const canChangeToStd = availableStd >= requestedQty;
@@ -3301,7 +3301,7 @@ return (
                                         Change to STD
                                     </Button>
                                 );
-                            })() : selectedRes?.stockType === 'std' && selectedReviewDesign?.design === selectedRes?.design && ['Submitted', 'InReview', 'Approved'].includes(selectedRes?.status) ? (() => {
+                            })() : selectedRes?.stockType === 'std' && selectedReviewDesign?.design === selectedRes?.design && ['Submitted', 'InReview', 'Approved', 'SaleOrder'].includes(selectedRes?.status) ? (() => {
                                 const requestedQty = Number(selectedRes?.requestedQty || 0);
                                 const availablePrm = designBatches.reduce((sum, batch) => (
                                     sum + (batch.status === 'Active' ? Number(batch.availableQty || 0) : 0)
@@ -3326,7 +3326,8 @@ return (
                         </div>
                         {(() => {
                             const isStdType   = selectedRes?.stockType === 'std';
-                            const availableStd = Number(selectedReviewDesign?.std || 0) - Number(selectedRes?.approvedQty || 0);
+                            const hasExistingStockReservation = ['Approved', 'SaleOrder'].includes(selectedRes?.status);
+                            const availableStd = Number(selectedReviewDesign?.std || 0) + (hasExistingStockReservation ? Number(selectedRes?.approvedQty || 0) : 0);
                             const maxQty      = isStdType ? availableStd : undefined;
                             return (
                                 <>
@@ -3360,13 +3361,13 @@ return (
                                     )}
                                     {!isStdType && (() => {
                                         const batchAvailable = designBatches.reduce((sum, b) => sum + (b.status === 'Active' ? Number(b.availableQty || 0) : 0), 0);
-                                        const isReApproval = ['Approved', 'Modified'].includes(selectedRes?.status);
+                                        const isReApproval = ['Approved', 'Modified', 'SaleOrder'].includes(selectedRes?.status);
                                         const effectiveAvailable = batchAvailable + (isReApproval ? Number(selectedRes?.approvedQty || 0) : 0);
                                         return (
                                             <p className="text-xs -mt-2 text-slate-500">
                                                 {loadingDesignBatches
                                                     ? 'Checking batch availability...'
-                                                    : <>Available PRM from batches: <span className="font-medium text-violet-600">{effectiveAvailable}</span>{isReApproval ? ' (incl. this order’s reservation)' : ''} • excess moves to production</>}
+                                                    : <>Available PRM from batches: <span className="font-medium text-violet-600">{effectiveAvailable}</span>{isReApproval ? ' (incl. this order’s reservation)' : ''}{selectedRes?.status === 'SaleOrder' ? ' • full quantity required' : ' • excess moves to production'}</>}
                                             </p>
                                         );
                                     })()}
@@ -3422,7 +3423,7 @@ return (
                                     const qty = Number(approvalQty || 0);
                                     return (
                                         <span className={`rounded-full px-2 py-1 text-xs font-medium ${selectedSum >= qty ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                            Selected {Math.min(selectedSum, qty)} / {qty}{selectedSum < qty ? ` • ${qty - selectedSum} to production` : ''}
+                                            Selected {Math.min(selectedSum, qty)} / {qty}{selectedSum < qty && selectedRes?.status !== 'SaleOrder' ? ` • ${qty - selectedSum} to production` : ''}
                                         </span>
                                     );
                                 })() : null}
@@ -3503,8 +3504,12 @@ return (
                                 </div>
                                 <div className="border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                                     {batchSequence.length > 0
-                                        ? 'Stock will be taken from the numbered batches in order; any remainder moves to production.'
-                                        : 'Tap batches to set the allocation order. Auto Approve lets you allocate available stock or send the full quantity to production.'}
+                                        ? selectedRes?.status === 'SaleOrder'
+                                            ? 'The selected batches must cover the full Sale Order quantity.'
+                                            : 'Stock will be taken from the numbered batches in order; any remainder moves to production.'
+                                        : selectedRes?.status === 'SaleOrder'
+                                            ? 'Save changes allocates the full Sale Order quantity from available PRM batches. Production is unavailable.'
+                                            : 'Tap batches to set the allocation order. Auto Approve lets you allocate available stock or send the full quantity to production.'}
                                 </div>
                             </>
                         )}
@@ -3648,7 +3653,12 @@ return (
                                 <Button variant="outline" onClick={() => setIsEditingOrderItem(false)} disabled={resLoading}>Cancel Edit</Button>
                             )}
 
-                            {selectedRes?.stockType === 'prm' && batchSequence.length === 0 ? (
+                            {selectedRes?.status === 'SaleOrder' ? (
+                                <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => submitApproval('SaleOrder')} disabled={resLoading}>
+                                    {resLoading ? <SpinnerGap className="mr-2 animate-spin" /> : null}
+                                    Save changes
+                                </Button>
+                            ) : selectedRes?.stockType === 'prm' && batchSequence.length === 0 ? (
                                 <Button className="bg-green-600 text-white" onClick={() => setShowAutoApproveChoice(true)} disabled={resLoading}>
                                     {resLoading ? <SpinnerGap className="mr-2 animate-spin" /> : null}
                                     Auto Approve
@@ -3665,16 +3675,18 @@ return (
                             
                             
                             
-                                <Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={resLoading}>
-                                    {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                                    Reject
-                                </Button>
-
-                            
-                                <Button className="bg-gray-600 text-white" onClick={() => submitApproval('OutOfStock')} disabled={resLoading}>
-                                    {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
-                                    Mark Out of Stock
-                                </Button>
+                            {selectedRes?.status !== 'SaleOrder' ? (
+                                <>
+                                    <Button className="bg-red-600 text-white" onClick={() => submitApproval('Rejected')} disabled={resLoading}>
+                                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                        Reject
+                                    </Button>
+                                    <Button className="bg-gray-600 text-white" onClick={() => submitApproval('OutOfStock')} disabled={resLoading}>
+                                        {resLoading ? <SpinnerGap className="animate-spin mr-2" /> : null}
+                                        Mark Out of Stock
+                                    </Button>
+                                </>
+                            ) : null}
                         </>
                     ) : (
                         <>
