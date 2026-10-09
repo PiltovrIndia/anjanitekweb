@@ -32,7 +32,19 @@ export async function GET(request,{params}) {
                     const executiveId = (requestUrl.searchParams.get("executiveId") || "").trim().slice(0, 100);
                     const basketType = (requestUrl.searchParams.get("basketType") || "All").trim().toUpperCase();
                     const dealerState = (requestUrl.searchParams.get("dealerState") || "All").trim().slice(0, 100);
+                    const fromDate = (requestUrl.searchParams.get("fromDate") || "").trim();
+                    const toDate = (requestUrl.searchParams.get("toDate") || "").trim();
+                    const productionFilter = params.ids[7] || "All";
                     const designType = basketType === "ATL" ? 1 : basketType === "VCL" ? 2 : null;
+                    const hasDateRange = Boolean(fromDate && toDate);
+
+                    if ((fromDate || toDate) && (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate) || fromDate > toDate)) {
+                        return Response.json({
+                            status: 400,
+                            success: false,
+                            message: "A valid from and to date are required",
+                        }, { status: 400 });
+                    }
                     // const page = 1;
                     const page = params.ids[3];
                     const limit = 20;
@@ -81,6 +93,17 @@ export async function GET(request,{params}) {
 
                     if (waitlistOnly) {
                         where.push("o.productionQty > 0");
+                    }
+
+                    if (hasDateRange) {
+                        where.push("((DATE(o.createdOn) BETWEEN ? AND ?) OR (DATE(o.modifiedOn) BETWEEN ? AND ?))");
+                        queryParams.push(fromDate, toDate, fromDate, toDate);
+                    }
+
+                    // Date-scoped executive browsing must respect the selected production filter.
+                    if (hasDateRange && executiveId && productionFilter !== "All") {
+                        where.push("o.isProduction = ?");
+                        queryParams.push(productionFilter);
                     }
 
                     if (designType !== null) {
@@ -256,13 +279,20 @@ export async function GET(request,{params}) {
                     WHERE o.cartId IN (${placeholders})
                         AND o.isDeleted = 0
                         ${waitlistOnly ? "AND o.productionQty > 0" : ""}
+                        ${hasDateRange ? "AND ((DATE(o.createdOn) BETWEEN ? AND ?) OR (DATE(o.modifiedOn) BETWEEN ? AND ?))" : ""}
+                        ${hasDateRange && executiveId && productionFilter !== "All" ? "AND o.isProduction = ?" : ""}
 
                     ORDER BY o.createdOn DESC, o.cartId DESC, o.serialId ASC, o.id ASC
 
                     
                     `;
 
-                    const [itemRows] = await pool.query(itemsQuery, cartIds);
+                    const itemQueryParams = [
+                        ...cartIds,
+                        ...(hasDateRange ? [fromDate, toDate, fromDate, toDate] : []),
+                        ...(hasDateRange && executiveId && productionFilter !== "All" ? [productionFilter] : []),
+                    ];
+                    const [itemRows] = await pool.query(itemsQuery, itemQueryParams);
 
                     // Attach the net PRM batch allocations so cart-level Excel
                     // downloads can emit one row for each allocated batch.
@@ -353,7 +383,18 @@ export async function GET(request,{params}) {
                     const waitlistOnly = requestUrl.searchParams.get("waitlist") === "1";
                     const basketType = (requestUrl.searchParams.get("basketType") || "All").trim().toUpperCase();
                     const dealerState = (requestUrl.searchParams.get("dealerState") || "All").trim().slice(0, 100);
+                    const fromDate = (requestUrl.searchParams.get("fromDate") || "").trim();
+                    const toDate = (requestUrl.searchParams.get("toDate") || "").trim();
+                    const productionFilter = params.ids[5] || "All";
                     const designType = basketType === "ATL" ? 1 : basketType === "VCL" ? 2 : null;
+
+                    if ((fromDate || toDate) && (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate) || fromDate > toDate)) {
+                        return Response.json({
+                            status: 400,
+                            success: false,
+                            message: "A valid from and to date are required",
+                        }, { status: 400 });
+                    }
 
                     if (!["GlobalAdmin", "SuperAdmin"].includes(role)) {
                         return Response.json({
@@ -373,6 +414,16 @@ export async function GET(request,{params}) {
 
                     if (waitlistOnly) {
                         where.push("o.productionQty > 0");
+                    }
+
+                    if (fromDate && toDate) {
+                        where.push("((DATE(o.createdOn) BETWEEN ? AND ?) OR (DATE(o.modifiedOn) BETWEEN ? AND ?))");
+                        values.push(fromDate, toDate, fromDate, toDate);
+                    }
+
+                    if (productionFilter !== "All") {
+                        where.push("o.isProduction = ?");
+                        values.push(productionFilter);
                     }
 
                     if (designType !== null) {
@@ -3046,6 +3097,8 @@ export async function GET(request,{params}) {
                     const reportRole = (reportUrl.searchParams.get('role') || '').trim();
                     const basketType = (reportUrl.searchParams.get('basketType') || 'All').trim().toUpperCase();
                     const dealerState = (reportUrl.searchParams.get('dealerState') || 'All').trim().slice(0, 100);
+                    const reportSearch = (reportUrl.searchParams.get('search') || '').trim().slice(0, 100);
+                    const waitlistOnly = reportUrl.searchParams.get('waitlist') === '1';
                     const designType = basketType === 'ATL' ? 1 : basketType === 'VCL' ? 2 : null;
 
                     if (executiveId) {
@@ -3189,6 +3242,10 @@ export async function GET(request,{params}) {
                         query = query.replace(' ORDER BY r.createdOn DESC', ' AND r.userId = ? ORDER BY r.createdOn DESC');
                         queryCount += ' AND r.userId = ?';
                         reportValues.push(executiveId);
+
+                        // The Executive tab is scoped to the same eligible data as its cards.
+                        query = query.replace(' ORDER BY r.createdOn DESC', ' AND r.isDeleted = 0 ORDER BY r.createdOn DESC');
+                        queryCount += ' AND r.isDeleted = 0';
                     }
 
                     if (designType !== null) {
@@ -3202,6 +3259,31 @@ export async function GET(request,{params}) {
                         query = query.replace(' ORDER BY r.createdOn DESC', ` AND ${statePredicate} ORDER BY r.createdOn DESC`);
                         queryCount += ` AND ${statePredicate}`;
                         reportValues.push(dealerState);
+                    }
+
+                    if (executiveId && waitlistOnly) {
+                        query = query.replace(' ORDER BY r.createdOn DESC', ' AND r.productionQty > 0 ORDER BY r.createdOn DESC');
+                        queryCount += ' AND r.productionQty > 0';
+                    }
+
+                    if (executiveId && reportSearch) {
+                        const searchPredicate = `(
+                            r.cartId LIKE ?
+                            OR r.design LIKE ?
+                            OR r.userId LIKE ?
+                            OR r.dealerId LIKE ?
+                            OR u.name LIKE ?
+                            OR EXISTS (
+                                SELECT 1 FROM user u_search_dealer
+                                WHERE u_search_dealer.id = r.dealerId
+                                AND u_search_dealer.name LIKE ?
+                            )
+                            OR p.name LIKE ?
+                            OR r.status LIKE ?
+                        )`;
+                        query = query.replace(' ORDER BY r.createdOn DESC', ` AND ${searchPredicate} ORDER BY r.createdOn DESC`);
+                        queryCount += ` AND ${searchPredicate}`;
+                        reportValues.push(...Array(8).fill(`%${reportSearch}%`));
                     }
 
                     const [rows, fields] = await connection.execute(query, reportValues);

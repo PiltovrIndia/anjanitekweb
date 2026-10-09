@@ -42,12 +42,16 @@ const xlsx = require('xlsx');
 const ORDER_PAGE_SIZE = 0;
 
 // get orders
-const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', dealerState = 'All', signal) => {
+const getOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', dealerState = 'All', fromDate = '', toDate = '', signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
 if (executiveId) searchParams.set('executiveId', executiveId)
 if (basketType !== 'All') searchParams.set('basketType', basketType)
 if (dealerState !== 'All') searchParams.set('dealerState', dealerState)
+if (fromDate && toDate) {
+    searchParams.set('fromDate', fromDate)
+    searchParams.set('toDate', toDate)
+}
 return fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -59,12 +63,16 @@ return fetch("/api/v2/orders_test/"+pass+"/U0.1/"+type+"/"+offset+"/"+role+"/"+u
 };
 
 // get waitlisted order items, grouped by cart
-const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', dealerState = 'All', signal) => {
+const getWaitlistOrdersAPI = async (pass, type, offset, role, userId, sortBy, isProduction, search = '', executiveId = '', basketType = 'All', dealerState = 'All', fromDate = '', toDate = '', signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
 if (executiveId) searchParams.set('executiveId', executiveId)
 if (basketType !== 'All') searchParams.set('basketType', basketType)
 if (dealerState !== 'All') searchParams.set('dealerState', dealerState)
+if (fromDate && toDate) {
+    searchParams.set('fromDate', fromDate)
+    searchParams.set('toDate', toDate)
+}
 return fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+userId+"/"+sortBy+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -76,7 +84,7 @@ return fetch("/api/v2/orders_test/"+pass+"/U0.8/"+type+"/"+offset+"/"+role+"/"+u
 };
 
 // get report specific listing
-const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction, executiveId = '', role = '', basketType = 'All', dealerState = 'All') => {
+const getOrdersByDateAPI = async (pass, type, fromDate, toDate, isProduction, executiveId = '', role = '', basketType = 'All', dealerState = 'All', search = '', waitlistOnly = false) => {
 const searchParams = new URLSearchParams()
 if (executiveId) {
     searchParams.set('executiveId', executiveId)
@@ -84,6 +92,8 @@ if (executiveId) {
 }
 if (basketType !== 'All') searchParams.set('basketType', basketType)
 if (dealerState !== 'All') searchParams.set('dealerState', dealerState)
+if (search.trim()) searchParams.set('search', search.trim())
+if (waitlistOnly) searchParams.set('waitlist', '1')
 return fetch("/api/v2/orders_test/"+pass+"/report/"+type+"/"+encodeURIComponent(fromDate)+","+encodeURIComponent(toDate)+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: {
@@ -93,12 +103,16 @@ return fetch("/api/v2/orders_test/"+pass+"/report/"+type+"/"+encodeURIComponent(
 });
 };
 
-const getExecutiveOrderSummariesAPI = async (pass, type, role, userId, isProduction, { search = '', waitlistOnly = false, basketType = 'All', dealerState = 'All' } = {}, signal) => {
+const getExecutiveOrderSummariesAPI = async (pass, type, role, userId, isProduction, { search = '', waitlistOnly = false, basketType = 'All', dealerState = 'All', fromDate = '', toDate = '' } = {}, signal) => {
 const searchParams = new URLSearchParams()
 if (search.trim()) searchParams.set('search', search.trim())
 if (waitlistOnly) searchParams.set('waitlist', '1')
 if (basketType !== 'All') searchParams.set('basketType', basketType)
 if (dealerState !== 'All') searchParams.set('dealerState', dealerState)
+if (fromDate && toDate) {
+    searchParams.set('fromDate', fromDate)
+    searchParams.set('toDate', toDate)
+}
 return fetch("/api/v2/orders_test/"+pass+"/U0.10/"+type+"/"+role+"/"+userId+"/"+isProduction+(searchParams.size ? `?${searchParams.toString()}` : ''), {
     method: "GET",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -317,6 +331,8 @@ export default function OrdersV2() {
     const [executiveSummariesError, setExecutiveSummariesError] = useState('');
     const [downloadFromDate, setDownloadFromDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
     const [downloadToDate, setDownloadToDate] = useState(dayjs().format('YYYY-MM-DD'));
+    const [executiveFromDate, setExecutiveFromDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
+    const [executiveToDate, setExecutiveToDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [showDownloadPopover, setShowDownloadPopover] = useState(false);
     const [downloadingCartId, setDownloadingCartId] = useState(null);
     const [downloadingSodCartId, setDownloadingSodCartId] = useState(null);
@@ -438,7 +454,14 @@ export default function OrdersV2() {
             user.role,
             user.id,
             isProduction,
-            { search: activeSearchQuery, waitlistOnly: showWaitlist, basketType: basketTypeFilter, dealerState: dealerStateFilter },
+            {
+                search: activeSearchQuery,
+                waitlistOnly: showWaitlist,
+                basketType: basketTypeFilter,
+                dealerState: dealerStateFilter,
+                fromDate: executiveFromDate,
+                toDate: executiveToDate,
+            },
             controller.signal
         )
             .then(async (response) => {
@@ -459,7 +482,7 @@ export default function OrdersV2() {
             });
 
         return () => controller.abort();
-    }, [canBrowseExecutives, user?.role, user?.id, resStatus, isProduction, showWaitlist, activeSearchQuery, basketTypeFilter, dealerStateFilter]);
+    }, [canBrowseExecutives, user?.role, user?.id, resStatus, isProduction, showWaitlist, activeSearchQuery, basketTypeFilter, dealerStateFilter, executiveFromDate, executiveToDate]);
 
     useEffect(() => {
         if (!user?.role || !user?.id) return;
@@ -859,7 +882,15 @@ export default function OrdersV2() {
         append = false,
         waitlistOnly = showWaitlist,
         searchQuery = activeSearchQuery,
-        { signal, keepRows = false, executiveId = selectedExecutiveId, basketType = basketTypeFilter, dealerState = dealerStateFilter } = {}
+        {
+            signal,
+            keepRows = false,
+            executiveId = selectedExecutiveId,
+            basketType = basketTypeFilter,
+            dealerState = dealerStateFilter,
+            fromDate = ordersView === 'executives' && selectedExecutiveId ? executiveFromDate : '',
+            toDate = ordersView === 'executives' && selectedExecutiveId ? executiveToDate : '',
+        } = {}
     ){
         const requestVersion = append ? ordersRequestVersionRef.current : ordersRequestVersionRef.current + 1;
         if (!append) {
@@ -889,8 +920,8 @@ export default function OrdersV2() {
 
         try {    
             const result = await (waitlistOnly
-                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, dealerState, signal)
-                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, dealerState, signal));
+                ? getWaitlistOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, dealerState, fromDate, toDate, signal)
+                : getOrdersAPI(process.env.NEXT_PUBLIC_API_PASS, val, offsetR, userObj['role'], userObj['id'], 'createdOn', productionFilter, searchQuery, executiveId, basketType, dealerState, fromDate, toDate, signal));
             const queryResult = await result.json() // get data
 
             if (!isCurrentRequest()) return false;
@@ -937,7 +968,7 @@ export default function OrdersV2() {
 
     function buildOrderDownloadRows(allOrders = []) {
         return allOrders.flatMap((res) => {
-            const buildRow = (batchNo, rowApprovedQty = res.approvedQty) => ({
+            const buildRow = (batchNo, rowApprovedQty = res.approvedQty, rowProductionQty = 0) => ({
                 Basket: res.cartId || '-',
                 // orderId: res.id,
                 dealerName: res.dealer || '-',
@@ -950,7 +981,7 @@ export default function OrdersV2() {
                 // productId: res.productId || '-',
                 requestedQty: Number(res.requestedQty || 0),
                 approvedQty: Number(rowApprovedQty || 0),
-                productionQty: Number(res.productionQty || 0),
+                productionQty: Number(rowProductionQty || 0),
                 batchNo,
                 stockType: res.stockType || '-',
                 waitlistPosition: res.waitlistPosition || res.waitlistSequence || '-',
@@ -965,12 +996,20 @@ export default function OrdersV2() {
 
             const allocations = Array.isArray(res.batchAllocations) ? res.batchAllocations : [];
             if (allocations.length === 0) {
-                return [buildRow('-')];
+                return [buildRow('-', res.approvedQty, res.productionQty)];
             }
-            return allocations.map((alloc) => {
+
+            // Each allocation is an approved quantity from one batch. Production is
+            // order-level, so export it only once rather than repeating it per batch.
+            const allocationRows = allocations.map((alloc) => {
                 const allocatedQty = Number(alloc.qty || 0);
-                return buildRow(alloc.batchId || 'UNNAMED', allocatedQty);
+                return buildRow(alloc.batchId || 'UNNAMED', allocatedQty, 0);
             });
+            const productionQty = Number(res.productionQty || 0);
+
+            return productionQty > 0
+                ? [...allocationRows, buildRow('-', 0, productionQty)]
+                : allocationRows;
         });
     }
 
@@ -985,24 +1024,31 @@ export default function OrdersV2() {
         const statusToDownload = resStatus || 'All';
         const executiveId = executive?.executiveId || '';
         const isExecutiveCardDownload = source === 'executive-card';
+        const fromDate = isExecutiveCardDownload ? executiveFromDate : downloadFromDate;
+        const toDate = isExecutiveCardDownload ? executiveToDate : downloadToDate;
+
+        if (!fromDate || !toDate || fromDate > toDate) {
+            toast({ description: 'Choose a valid date range before downloading orders' });
+            return;
+        }
 
         if (isExecutiveCardDownload) setDownloadingExecutiveId(executiveId);
         else setDownloadingOrders(true);
         setShowDownloadPopover(false);
 
         try {
-            console.log("/api/v2/orders_test/"+process.env.NEXT_PUBLIC_API_PASS+"/report/"+statusToDownload+"/"+encodeURIComponent(downloadFromDate)+","+encodeURIComponent(downloadToDate)+"/"+isProduction);
-            
             const result = await getOrdersByDateAPI(
                 process.env.NEXT_PUBLIC_API_PASS,
                 statusToDownload,
-                downloadFromDate,
-                downloadToDate,
+                fromDate,
+                toDate,
                 isProduction,
                 executiveId,
                 user?.role || '',
                 basketTypeFilter,
-                dealerStateFilter
+                dealerStateFilter,
+                isExecutiveCardDownload ? activeSearchQuery : '',
+                isExecutiveCardDownload && showWaitlist
             );
             const queryResult = await result.json();
 
@@ -1034,7 +1080,7 @@ export default function OrdersV2() {
 
             const orderRows = buildOrderDownloadRows(allOrders);
             const executiveSuffix = executiveId ? `_executive_${executiveId}` : '';
-            writeOrdersWorkbook(orderRows, `orders${isProduction != 'All' ? (isProduction == 1 ? '_Production' : '_Current') : ''}${executiveSuffix}_${statusToDownload.toLowerCase()}_${downloadFromDate}_to_${downloadToDate}.xlsx`);
+            writeOrdersWorkbook(orderRows, `orders${isProduction != 'All' ? (isProduction == 1 ? '_Production' : '_Current') : ''}${executiveSuffix}_${statusToDownload.toLowerCase()}_${fromDate}_to_${toDate}.xlsx`);
 
             toast({ description: `Downloaded ${allOrders.length} orders (${orderRows.length} rows)${executive?.executiveName ? ` for ${executive.executiveName}` : ''}` });
         } catch (e) {
@@ -1889,7 +1935,10 @@ export default function OrdersV2() {
         const requestedQty = Number(selectedRes?.requestedQty || 0);
         const availableStd = Number(selectedReviewDesign?.std || 0);
 
-        if (!selectedRes?.id || selectedRes.stockType !== 'prm') return;
+        if (!selectedRes?.id || selectedRes.stockType !== 'prm') {
+            toast({ description: 'This order item is no longer available to change to STD.' });
+            return;
+        }
         if (!selectedReviewDesign?.design || selectedReviewDesign.design !== selectedRes.design) {
             toast({ description: 'Restore the requested design before changing its stock type' });
             return;
@@ -1915,7 +1964,7 @@ export default function OrdersV2() {
             const queryResult = await result.json();
 
             if (queryResult.status !== 200) {
-                throw new Error(queryResult.message || 'Unable to change the order to STD');
+                throw new Error(queryResult.error || queryResult.message || 'Unable to change the order to STD');
             }
 
             const data = queryResult.data || {};
@@ -1980,12 +2029,19 @@ export default function OrdersV2() {
             sum + (batch.status === 'Active' ? Number(batch.availableQty || 0) : 0)
         ), 0);
 
-        if (!selectedRes?.id || selectedRes.stockType !== 'std') return;
+        if (!selectedRes?.id || selectedRes.stockType !== 'std') {
+            toast({ description: 'This order item is no longer available to change to PRM.' });
+            return;
+        }
         if (!selectedReviewDesign?.design || selectedReviewDesign.design !== selectedRes.design) {
             toast({ description: 'Restore the requested design before changing its stock type' });
             return;
         }
-        if (loadingDesignBatches || availablePrm < requestedQty) {
+        if (loadingDesignBatches) {
+            toast({ description: 'PRM batch availability is still loading. Please try again in a moment.' });
+            return;
+        }
+        if (availablePrm < requestedQty) {
             toast({ description: `PRM batch stock must be at least ${requestedQty} to change this order` });
             return;
         }
@@ -2006,7 +2062,7 @@ export default function OrdersV2() {
             const queryResult = await result.json();
 
             if (queryResult.status !== 200) {
-                throw new Error(queryResult.message || 'Unable to change the order to PRM');
+                throw new Error(queryResult.error || queryResult.message || 'Unable to change the order to PRM');
             }
 
             const data = queryResult.data || {};
@@ -2214,13 +2270,29 @@ export default function OrdersV2() {
         setResOffset(0);
         setExpandedCartGroups({});
 
-        if (user) {
+        if (user && ordersView !== 'executives') {
             getOrders(resStatus, 0, user, isProduction, false, showWaitlist, getEligibleOrderSearchQuery(), {
                 keepRows: true,
                 executiveId: nextExecutiveId,
             });
         }
     }
+
+    useEffect(() => {
+        if (ordersView !== 'executives' || !selectedExecutiveId || !user?.role || !user?.id) return;
+
+        cancelOrderSearch();
+        setResOffset(0);
+        setExpandedCartGroups({});
+        getOrders(resStatus, 0, user, isProduction, false, showWaitlist, getEligibleOrderSearchQuery(), {
+            keepRows: true,
+            executiveId: selectedExecutiveId,
+            fromDate: executiveFromDate,
+            toDate: executiveToDate,
+        });
+        // The request intentionally follows the dedicated executive period only.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ordersView, selectedExecutiveId, executiveFromDate, executiveToDate, user?.role, user?.id]);
 
     async function handleWaitlistToggle(checked) {
         if (resLoading || isLoadingMore || isSearchingOrders || !user) return;
@@ -2459,19 +2531,45 @@ return (
                   </TabsList>
                   <TabsContent value="executives" className="mt-4">
                       <div className="flex flex-col gap-4">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-end justify-between gap-3">
                               <div>
                                   <h3 className="text-base font-semibold">Executive order activity</h3>
-                                  <p className="text-sm text-muted-foreground">Choose an executive to browse their carts using the current order filters.</p>
+                                  <p className="text-sm text-muted-foreground">Metrics, carts, and downloads use this period and the active order filters.</p>
                               </div>
-                              <div className="relative w-full sm:w-64">
-                                  <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                  <Input
-                                      value={executiveSummaryQuery}
-                                      onChange={(event) => setExecutiveSummaryQuery(event.target.value)}
-                                      placeholder="Search executives..."
-                                      className="pl-8"
-                                  />
+                              <div className="flex w-full flex-wrap items-end gap-2 lg:w-auto">
+                                  <div className="grid grid-cols-2 gap-2">
+                                      <div className="space-y-1">
+                                          <Label htmlFor="executive-from-date" className="text-xs text-muted-foreground">From</Label>
+                                          <Input
+                                              id="executive-from-date"
+                                              type="date"
+                                              value={executiveFromDate}
+                                              max={executiveToDate || undefined}
+                                              onChange={(event) => setExecutiveFromDate(event.target.value)}
+                                              className="w-[148px]"
+                                          />
+                                      </div>
+                                      <div className="space-y-1">
+                                          <Label htmlFor="executive-to-date" className="text-xs text-muted-foreground">To</Label>
+                                          <Input
+                                              id="executive-to-date"
+                                              type="date"
+                                              value={executiveToDate}
+                                              min={executiveFromDate || undefined}
+                                              onChange={(event) => setExecutiveToDate(event.target.value)}
+                                              className="w-[148px]"
+                                          />
+                                      </div>
+                                  </div>
+                                  <div className="relative w-full sm:w-64">
+                                      <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                      <Input
+                                          value={executiveSummaryQuery}
+                                          onChange={(event) => setExecutiveSummaryQuery(event.target.value)}
+                                          placeholder="Search executives..."
+                                          className="pl-8"
+                                      />
+                                  </div>
                               </div>
                           </div>
 
@@ -2557,6 +2655,9 @@ return (
                   <div className="min-w-0">
                       <p className="text-sm text-muted-foreground">Browsing orders created by</p>
                       <p className="truncate font-semibold">{selectedExecutive.executiveName || selectedExecutive.executiveId}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                          {executiveFromDate && executiveToDate ? `${dayjs(executiveFromDate).format('DD MMM YYYY')} to ${dayjs(executiveToDate).format('DD MMM YYYY')}` : 'Selected period'}
+                      </p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => handleExecutiveSelection(null)}>
                       <X className="mr-2 h-4 w-4" /> Clear executive
@@ -3288,9 +3389,10 @@ return (
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        className="h-8 shrink-0 border-blue-200 text-xs text-blue-700 hover:bg-blue-50 hover:text-blue-800"
-                                        disabled={!canChangeToStd || resLoading}
+                                        disabled={resLoading}
+                                        aria-disabled={!canChangeToStd}
                                         onClick={changePrmOrderToStd}
+                                        className={`h-8 shrink-0 border-blue-200 text-xs text-blue-700 hover:bg-blue-50 hover:text-blue-800 ${!canChangeToStd ? 'cursor-not-allowed opacity-50' : ''}`}
                                         title={`STD stock: ${availableStd} available / ${requestedQty} required`}
                                         aria-label={`Change this PRM order to STD. ${availableStd} STD available and ${requestedQty} required`}
                                     >
@@ -3309,11 +3411,12 @@ return (
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        className="h-8 shrink-0 border-violet-200 text-xs text-violet-700 hover:bg-violet-50 hover:text-violet-800"
-                                        disabled={!canChangeToPrm || resLoading}
+                                        disabled={resLoading}
+                                        aria-disabled={!canChangeToPrm}
                                         onClick={changeStdOrderToPrm}
                                         title={loadingDesignBatches ? 'Checking PRM batch stock' : `PRM batch stock: ${availablePrm} available / ${requestedQty} required`}
                                         aria-label={loadingDesignBatches ? 'Checking PRM batch stock' : `Change this STD order to PRM. ${availablePrm} PRM available and ${requestedQty} required`}
+                                        className={`h-8 shrink-0 border-violet-200 text-xs text-violet-700 hover:bg-violet-50 hover:text-violet-800 ${!canChangeToPrm ? 'cursor-not-allowed opacity-50' : ''}`}
                                     >
                                         {resLoading || loadingDesignBatches ? <SpinnerGap className="mr-2 h-4 w-4 animate-spin" /> : null}
                                         Change to PRM
