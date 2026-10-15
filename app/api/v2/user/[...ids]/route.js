@@ -140,16 +140,21 @@ export async function GET(request,{params}) {
                         // get the list of executives mapped to SalesManager
                         const [rows, fields] = await connection.execute('SELECT * FROM user WHERE role="SalesExecutive" AND mapTo="'+params.ids[5]+'"');
                         
-                        // get the list of dealers mapped to each executive
+                        // Include dealers mapped directly to the manager as well as
+                        // dealers mapped through the manager's executives.
                         var dealers = [];
+                        const [directDealers] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+params.ids[5]+'"');
+                        directDealers.map((dealer) => {
+                            dealers.push(dealer.id);
+                        });
+
                         const promises = rows.map(async (row) => {
                             const [rows1, fields1] = await connection.execute('SELECT * FROM user WHERE role="Dealer" AND mapTo="'+row.id+'"');
                             rows1.map((row1) => {
                                 dealers.push(row1.id);
-                                
                             })
                         });
-                        
+
                         await Promise.all(promises);
 
                         if(dealers.length > 0){
