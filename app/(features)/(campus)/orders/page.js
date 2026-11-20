@@ -204,6 +204,15 @@ fetch(`/api/v2/orders_test/${pass}/U0.15/${orderId}/${actorId}/${actionDate}`, {
     },
 });
 
+const rejectSaleOrderAPI = async (pass, orderId, actorId, actionDate, reason) =>
+fetch(`/api/v2/orders_test/${pass}/U0.17/${orderId}/${actorId}/${actionDate}?${new URLSearchParams({ reason }).toString()}`, {
+    method: 'GET',
+    headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+    },
+});
+
 // mark a submitted order item as in review
 const markOrderInReviewAPI = async (pass, orderId, actorId) =>
 fetch("/api/v2/orders_test/"+pass+"/U0.7/"+orderId+"?"+new URLSearchParams({ actorId: actorId || '' }).toString(), {
@@ -378,6 +387,9 @@ export default function OrdersV2() {
     const [showAutoApproveChoice, setShowAutoApproveChoice] = useState(false)
     const [saleOrderCartId, setSaleOrderCartId] = useState(null) // cartId currently being marked as Sale Order
     const [saleOrderOrderId, setSaleOrderOrderId] = useState(null) // order item currently being marked as Sale Order
+    const [saleOrderRejectTarget, setSaleOrderRejectTarget] = useState(null)
+    const [saleOrderRejectReason, setSaleOrderRejectReason] = useState('')
+    const [saleOrderRejectingId, setSaleOrderRejectingId] = useState(null)
     const reviewDesignTimer = useRef(null)
     const reviewDesignRef = useRef(null)
     const ordersEndRef = useRef(null)
@@ -415,6 +427,7 @@ export default function OrdersV2() {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [imageError, setImageError] = useState('');
     const canBrowseExecutives = ['GlobalAdmin', 'SuperAdmin'].includes(user?.role);
+    const canRejectSaleOrders = ['GlobalAdmin', 'SuperAdmin'].includes(user?.role || role);
     const selectedExecutiveId = selectedExecutive?.executiveId || '';
     const shouldShowOrdersListing = !canBrowseExecutives || ordersView === 'orders' || Boolean(selectedExecutiveId);
     
@@ -1117,6 +1130,8 @@ export default function OrdersV2() {
 
     function buildCartSodRows(cartRows = []) {
         return cartRows.flatMap((order) => {
+            if (['Rejected', 'Cancelled', 'OutOfStock', 'Deleted'].includes(order.status)) return [];
+
             const approvedQty = Number(order.approvedQty || 0);
             if (approvedQty <= 0) return [];
 
@@ -1127,7 +1142,7 @@ export default function OrdersV2() {
             const buildRow = (batchId, qty) => ({
                 productCode,
                 productName: order.name || '',
-                batchId: stockType === 'prm' ? (batchId || '') : '',
+                batchId: stockType === 'prm' ? (batchId || '') : 'STD',
                 qty: Number(qty || 0),
             });
 
@@ -1700,6 +1715,95 @@ export default function OrdersV2() {
             toast({ description: error.message || 'Failed to mark order item as Sale Order' });
         } finally {
             setSaleOrderOrderId(null);
+        }
+    }
+
+    function openSaleOrderRejectDialog(order, event) {
+        event?.stopPropagation?.();
+        if (!canRejectSaleOrders || order?.status !== 'SaleOrder' || saleOrderRejectingId) return;
+
+        setSaleOrderRejectTarget(order);
+        setSaleOrderRejectReason('');
+    }
+
+    async function handleRejectSaleOrder() {
+        const order = saleOrderRejectTarget;
+        const reason = saleOrderRejectReason.trim();
+
+        if (!order?.id || !reason) {
+            toast({ description: 'Enter a reason before rejecting this Sale Order.' });
+            return;
+        }
+
+        const actionDate = dayjs().format('YYYY-MM-DD HH:mm:ss');
+        setSaleOrderRejectingId(order.id);
+
+        try {
+            const response = await rejectSaleOrderAPI(
+                process.env.NEXT_PUBLIC_API_PASS,
+                order.id,
+                user?.id,
+                actionDate,
+                reason,
+            );
+            const payload = await response.json();
+
+            if (!response.ok || payload.status !== 200) {
+                throw new Error(payload.message || 'Failed to reject Sale Order item');
+            }
+
+            const data = payload.data || {};
+            const itemPatch = {
+                status: 'Rejected',
+                productionQty: 0,
+                modifiedOn: data.modifiedOn || actionDate,
+                lastActionById: data.lastActionById || user?.id,
+                lastActionByName: data.lastActionByName || user?.name,
+                lastActionType: data.lastActionType || 'SaleOrderRejected',
+                lastActionOn: data.lastActionOn || actionDate,
+            };
+
+            setOrders((previousOrders) => previousOrders.map((group) => {
+                if (!group.rows?.some((row) => String(row.id) === String(order.id))) return group;
+
+                const updatedRows = group.rows.map((row) => (
+                    String(row.id) === String(order.id) ? { ...row, ...itemPatch } : row
+                ));
+                const latestActionRow = updatedRows.reduce((latest, row) => {
+                    if (!row.lastActionOn) return latest;
+                    return !latest?.lastActionOn || new Date(row.lastActionOn) > new Date(latest.lastActionOn) ? row : latest;
+                }, null);
+                const totalRequestedQty = updatedRows.reduce((sum, row) => sum + Number(row.requestedQty || 0), 0);
+                const totalApprovedQty = updatedRows.reduce((sum, row) => sum + Number(row.approvedQty || 0), 0);
+                const totalProductionQty = updatedRows.reduce((sum, row) => sum + Number(row.productionQty || 0), 0);
+
+                return {
+                    ...group,
+                    rows: updatedRows,
+                    first: updatedRows[0] || group.first,
+                    totalRequestedQty,
+                    totalApprovedQty,
+                    totalProductionQty,
+                    requestedQty: totalRequestedQty,
+                    approvedQty: totalApprovedQty,
+                    productionQty: totalProductionQty,
+                    waitlistItems: updatedRows.filter((row) => Number(row.productionQty || 0) > 0).length,
+                    requestTypes: [...new Set(updatedRows.map((row) => Number(row.productionQty || 0) > 0 ? 'Production' : 'Current'))],
+                    statuses: getStatusCounts(updatedRows),
+                    lastActionById: latestActionRow?.lastActionById,
+                    lastActionByName: latestActionRow?.lastActionByName,
+                    lastActionType: latestActionRow?.lastActionType,
+                    lastActionOn: latestActionRow?.lastActionOn,
+                };
+            }));
+
+            toast({ description: 'Sale Order rejected and reserved stock returned.' });
+            setSaleOrderRejectTarget(null);
+            setSaleOrderRejectReason('');
+        } catch (error) {
+            toast({ description: error.message || 'Failed to reject Sale Order item' });
+        } finally {
+            setSaleOrderRejectingId(null);
         }
     }
 
@@ -2851,7 +2955,7 @@ return (
                                                     const hasReviewableItems = groupRows.some((row) => ['Submitted', 'InReview'].includes(row?.status));
                                                     const saleOrderEligible = groupRows.some(r => r?.status === 'Approved') && !groupRows.some(r => ['Submitted', 'InReview'].includes(r?.status));
                                                     const isMarking = saleOrderCartId === group.cartId;
-                                                    const isAnySaleOrderActionPending = Boolean(saleOrderCartId || saleOrderOrderId);
+                                                    const isAnySaleOrderActionPending = Boolean(saleOrderCartId || saleOrderOrderId || saleOrderRejectingId);
                                                     const isDownloadingCart = downloadingCartId === group.cartId;
                                                     const isDownloadingSod = downloadingSodCartId === group.cartId;
                                                     const downloadButton = (
@@ -2900,6 +3004,17 @@ return (
                                                             onClick={(e) => handleMarkSaleOrder(group, e)}
                                                         >
                                                             {isMarking ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'SO'}
+                                                        </Button>
+                                                    ) : null;
+                                                    const saleOrderRejectButton = canRejectSaleOrders && !hasMultipleRows && group.first?.status === 'SaleOrder' ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
+                                                            disabled={isAnySaleOrderActionPending}
+                                                            onClick={(event) => openSaleOrderRejectDialog(group.first, event)}
+                                                        >
+                                                            {saleOrderRejectingId === group.first.id ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'Reject SO'}
                                                         </Button>
                                                     ) : null;
                                                     const sodButton = (
@@ -2952,6 +3067,7 @@ return (
                                                                 <MessageSquare className="h-4 w-4" />
                                                             </Button>
                                                             {saleOrderButton}
+                                                            {saleOrderRejectButton}
                                                             {sodButton}
                                                         </div>
                                                     );
@@ -3050,6 +3166,18 @@ return (
                                                                 onClick={(event) => handleMarkOrderAsSaleOrder(res, event)}
                                                             >
                                                                 {saleOrderOrderId === res.id ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'SO'}
+                                                            </Button>
+                                                        ) : null}
+                                                        {canRejectSaleOrders && res.status === 'SaleOrder' ? (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
+                                                                disabled={Boolean(saleOrderCartId || saleOrderOrderId || saleOrderRejectingId)}
+                                                                title={`Reject Sale Order ${res.design}`}
+                                                                onClick={(event) => openSaleOrderRejectDialog(res, event)}
+                                                            >
+                                                                {saleOrderRejectingId === res.id ? <SpinnerGap className="h-4 w-4 animate-spin" /> : 'Reject SO'}
                                                             </Button>
                                                         ) : null}
                                                     </div>
@@ -3818,6 +3946,50 @@ return (
                 </AlertDialog>
             </DialogContent>
           </Dialog>
+
+          <AlertDialog
+            open={Boolean(saleOrderRejectTarget)}
+            onOpenChange={(open) => {
+                if (!open && !saleOrderRejectingId) {
+                    setSaleOrderRejectTarget(null);
+                    setSaleOrderRejectReason('');
+                }
+            }}
+          >
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Reject Sale Order item?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This returns the reserved {saleOrderRejectTarget?.stockType?.toUpperCase() || 'stock'} quantity for design {saleOrderRejectTarget?.design || '-'} to inventory and marks only this order item as rejected. Do not continue after invoice, dispatch, or physical fulfilment.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-2">
+                    <Label htmlFor="sale-order-rejection-reason">Rejection reason</Label>
+                    <Textarea
+                        id="sale-order-rejection-reason"
+                        value={saleOrderRejectReason}
+                        onChange={(event) => setSaleOrderRejectReason(event.target.value)}
+                        placeholder="Explain why this Sale Order item is being rejected"
+                        maxLength={2000}
+                        disabled={Boolean(saleOrderRejectingId)}
+                    />
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={Boolean(saleOrderRejectingId)}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        className="bg-red-600 text-white hover:bg-red-700"
+                        disabled={!saleOrderRejectReason.trim() || Boolean(saleOrderRejectingId)}
+                        onClick={(event) => {
+                            event.preventDefault();
+                            handleRejectSaleOrder();
+                        }}
+                    >
+                        {saleOrderRejectingId ? <SpinnerGap className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Reject Sale Order
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           
     </div>
 );

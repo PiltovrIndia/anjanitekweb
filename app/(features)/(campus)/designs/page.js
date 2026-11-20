@@ -573,7 +573,7 @@ export default function Products() {
                     index + 1,
                     productCode,
                     product.name || '',
-                    stockType === 'prm' ? (product.batchId || '') : '',
+                    stockType === 'prm' ? (product.batchId || '') : 'STD',
                     '',
                     '',
                     'BOX',

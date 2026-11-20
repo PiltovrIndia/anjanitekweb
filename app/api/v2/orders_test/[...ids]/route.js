@@ -1512,6 +1512,15 @@ export async function GET(request,{params}) {
                     const currentStatus = existingOrder.status;
                     let waitlistAllocations = [];
 
+                    if (currentStatus === 'SaleOrder') {
+                        await rejectConnection.rollback();
+                        return Response.json({
+                            status: 409,
+                            success: false,
+                            message: 'Sale Orders must be rejected through the dedicated Sale Order reversal action',
+                        });
+                    }
+
                     const actor = await resolveOrderActionActor(rejectConnection, adminId);
                     if (!actor) {
                         await rejectConnection.rollback();
@@ -2345,6 +2354,142 @@ export async function GET(request,{params}) {
                 } catch (error) {
                     await connection.rollback();
                     return Response.json({ status: 500, success: false, message: 'Failed to mark order item as Sale Order', error: error.message });
+                } finally {
+                    connection.release();
+                }
+            }
+            // Reject one Sale Order item and return its reserved stock.
+            // /U0.17/$orderId/$actorId/$actionDate?reason=
+            else if (params.ids[1] === "U0.17") {
+                const orderId = params.ids[2];
+                const actorId = params.ids[3];
+                const actionDate = params.ids[4] || new Date();
+                const reason = (new URL(request.url).searchParams.get('reason') || '').trim().slice(0, 2000);
+
+                if (!orderId || !actorId || !reason) {
+                    connection.release();
+                    return Response.json({
+                        status: 400,
+                        success: false,
+                        message: 'An order item, active administrator, and rejection reason are required',
+                    });
+                }
+
+                try {
+                    await connection.beginTransaction();
+
+                    const [actorRows] = await connection.query(
+                        `SELECT id, name, role
+                         FROM user
+                         WHERE id = ? AND isActive = 1
+                         LIMIT 1`,
+                        [actorId]
+                    );
+                    const actor = actorRows[0];
+
+                    if (!actor) {
+                        await connection.rollback();
+                        return Response.json({ status: 400, success: false, message: 'A valid active user is required to take order actions' });
+                    }
+                    if (!['GlobalAdmin', 'SuperAdmin'].includes(actor.role)) {
+                        await connection.rollback();
+                        return Response.json({ status: 403, success: false, message: 'Only administrators can reject Sale Orders' });
+                    }
+
+                    const [orderRows] = await connection.query(
+                        `SELECT id, cartId, design, stockType, status, approvedQty
+                         FROM orders
+                         WHERE id = ? AND isDeleted = 0
+                         FOR UPDATE`,
+                        [orderId]
+                    );
+                    const order = orderRows[0];
+
+                    if (!order) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Order item not found' });
+                    }
+                    if (order.status !== 'SaleOrder') {
+                        await connection.rollback();
+                        return Response.json({ status: 409, success: false, message: 'Only Sale Order items can be rejected with this action' });
+                    }
+
+                    const [productRows] = await connection.query(
+                        `SELECT productId
+                         FROM products
+                         WHERE design = ?
+                         LIMIT 1
+                         FOR UPDATE`,
+                        [order.design]
+                    );
+                    if (productRows.length === 0) {
+                        await connection.rollback();
+                        return Response.json({ status: 404, success: false, message: 'Product not found for this Sale Order item' });
+                    }
+
+                    const releasedQty = Number(order.approvedQty || 0);
+                    let releasedBatches = [];
+
+                    if (releasedQty > 0) {
+                        if (order.stockType === 'prm') {
+                            const releaseResult = await releasePrmToBatches(connection, {
+                                orderId: order.id,
+                                design: order.design,
+                                qty: releasedQty,
+                                adminId: actor.id,
+                            });
+                            const batches = await lockPrmBatches(connection, order.design);
+                            const availablePrm = batches.reduce((sum, batch) => sum + Number(batch.availableQty || 0), 0);
+                            await connection.query('UPDATE products SET prm = ? WHERE design = ?', [availablePrm, order.design]);
+                            releasedBatches = releaseResult.released;
+                        }
+                        else {
+                            const stockColumn = getStockColumn(order.stockType);
+                            await connection.query(
+                                `UPDATE products SET ${stockColumn} = ${stockColumn} + ? WHERE design = ?`,
+                                [releasedQty, order.design]
+                            );
+                        }
+                    }
+
+                    await connection.query(
+                        `UPDATE orders
+                         SET status = 'Rejected', productionQty = 0, modifiedOn = ?
+                         WHERE id = ? AND isDeleted = 0`,
+                        [actionDate, order.id]
+                    );
+                    await recordOrderAction(connection, {
+                        orderId: order.id,
+                        cartId: order.cartId,
+                        actor,
+                        actionType: 'SaleOrderRejected',
+                        actionOn: actionDate,
+                        actionNotes: reason,
+                    });
+
+                    await connection.commit();
+                    return Response.json({
+                        status: 200,
+                        success: true,
+                        message: 'Sale Order item rejected and reserved stock returned',
+                        data: {
+                            orderId: order.id,
+                            cartId: order.cartId,
+                            status: 'Rejected',
+                            approvedQty: releasedQty,
+                            productionQty: 0,
+                            releasedQty,
+                            releasedBatches,
+                            modifiedOn: actionDate,
+                            lastActionById: actor.id,
+                            lastActionByName: actor.name,
+                            lastActionType: 'SaleOrderRejected',
+                            lastActionOn: actionDate,
+                        },
+                    });
+                } catch (error) {
+                    await connection.rollback();
+                    return Response.json({ status: 500, success: false, message: 'Failed to reject Sale Order item', error: error.message });
                 } finally {
                     connection.release();
                 }
