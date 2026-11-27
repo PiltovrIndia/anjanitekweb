@@ -12,7 +12,7 @@ export async function send_notification(message, recipients) {
     for (let offset = 0; offset < userIds.length; offset += 500) {
       const ids = userIds.slice(offset, offset + 500);
       const [rows] = await pool.query(
-        `SELECT d.token, d.token_hash FROM notification_devices d JOIN user u ON u.id = d.user_id WHERE u.isActive = 1 AND d.user_id IN (${ids.map(() => '?').join(',')})`, ids);
+        `SELECT d.token, d.token_hash FROM notification_devices d JOIN user u ON u.id = d.user_id COLLATE utf8mb4_general_ci WHERE u.isActive = 1 AND d.user_id COLLATE utf8mb4_general_ci IN (${ids.map(() => '?').join(',')})`, ids);
       devices.push(...rows);
     }
     let sent = 0;
