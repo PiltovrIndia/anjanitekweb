@@ -217,11 +217,11 @@ export async function GET(request,{params}) {
                         // }
                     }
                     
-                    const [nrows] = await connection.execute(`SELECT gcm_regId FROM user where role='SuperAdmin'`);
+                    const [nrows] = await connection.execute(`SELECT id as gcm_regId FROM user where role='SuperAdmin'`);
                     const [nrows1] = await connection.execute(`SELECT id, relatedTo FROM user where mapTo ='${params.ids[5]}'`);
                     connection.release();
 
-                    var gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
+                    var gcmIds = nrows.map(r => r.gcm_regId).filter(Boolean);
                     // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
                     if(nrows1.length > 0){
                         for (let index = 0; index < nrows1.length; index++) {
@@ -298,11 +298,11 @@ export async function GET(request,{params}) {
                         }
                     }
                     
-                    const [nrows] = await connection.execute(`SELECT gcm_regId FROM user where role='SuperAdmin'`);
+                    const [nrows] = await connection.execute(`SELECT id as gcm_regId FROM user where role='SuperAdmin'`);
                     const [nrows1] = await connection.execute(`SELECT id, relatedTo FROM user where mapTo ='${params.ids[5]}'`);
                     connection.release();
 
-                    var gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
+                    var gcmIds = nrows.map(r => r.gcm_regId).filter(Boolean);
                     // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
                     if(nrows1.length > 0){
                         for (let index = 0; index < nrows1.length; index++) {
@@ -539,11 +539,11 @@ export async function POST(request, {params}) {
 
                     await connection.commit();
 
-                    const [nrows] = await connection.execute(`SELECT gcm_regId FROM user where role='SuperAdmin'`);
+                    const [nrows] = await connection.execute(`SELECT id as gcm_regId FROM user where role='SuperAdmin'`);
                     const [nrows1] = await connection.execute(`SELECT id, relatedTo FROM user where mapTo ='${params.ids[5]}'`);
                     connection.release();
 
-                    var gcmIds = nrows.map(r => r.gcm_regId).filter(id => id && id.length > 3);
+                    var gcmIds = nrows.map(r => r.gcm_regId).filter(Boolean);
                     // nrows1 has 2 columns one is id which we can add to the gcmIds directly the other is relatedTo which will be comma separated string, lets split and add into gcmIds
                     if(nrows1.length > 0){
                         for (let index = 0; index < nrows1.length; index++) {

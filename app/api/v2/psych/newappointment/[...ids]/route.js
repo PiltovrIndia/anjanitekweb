@@ -46,13 +46,13 @@ export async function GET(request,{params}) {
                         // sendSMS(params.ids[11], params.ids[12], dayjs(params.ids[6]).format('DD-MM-YY hh:mm A'), dayjs(params.ids[7]).format('YYYY-MM-DD'))
 
                         // get the gcm_regIds of SuperAdmin and branch admin to notify
-                        const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin_P")');
+                        const [nrows, nfields] = await connection.execute('SELECT id as gcm_regId FROM `user` where role IN ("SuperAdmin_P")');
 
                         // get the gcm_regIds list from the query result
                         var gcmIds = [];
                         for (let index = 0; index < nrows.length; index++) {
                           const element = nrows[index].gcm_regId;
-                          if(element.length > 3)
+                          if(element && element.length > 0)
                             gcmIds.push(element); 
                         }
 

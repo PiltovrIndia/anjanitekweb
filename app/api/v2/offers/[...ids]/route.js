@@ -26,7 +26,7 @@ export async function GET(request,{params}) {
                     const q = 'INSERT INTO offer_event (title, description, media, isOpen, createdBy, createdOn) VALUES ( ?, ?, ?, ?, ?, ?)';
                     const [rows, fields] = await connection.execute(q, [ decodeURIComponent(params.ids[2]), decodeURIComponent(params.ids[3]), media, 1, params.ids[5], currentDate ]);
                     
-                    const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM users where role='Dealer' and isActive=1 and gcm_regId IS NOT NULL and gcm_regId != ''`);
+                    const [nrows, nfields] = await connection.execute(`SELECT id as gcm_regId FROM user where role='Dealer' and isActive=1`);
                     connection.release();
                         // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         
@@ -35,7 +35,7 @@ export async function GET(request,{params}) {
                         for (let index = 0; index < nrows.length; index++) {
                           const element = nrows[index].gcm_regId;
                         
-                          if(element.length > 3)
+                          if(element && element.length > 0)
                             gcmIds.push(element); 
                           }
 
@@ -163,4 +163,3 @@ export async function GET(request,{params}) {
   
 
 
-    

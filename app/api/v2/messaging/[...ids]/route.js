@@ -51,15 +51,15 @@ export async function GET(request,{params}) {
                         var conditionsString = '';
                         var query = '';
                         if(params.ids[3]!='All'){ 
-                            query = 'SELECT gcm_regId FROM user where id="'+params.ids[3]+'" AND CHAR_LENGTH(gcm_regId) > 3';
+                            query = 'SELECT id as gcm_regId FROM user where id="'+params.ids[3]+'"';
                         }
                         else {
                             // check if state is provided?
                             if(params.ids[7] == '-'){
-                              query = 'SELECT gcm_regId from user where role="Dealer" AND CHAR_LENGTH(gcm_regId) > 3'
+                              query = 'SELECT id as gcm_regId from user where role="Dealer"'
                             }
                             else {
-                              query = 'SELECT u.gcm_regId from user u JOIN dealer d ON d.dealerId=u.id where u.role="Dealer" AND d.state="'+params.ids[7]+'" AND CHAR_LENGTH(u.gcm_regId) > 3'
+                              query = 'SELECT u.id as gcm_regId from user u JOIN dealer d ON d.dealerId=u.id where u.role="Dealer" AND d.state="'+params.ids[7]+'"'
                             }
                         }
                         const [nrows, nfields] = await connection.execute(query);
@@ -70,7 +70,7 @@ export async function GET(request,{params}) {
                         for (let index = 0; index < nrows.length; index++) {
                           const element = nrows[index].gcm_regId;
                         
-                          if(element.length > 3)
+                          if(element && element.length > 0)
                             gcmIds.push(element); 
                         }
 
@@ -403,6 +403,5 @@ export async function GET(request,{params}) {
   
 
 
-    
     
     

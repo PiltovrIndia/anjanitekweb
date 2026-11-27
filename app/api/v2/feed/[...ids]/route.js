@@ -370,7 +370,7 @@ export async function GET(request,{params}) {
                         // }
                         
                         // // const [nrows, nfields] = await connection.execute('SELECT gcm_regId FROM `user` where role IN ("SuperAdmin") or (role="Admin" AND branch = ?)', [ rows1[0].branch ],);
-                        const [nrows, nfields] = await connection.execute(`SELECT gcm_regId FROM user where isActive = 1`);
+                        const [nrows, nfields] = await connection.execute(`SELECT id as gcm_regId FROM user where isActive = 1`);
                         connection.release();
                         // console.log(`SELECT gcm_regId FROM users where ${conditionsString} `);
                         
@@ -379,7 +379,7 @@ export async function GET(request,{params}) {
                         for (let index = 0; index < nrows.length; index++) {
                           const element = nrows[index].gcm_regId;
                         //   console.log(element)
-                          if(element.length > 3)
+                          if(element && element.length > 0)
                             gcmIds.push(element); 
                         }
 
@@ -595,10 +595,10 @@ export async function POST(request, { params }) {
             [result.insertId]
         );
 
-        const [notificationRows] = await connection.execute('SELECT gcm_regId FROM user WHERE isActive = 1');
+        const [notificationRows] = await connection.execute('SELECT id as gcm_regId FROM user WHERE isActive = 1');
         const gcmIds = notificationRows
             .map((row) => String(row.gcm_regId || ''))
-            .filter((id) => id.length > 3);
+            .filter((id) => id.length > 0);
         const notification = gcmIds.length > 0
             ? await send_notification(message, gcmIds, 'Multiple')
             : null;

@@ -618,7 +618,7 @@ export async function POST(request, {params}) {
 
         // get the gcm_regIds of Students to notify
             // Split the branches string into an array
-            var query = 'SELECT u.name, u.mapTo, u.gcm_regId, (SELECT gcm_regId from user where id=u.mapTo)  as mappedTo FROM user u where u.id="'+id+'" AND CHAR_LENGTH(u.gcm_regId) > 3';
+            var query = 'SELECT u.name, u.mapTo, u.id as gcm_regId, u.mapTo as mappedTo FROM user u where u.id="'+id+'"';
             const [nrows, nfields] = await connection.execute(query);
             
             // console.log(query);
@@ -631,12 +631,12 @@ export async function POST(request, {params}) {
               const element1 = nrows[index].mappedTo;
               const dealer_name = nrows[index].name;
             
-              if(element.length > 3){
+              if(element && element.length > 0){
                 gcmIds.push(element); 
                 // send notification to the dealer
                 const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+id, element, 'Single');
               }
-              if(element1.length > 3){
+              if(element1 && element1.length > 0){
                 gcmIds.push(element1); 
                 // send notification to the executive
                 const notificationResult = await send_notification('Payment of ₹'+amount+' is updated for '+dealer_name, element1, 'Single');

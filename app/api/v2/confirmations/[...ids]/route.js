@@ -120,7 +120,7 @@ export async function GET(request,{params}) {
                     
                     if(rows.affectedRows > 0){
                         // send notification to all dealers
-                        const [rowsD, fieldsD] = await connection.execute('SELECT gcm_regId FROM user WHERE role="Dealer" AND isActive=1');
+                        const [rowsD, fieldsD] = await connection.execute('SELECT id as gcm_regId FROM user WHERE role="Dealer" AND isActive=1');
 
                         var gcm_regIds = [];
                         rowsD.map((item) => {
